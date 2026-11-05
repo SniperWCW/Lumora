@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lumora.js'
+      - 'hacs.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Syntax check
+        run: |
+          cp lumora.js "$RUNNER_TEMP/lumora.mjs"
+          node --check "$RUNNER_TEMP/lumora.mjs"
+
+      - name: Calculate next version
+        id: version
+        run: |
+          last=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          if [ -z "$last" ]; then
+            next="0.1.0"
+          else
+            IFS=. read -r major minor patch <<< "${last#v}"
+            msgs=$(git log "$last..HEAD" --format=%B)
+            if echo "$msgs" | grep -qE 'BREAKING CHANGE|^[a-z]+(\(.+\))?!:'; then
+              major=$((major+1)); minor=0; patch=0
+            elif echo "$msgs" | grep -qE '^feat(\(.+\))?:'; then
+              minor=$((minor+1)); patch=0
+            else
+              patch=$((patch+1))
+            fi
+            next="$major.$minor.$patch"
+          fi
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "Next version: v$next (previous: ${last:-none})"
+
+      - name: Build release asset
+        run: |
+          mkdir -p dist
+          sed -E "s/^const VERSION = '[^']*';/const VERSION = '${{ steps.version.outputs.version }}';/" lumora.js > dist/lumora.js
+          grep -n "^const VERSION" dist/lumora.js
+
+      - name: Create tag and release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v="v${{ steps.version.outputs.version }}"
+          gh release create "$v" dist/lumora.js hacs.json \
+            --target "$GITHUB_SHA" \
+            --title "Lumora $v" \
+            --generate-notes
