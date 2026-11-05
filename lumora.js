@@ -1,6 +1,6 @@
 /* Lumora v0.1.0
  * Schnelle, abhängigkeitsfreie Karte: Startseite mit gefilterten Meldungen + Räume je Etage/Area + Kameras.
- * Einbindung: Ressource /local/lumora/lumora.js (Typ: JavaScript-Modul), Karte: type: custom:lumora-card (Panel-Ansicht).
+ * Einbindung: Ressource /local/lumora/lumora.js (Typ: JavaScript-Modul), Karte: type: custom:lumora-card (Panel-Ansicht). Optional: theme: forest.
  */
 const VERSION = '0.1.0';
 const KEY = 'lumora_panel';
@@ -9,6 +9,8 @@ const DEF = {
   excludeEntities: [],
   excludeAreas: ['fahrzeug'],
   pinned: [],
+  hidden: [],
+  hiddenAreas: [],
 };
 const OUTDOOR = ['garten', 'aussenbereich_vorne', 'fahrzeug', 'system', 'allgemein'];
 const DOM_ICON = {
@@ -55,57 +57,70 @@ const cleanName = (n) => {
 };
 
 const CSS = `
-:host{display:block;height:calc(100vh - var(--header-height,56px));height:calc(100dvh - var(--header-height,56px));color:#fff;
- font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;--a:rgba(255,255,255,.12);--b:rgba(255,255,255,.2)}
+:host{display:block;height:calc(100vh - var(--header-height,56px));height:calc(100dvh - var(--header-height,56px));
+ --fg:#3b3226;--fg2:rgba(59,50,38,.68);--a:rgba(110,88,56,.11);--b:rgba(255,255,255,.75);--from:#f2eadb;--to:#d6c5a8;
+ --sheet:#f6f0e4;--selbg:#4a3c2b;--selfg:#f6f0e4;--accent:#e6b655;--accentfg:#3a2a00;--line:rgba(59,50,38,.12);--nav:rgba(255,255,255,.5);
+ --bad:rgba(205,65,50,.25);--badfg:#7d1f16;--warn:rgba(224,160,40,.32);--okbg:rgba(100,150,80,.22);--scrim:rgba(40,30,15,.45);--shadow:0 1px 3px rgba(80,60,30,.14);
+ color:var(--fg);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+:host([theme=forest]){--fg:#fff;--fg2:rgba(255,255,255,.72);--a:rgba(255,255,255,.12);--b:rgba(255,255,255,.2);--from:#5b7248;--to:#232f21;
+ --sheet:#1f2a1e;--selbg:rgba(255,255,255,.88);--selfg:#223;--line:rgba(255,255,255,.1);--nav:rgba(0,0,0,.18);
+ --bad:rgba(244,67,54,.5);--badfg:#fff;--warn:rgba(255,193,7,.28);--okbg:rgba(120,200,120,.25);--scrim:rgba(0,0,0,.55);--shadow:none}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-.app{height:100%;display:flex;flex-direction:column;background:linear-gradient(165deg,var(--zp-from,#5b7248) 0%,var(--zp-to,#232f21) 100%)}
+.app{height:100%;display:flex;flex-direction:column;background:linear-gradient(165deg,var(--zp-from,var(--from)) 0%,var(--zp-to,var(--to)) 100%)}
 .body{flex:1;overflow:auto;padding:20px 18px 16px}
 .top{display:flex;align-items:center;gap:12px}
 .logo{width:48px;height:48px;border-radius:14px;background:var(--a);display:grid;place-items:center}
 .ttl{font-size:18px;font-weight:600;flex:1}
-.pill{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:99px;background:var(--a);font-size:14px;cursor:pointer;border:0;color:inherit;font:inherit;font-size:14px}
-.pill.warn{background:rgba(255,193,7,.28)}.pill.bad{background:rgba(244,67,54,.5)}.pill.ok{background:rgba(120,200,120,.25)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:99px;background:var(--a);cursor:pointer;border:0;color:inherit;font:inherit;font-size:14px}
+.pill.warn{background:var(--warn)}.pill.bad{background:var(--bad);color:var(--badfg)}.pill.ok{background:var(--okbg)}
 .pill ha-icon{--mdc-icon-size:18px}
-.meta{margin:26px 0 6px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.75)}
+.meta{margin:26px 0 6px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg2)}
 h1{margin:0 0 14px;font-size:clamp(42px,12vw,64px);line-height:1.05;font-weight:600;letter-spacing:-.02em}
-.note{display:flex;gap:10px;align-items:center;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.8);margin-bottom:14px;cursor:pointer}
+.note{display:flex;gap:10px;align-items:center;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg2);margin-bottom:14px;cursor:pointer}
 .note ha-icon{--mdc-icon-size:20px;flex:none}
 .pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7);display:flex;justify-content:space-between;align-items:center}
+h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);display:flex;justify-content:space-between;align-items:center}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 @media(min-width:760px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .card,.tile{background:var(--a);border-radius:18px;padding:14px;display:flex;gap:12px;align-items:center;min-width:0;position:relative;cursor:pointer}
 .card{flex-direction:column;align-items:flex-start;gap:8px;min-height:92px}
 .card b,.tile b{display:block;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card span,.tile span{font-size:12.5px;color:rgba(255,255,255,.7)}
+.card span,.tile span{font-size:12.5px;color:var(--fg2)}
 .card ha-icon{--mdc-icon-size:24px}
-.card.add{border:1.5px dashed rgba(255,255,255,.35);background:transparent;justify-content:center;align-items:center;flex-direction:row;color:rgba(255,255,255,.75)}
-.card .x{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.35);display:grid;place-items:center}
+.card.add{border:1.5px dashed var(--fg2);background:transparent;justify-content:center;align-items:center;flex-direction:row;color:var(--fg2)}
+.x,.mini{border:0;color:inherit;display:grid;place-items:center;cursor:pointer;padding:0}
+.card .x{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.35);color:#fff}
+.mini{width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.1)}
+.mini ha-icon{--mdc-icon-size:16px}
+.pill .mini{width:20px;height:20px;margin:0 -6px 0 2px}
+.tile .mini,.cam .mini{position:absolute;top:6px;right:6px}
+.cam .mini{background:rgba(0,0,0,.55);color:#fff;top:8px;right:8px}
+.hid{opacity:.45}
 .tile .ic{width:42px;height:42px;border-radius:50%;background:var(--a);display:grid;place-items:center;flex:none}
 .tile .tx{min-width:0;flex:1}
-.tile.on{background:var(--b)}.tile.on .ic{background:rgba(255,214,102,.85);color:#3a2a00}
+.tile.on{background:var(--b);box-shadow:var(--shadow)}.tile.on .ic{background:var(--accent);color:var(--accentfg)}
 .tile.sens .ic{background:transparent}
 .cams{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
 .cam{border-radius:18px;overflow:hidden;background:rgba(0,0,0,.3);position:relative;aspect-ratio:16/9;cursor:pointer}
 .cam img{width:100%;height:100%;object-fit:cover;display:block}
-.cam span{position:absolute;left:10px;bottom:8px;font-size:13px;background:rgba(0,0,0,.45);padding:3px 9px;border-radius:99px}
+.cam span.n{position:absolute;left:10px;bottom:8px;font-size:13px;background:rgba(0,0,0,.5);color:#fff;padding:3px 9px;border-radius:99px}
 .tabs{display:flex;gap:8px;overflow:auto;padding-bottom:8px;margin:0 -2px}
-.tabs .pill{white-space:nowrap}.pill.sel{background:rgba(255,255,255,.88);color:#223}
-.rh{display:flex;justify-content:space-between;align-items:flex-end;margin:10px 0 12px}
-.rh h2{margin:0;font-size:30px;font-weight:600}.rh span{font-size:14px;color:rgba(255,255,255,.75)}
-.empty{color:rgba(255,255,255,.6);font-size:14px;padding:10px 0}
-.nav{display:flex;gap:8px;padding:10px 14px calc(12px + env(safe-area-inset-bottom));background:rgba(0,0,0,.18)}
-.nav button{flex:1;border:0;background:transparent;color:rgba(255,255,255,.7);display:flex;flex-direction:column;align-items:center;gap:2px;font:inherit;font-size:12px;padding:6px;border-radius:99px;cursor:pointer}
-.nav button.sel{background:var(--b);color:#fff}.nav ha-icon{--mdc-icon-size:22px}
-.sbg{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;z-index:5}
-.sheet{width:100%;max-width:560px;max-height:82%;overflow:auto;background:#1f2a1e;border-radius:24px 24px 0 0;padding:18px 18px 28px}
-.sheet h2{margin:0 0 12px;font-size:20px}.sheet h4{margin:18px 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6);font-weight:500}
-.row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)}
-.row .t{flex:1;min-width:0}.row .t b{display:block;font-size:15px;font-weight:500}.row .t span{font-size:12.5px;color:rgba(255,255,255,.6)}
+.tabs .pill{white-space:nowrap}.pill.sel{background:var(--selbg);color:var(--selfg)}
+.rh{display:flex;justify-content:space-between;align-items:center;margin:10px 0 12px;gap:10px}
+.rh h2{margin:0;font-size:30px;font-weight:600}.rh .inf{font-size:14px;color:var(--fg2);display:flex;gap:10px;align-items:center}
+.empty{color:var(--fg2);font-size:14px;padding:10px 0}
+.nav{display:flex;gap:8px;padding:10px 14px calc(12px + env(safe-area-inset-bottom));background:var(--nav)}
+.nav button{flex:1;border:0;background:transparent;color:var(--fg2);display:flex;flex-direction:column;align-items:center;gap:2px;font:inherit;font-size:12px;padding:6px;border-radius:99px;cursor:pointer}
+.nav button.sel{background:var(--b);color:var(--fg)}.nav ha-icon{--mdc-icon-size:22px}
+.sbg{position:absolute;inset:0;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;z-index:5}
+.sheet{width:100%;max-width:560px;max-height:82%;overflow:auto;background:var(--sheet);border-radius:24px 24px 0 0;padding:18px 18px 28px}
+.sheet h2{margin:0 0 12px;font-size:20px}.sheet h4{margin:18px 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);font-weight:500}
+.row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.row .t{flex:1;min-width:0}.row .t b{display:block;font-size:15px;font-weight:500}.row .t span{font-size:12.5px;color:var(--fg2)}
 .row button{border:0;border-radius:99px;padding:7px 12px;background:var(--a);color:inherit;font:inherit;font-size:13px;cursor:pointer}
-.row button.sel{background:rgba(255,255,255,.88);color:#223}
-.srch{width:100%;padding:12px 14px;border-radius:12px;border:0;background:var(--a);color:#fff;font:inherit;font-size:15px;margin-bottom:10px;outline:none}
-.srch::placeholder{color:rgba(255,255,255,.5)}
+.row button.sel{background:var(--selbg);color:var(--selfg)}
+.srch{width:100%;padding:12px 14px;border-radius:12px;border:0;background:var(--a);color:var(--fg);font:inherit;font-size:15px;margin-bottom:10px;outline:none}
+.srch::placeholder{color:var(--fg2)}
 `;
 
 class LumoraCard extends HTMLElement {
@@ -122,6 +137,7 @@ class LumoraCard extends HTMLElement {
   }
   setConfig(cfg) {
     this._cfg = cfg || {};
+    if (cfg && cfg.theme) this.setAttribute('theme', cfg.theme);
     if (cfg && cfg.color_from) this.style.setProperty('--zp-from', cfg.color_from);
     if (cfg && cfg.color_to) this.style.setProperty('--zp-to', cfg.color_to);
   }
@@ -148,7 +164,7 @@ class LumoraCard extends HTMLElement {
     }
   }
   _signature() {
-    const h = this._hass; const parts = [this._view, this._floor, this._area, this._sheet, this._edit, Math.floor(Date.now() / 60000), this._set.pinned.length];
+    const h = this._hass; const parts = [this._view, this._floor, this._area, this._sheet, this._edit, Math.floor(Date.now() / 60000), this._set.pinned.length, this._set.hidden.length, this._set.hiddenAreas.length];
     const doms = ['light', 'media_player', 'vacuum', 'person', 'alarm_control_panel', 'lock', 'binary_sensor', 'camera', 'switch', 'cover', 'climate', 'fan'];
     for (const id in h.states) {
       const d = dom(id);
@@ -292,6 +308,7 @@ class LumoraCard extends HTMLElement {
       const d = dom(id); if (!ROOM_DOMAINS.includes(d)) continue;
       const r = h.entities && h.entities[id]; if (!r || r.hidden || r.entity_category) continue;
       const a = this._areaOf(id); if (!a) continue;
+      if (this._set.hidden.includes(id) && !this._edit) continue;
       const st = h.states[id]; const dc = st.attributes.device_class;
       if (d === 'binary_sensor' && !BS_CLASSES.includes(dc)) continue;
       if (d === 'sensor' && !['temperature', 'humidity', ...SENSOR_CLASSES].includes(dc)) continue;
@@ -300,6 +317,7 @@ class LumoraCard extends HTMLElement {
     const floors = {};
     const fl = h.floors || {};
     Object.keys(areas).forEach((aid) => {
+      if (this._set.hiddenAreas.includes(aid) && !this._edit) return;
       const fid = (h.areas && h.areas[aid] && h.areas[aid].floor_id) || '_';
       (floors[fid] || (floors[fid] = { id: fid, name: fid === '_' ? 'Sonstige' : (fl[fid] && fl[fid].name) || fid, level: fid === '_' ? 99 : (fl[fid] && fl[fid].level) ?? 50, areas: [] })).areas.push({ id: aid, name: this._aname(aid) || aid, ents: areas[aid] });
     });
@@ -314,7 +332,7 @@ class LumoraCard extends HTMLElement {
     this._floor = f.id;
     let a = f.areas.find((x) => x.id === this._area) || f.areas[0]; this._area = a.id;
     const ftabs = floors.map((x) => `<button class="pill ${x.id === f.id ? 'sel' : ''}" data-act="floor" data-id="${x.id}">${esc(x.name)}</button>`).join('');
-    const atabs = f.areas.map((x) => `<button class="pill ${x.id === a.id ? 'sel' : ''}" data-act="area" data-id="${x.id}">${esc(x.name)}</button>`).join('');
+    const atabs = f.areas.map((x) => { const hd = this._set.hiddenAreas.includes(x.id); return `<button class="pill ${x.id === a.id ? 'sel' : ''} ${hd ? 'hid' : ''}" data-act="area" data-id="${x.id}">${esc(x.name)}${this._edit ? `<span class="mini" data-act="hidearea" data-id="${x.id}"><ha-icon icon="${hd ? 'mdi:eye' : 'mdi:eye-off'}"></ha-icon></span>` : ''}</button>`; }).join('');
     const ents = a.ents; const info = [];
     const t = ents.find((s) => s.attributes.device_class === 'temperature' && !isNaN(parseFloat(s.state)));
     const c = ents.find((s) => dom(s.entity_id) === 'climate' && typeof s.attributes.current_temperature === 'number');
@@ -326,26 +344,28 @@ class LumoraCard extends HTMLElement {
       .sort((x, y) => ROOM_DOMAINS.indexOf(dom(x.entity_id)) - ROOM_DOMAINS.indexOf(dom(y.entity_id)))
       .map((s) => this._tile(s, a.name)).join('');
     return `<div class="tabs">${ftabs}</div><div class="tabs">${atabs}</div>
-      <div class="rh"><h2>${esc(a.name)}</h2><span>${info.join(' · ')}</span></div>
+      <div class="rh"><h2>${esc(a.name)}</h2><div class="inf"><span>${info.join(' · ')}</span>${this._editBtn()}</div></div>
       ${cams.length ? `<div class="cams" style="margin-bottom:10px">${cams.map((s) => this._camHtml(s)).join('')}</div>` : ''}
       <div class="grid">${tiles || '<div class="empty">Keine Geräte in diesem Raum.</div>'}</div>`;
   }
+  _editBtn() { return `<button class="pill" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button>`; }
+  _hideBtn(id) { const hd = this._set.hidden.includes(id); return this._edit ? `<span class="mini" data-act="hidee" data-id="${id}"><ha-icon icon="${hd ? 'mdi:eye' : 'mdi:eye-off'}"></ha-icon></span>` : ''; }
   _tile(st, area) {
     const d = dom(st.entity_id); const on = !INACTIVE.includes(st.state);
     let n = st.attributes.friendly_name || st.entity_id;
     if (n.toLowerCase().startsWith(area.toLowerCase() + ' ') && n.length > area.length + 1) n = n.slice(area.length + 1);
     const sens = d === 'sensor' ? 'sens' : '';
     const bad = d === 'binary_sensor' && st.state === 'on' && ['door', 'window', 'opening', 'smoke', 'moisture', 'gas'].includes(st.attributes.device_class);
-    return `<div class="tile ${on || bad ? 'on' : ''} ${sens}"><div class="ic" data-act="toggle" data-id="${st.entity_id}"><ha-icon icon="${this._icon(st)}"></ha-icon></div>
+    return `<div class="tile ${on || bad ? 'on' : ''} ${sens} ${this._set.hidden.includes(st.entity_id) ? 'hid' : ''}">${this._hideBtn(st.entity_id)}<div class="ic" data-act="toggle" data-id="${st.entity_id}"><ha-icon icon="${this._icon(st)}"></ha-icon></div>
       <div class="tx" data-act="info" data-id="${st.entity_id}"><b>${esc(n)}</b><span>${esc(this._state(st))}</span></div></div>`;
   }
   _camHtml(st) {
     const src = st.attributes.entity_picture || '';
-    return `<div class="cam" data-act="info" data-id="${st.entity_id}">${src ? `<img loading="lazy" src="${esc(src)}" alt="">` : ''}<span>${esc(cleanName(st.attributes.friendly_name))}</span></div>`;
+    return `<div class="cam ${this._set.hidden.includes(st.entity_id) ? 'hid' : ''}" data-act="info" data-id="${st.entity_id}">${src ? `<img loading="lazy" src="${esc(src)}" alt="">` : ''}${this._hideBtn(st.entity_id)}<span class="n">${esc(cleanName(st.attributes.friendly_name))}</span></div>`;
   }
   _cams() {
-    const cams = (this._byDomain().camera || []).filter((s) => s.state !== 'unavailable');
-    return `<div class="rh"><h2>Kameras</h2><span>${cams.length}</span></div><div class="cams">${cams.map((s) => this._camHtml(s)).join('') || '<div class="empty">Keine Kameras verfügbar.</div>'}</div>`;
+    const cams = (this._byDomain().camera || []).filter((s) => s.state !== 'unavailable' && (this._edit || !this._set.hidden.includes(s.entity_id)));
+    return `<div class="rh"><h2>Kameras</h2><div class="inf"><span>${cams.length}</span>${this._editBtn()}</div></div><div class="cams">${cams.map((s) => this._camHtml(s)).join('') || '<div class="empty">Keine Kameras verfügbar.</div>'}</div>`;
   }
 
   /* ---------- Sheets ---------- */
@@ -357,6 +377,7 @@ class LumoraCard extends HTMLElement {
       const CAT = [['door', 'Türen'], ['window', 'Fenster'], ['motion', 'Bewegung'], ['smoke', 'Rauch / Wasser / Gas'], ['alarm', 'Alarmanlage'], ['lock', 'Schloss entsperrt']];
       c = `<h2>Meldungen</h2>${al.map((a) => `<div class="row"><ha-icon icon="${a.icon}"></ha-icon><div class="t"><b>${esc(a.text)}</b><span>${ago(a.since)}</span></div><button data-act="hide" data-id="${a.id}">Ausblenden</button></div>`).join('') || '<div class="empty">Keine aktiven Meldungen.</div>'}
         <h4>Was gemeldet wird</h4>${CAT.map(([k, l]) => `<div class="row"><div class="t"><b>${l}</b></div><button class="${s.alerts[k] ? 'sel' : ''}" data-act="cat" data-k="${k}">${s.alerts[k] ? 'An' : 'Aus'}</button></div>`).join('')}
+        <h4>Räume von Meldungen ausnehmen</h4>${Object.keys(this._hass.areas || {}).sort((x, y) => this._aname(x).localeCompare(this._aname(y), 'de')).map((id) => `<div class="row"><div class="t"><b>${esc(this._aname(id))}</b></div><button class="${s.excludeAreas.includes(id) ? '' : 'sel'}" data-act="exarea" data-id="${id}">${s.excludeAreas.includes(id) ? 'Aus' : 'Gemeldet'}</button></div>`).join('')}
         ${s.excludeEntities.length ? `<h4>Ausgeblendet</h4>${s.excludeEntities.map((id) => `<div class="row"><div class="t"><b>${esc((this._hass.states[id] && this._hass.states[id].attributes.friendly_name) || id)}</b></div><button data-act="unhide" data-id="${id}">Einblenden</button></div>`).join('')}` : ''}`;
     } else if (this._sheet === 'lights') {
       const l = (this._byDomain().light || []).filter((x) => x.state === 'on');
@@ -389,7 +410,7 @@ class LumoraCard extends HTMLElement {
     if (act === 'noop') return;
     e.stopPropagation();
     switch (act) {
-      case 'nav': this._view = t.dataset.v; this._sheet = null; break;
+      case 'nav': this._view = t.dataset.v; this._sheet = null; this._edit = false; break;
       case 'floor': this._floor = id; this._area = null; break;
       case 'area': this._area = id; break;
       case 'info': this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId: id }, bubbles: true, composed: true })); return;
@@ -414,6 +435,9 @@ class LumoraCard extends HTMLElement {
       case 'pick': if (!s.pinned.some((p) => p.entity === id)) s.pinned.push({ entity: id, only: this._only }); this._save(); this._sheet = null; this._only = false; break;
       case 'unpin': s.pinned = s.pinned.filter((p) => p.entity !== id); this._save(); break;
       case 'edit': this._edit = !this._edit; break;
+      case 'hidee': s.hidden = s.hidden.includes(id) ? s.hidden.filter((x) => x !== id) : [...s.hidden, id]; this._save(); break;
+      case 'hidearea': s.hiddenAreas = s.hiddenAreas.includes(id) ? s.hiddenAreas.filter((x) => x !== id) : [...s.hiddenAreas, id]; this._save(); break;
+      case 'exarea': s.excludeAreas = s.excludeAreas.includes(id) ? s.excludeAreas.filter((x) => x !== id) : [...s.excludeAreas, id]; this._save(); break;
       default: return;
     }
     this._sig = ''; this._render();

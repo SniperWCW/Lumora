@@ -6,6 +6,7 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - Meldungen sind konfigurierbar (Kategorien an oder aus, einzelne Sensoren ausblenden), gespeichert pro HA-Benutzer
 - "Aktiv jetzt" mit Lichtern, Medien und frei hinzufügbaren Karten, optional nur bei Aktivität
 - Räume je Etage und Area, Kameraübersicht
+- Bearbeiten-Modus auf Start, Räumen und Kameras: Räume, Geräte und Kameras ausblenden, Räume von Meldungen ausnehmen
 
 ## Installation
 
@@ -26,8 +27,9 @@ Dashboard-Ansicht vom Typ `panel` mit folgender Karte:
 ```yaml
 type: custom:lumora-card
 # optional
-color_from: "#5b7248"
-color_to: "#232f21"
+theme: sand        # Standard; alternativ: forest
+color_from: "#f2eadb"
+color_to: "#d6c5a8"
 ```
 
 ## Releases
