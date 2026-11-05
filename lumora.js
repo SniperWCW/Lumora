@@ -5,7 +5,8 @@
 const VERSION = '0.1.0';
 const KEY = 'lumora_panel';
 const DEF = {
-  alerts: { door: true, window: true, motion: true, smoke: true, alarm: true, lock: false, weather: true },
+  alerts: { door: true, window: true, motion: true, smoke: true, alarm: true, lock: false, weather: true, climate: true },
+  chips: { warn: false, ice: false },
   excludeEntities: [],
   excludeAreas: ['fahrzeug'],
   pinned: [],
@@ -26,7 +27,7 @@ const APPLIANCES = [
   { base: 'sensor.kuche_spulmaschine', title: 'Spülmaschine', icon: 'mdi:dishwasher', hint: 'Geschirr ausräumen' },
 ];
 const INFO = {
-  ice: 'sensor.system_eiswarnung', bike: 'sensor.fahrrad_wetter', pollen: 'sensor.polleninformation_stuttgart_allergy_risk',
+  vent: 'sensor.room_climate_hausluftung', day: 'sensor.room_climate_tageslage', ice: 'sensor.system_eiswarnung', bike: 'sensor.fahrrad_wetter', pollen: 'sensor.polleninformation_stuttgart_allergy_risk',
   travel: [['Steffen zur Arbeit', 'sensor.system_steffen_heimerdingen_steffen'], ['Katharina zur Arbeit', 'sensor.system_katharina_arbeitsweg_katharina'], ['Katharina nach Hause', 'sensor.katharina_heimweg']],
   trains: [['Korntal → Feuerbach', 'sensor.korntal_to_feuerbach'], ['Feuerbach → Korntal', 'sensor.feuerbach_1_to_korntal_1']],
 };
@@ -80,7 +81,7 @@ const dom = (id) => id.split('.')[0];
 const merge = (v) => {
   v = v || {};
   const arr = (k) => [...(v[k] || DEF[k])];
-  return { alerts: { ...DEF.alerts, ...v.alerts }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})) };
+  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})) };
 };
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -115,6 +116,7 @@ const CSS = `
 .pill{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:99px;background:var(--a);cursor:pointer;border:0;color:inherit;font:inherit;font-size:14px}
 .pill.warn{background:var(--warn)}.pill.bad{background:var(--bad);color:var(--badfg)}.pill.ok{background:var(--okbg)}
 .pill ha-icon{--mdc-icon-size:18px}
+.vent{display:flex;gap:10px;align-items:center;margin:2px 0 6px;color:var(--fg2);font-size:13px;cursor:pointer}.vent b{display:block;font-size:14px;font-weight:600;color:var(--fg)}.vent ha-icon{--mdc-icon-size:22px;flex:none}.vent.warn ha-icon{color:#c98a2b}.vent.bad ha-icon{color:#c0504a}
 .meta{margin:26px 0 6px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg2)}
 h1{margin:0;font-size:clamp(26px,7.4vw,38px);line-height:1.1;font-weight:600;letter-spacing:-.02em}
 .hello{display:flex;gap:14px;align-items:center;margin:14px 0 14px}.hello .sub{font-size:14px;color:var(--fg2);margin-top:4px}
@@ -254,7 +256,7 @@ class LumoraCard extends HTMLElement {
     this._eids = [...Object.values({ ...ENERGY, ...((cfg && cfg.energy) || {}) }), ...Object.values({ ...EXTRA, ...((cfg && cfg.extras) || {}) }),
       ...((cfg && cfg.appliances) || APPLIANCES).flatMap((a) => ['zustand', 'programm', 'fortschritt', 'verbleibende_zeit'].map((k) => `${a.base}_${k}`))];
     const inf = { ...INFO, ...((cfg && cfg.info) || {}) };
-    this._eids.push(inf.ice, inf.bike, inf.pollen, ...inf.travel.map((x) => x[1]), ...inf.trains.map((x) => x[1]));
+    this._eids.push(inf.vent, inf.day, inf.ice, inf.bike, inf.pollen, ...inf.travel.map((x) => x[1]), ...inf.trains.map((x) => x[1]));
     if (cfg && cfg.theme) this.setAttribute('theme', cfg.theme);
     if (cfg && cfg.color_from) this.style.setProperty('--zp-from', cfg.color_from);
     if (cfg && cfg.color_to) this.style.setProperty('--zp-to', cfg.color_to);
@@ -291,6 +293,7 @@ class LumoraCard extends HTMLElement {
       if (doms.includes(d)) { const s = h.states[id]; parts.push(id + s.state + (d === 'climate' ? `${s.attributes.current_temperature}/${s.attributes.temperature}/${s.attributes.hvac_action}` : '')); }
       else if (this._view === 'rooms' && d === 'sensor') parts.push(id + h.states[id].state);
       else if (d === 'sensor' && (h.states[id].attributes.warning_count !== undefined || h.states[id].attributes.is_ice_warning !== undefined)) parts.push(id + h.states[id].state + h.states[id].attributes.warning_count);
+      else if (id.startsWith('sensor.room_climate_')) parts.push(id + h.states[id].state + h.states[id].attributes.mold_risk);
       else if ((this._eids || []).includes(id)) parts.push(id + h.states[id].state);
       else if (this._set.pinned.some((p) => p.entity === id)) parts.push(id + h.states[id].state);
     }
@@ -351,16 +354,52 @@ class LumoraCard extends HTMLElement {
         if (['smoke', 'gas', 'carbon_monoxide', 'moisture'].includes(dc) && s.alerts.smoke) a = { sev: 0, text: `${dc === 'smoke' ? 'Rauch' : dc === 'moisture' ? 'Wasser' : 'Gas'}: ${where}`, icon: this._icon(st), k: id };
         else if (['door', 'garage_door', 'opening'].includes(dc) && s.alerts.door) a = { sev: 1, text: `${nm} offen`, icon: this._icon(st), k: id };
         else if (dc === 'window' && s.alerts.window) a = { sev: 1, text: `${nm} offen`, icon: this._icon(st), k: id };
-        else if (['motion', 'occupancy', 'moving'].includes(dc) && s.alerts.motion) {
+        else if (['motion', 'occupancy', 'moving', 'presence'].includes(dc) && s.alerts.motion) {
           const key = 'm:' + where; if (seen.has(key)) continue; seen.add(key);
-          a = { sev: 2, text: `Bewegung: ${where}`, icon: 'mdi:motion-sensor', k: id };
+          a = { sev: 2, text: `Bewegung: ${where}`, icon: 'mdi:motion-sensor', k: id, motion: where };
         }
       }
       if (a) out.push({ ...a, id, since: st.last_changed });
     }
     if (s.alerts.weather) out.push(...this._warnAlerts());
+    if (s.alerts.climate) out.push(...this._climAlerts());
     return out.sort((x, y) => x.sev - y.sev);
   }
+  _climAlerts() {
+    const h = this._hass; const s = this._set; const out = []; const T = {
+      schimmelrisiko: [1, 'Schimmelrisiko', 'mdi:mushroom-outline'], fenster_schliessen: [1, 'Fenster schließen', 'mdi:window-closed'],
+      lueften_jetzt: [2, 'Jetzt lüften', 'mdi:window-open-variant'], rollladen_schliessen: [2, 'Rollladen schließen', 'mdi:blinds'], heizung_herunterregeln: [2, 'Heizung herunterregeln', 'mdi:radiator-off'],
+    };
+    const moldRooms = new Set();
+    for (const id in h.states) {
+      const st = h.states[id];
+      const m = /^binary_sensor\.room_climate_(.+?)_(schimmelrisiko|fenster_schliessen|lueften_jetzt|rollladen_schliessen|heizung_herunterregeln)$/.exec(id);
+      if (m) {
+        if (st.state !== 'on' || s.excludeEntities.includes(id)) continue;
+        const area = this._areaOf(id); if (area && s.excludeAreas.includes(area)) continue;
+        const room = area ? this._aname(area) : m[1]; const t = T[m[2]];
+        if (m[2] === 'schimmelrisiko') moldRooms.add(room);
+        out.push({ sev: t[0], text: `${t[1]}: ${room}`, icon: t[2], k: id, id, since: st.last_changed });
+      } else if (/^sensor\.room_climate_.+_recommendation$/.test(id) && st.attributes.mold_risk === 'high' && !s.excludeEntities.includes(id)) {
+        const room = st.attributes.room_name || cleanName(st.attributes.friendly_name);
+        if (moldRooms.has(room)) continue;
+        out.push({ sev: 1, text: `Schimmelrisiko hoch: ${room}`, icon: 'mdi:mushroom-outline', k: id, id, since: st.last_changed });
+      }
+    }
+    const day = h.states[this._inf().day];
+    if (!out.length && this._ok(day) && day.attributes.has_actions && !s.excludeEntities.includes(day.entity_id)) (day.attributes.actions || []).forEach((t, i) => out.push({ sev: 2, text: String(t), icon: 'mdi:home-thermometer-outline', k: `${day.entity_id}:${i}`, id: day.entity_id, since: day.last_changed }));
+    return out;
+  }
+  _vent() {
+    const st = this._hass.states[this._inf().vent]; if (!this._ok(st)) return '';
+    const a = st.attributes; const calm = ['keep_windows_closed', 'unknown'].includes(st.state);
+    const rooms = (a.recommended_rooms || []).length ? `Zuerst: ${a.recommended_rooms.join(', ')}` : '';
+    const win = a.next_window && a.next_window.available ? `Nächstes Fenster ${a.next_window.label}` : '';
+    const dur = a.duration_minutes && /recommended/.test(st.state) ? ` · ${a.duration_minutes} min` : '';
+    const cls = a.color === 'red' ? 'bad' : a.color === 'orange' || a.color === 'yellow' ? 'warn' : '';
+    return `<div class="vent ${cls}" data-act="info" data-id="${st.entity_id}"><ha-icon icon="${calm ? 'mdi:window-closed-variant' : 'mdi:window-open-variant'}"></ha-icon><div><b>${esc(a.title || st.state)}${dur}</b><span>${esc([rooms, win].filter(Boolean).join(' · ') || a.reason || '')}</span></div></div>`;
+  }
+  _chipOn(k) { const v = this._set.chips[k]; return v === undefined ? true : v; }
   _inf() { return { ...INFO, ...((this._cfg && this._cfg.info) || {}) }; }
   _ok(st) { return !!st && !['unavailable', 'unknown', ''].includes(st.state); }
   _ice() {
@@ -401,18 +440,19 @@ class LumoraCard extends HTMLElement {
     if (ice && ice.warn && !s.excludeEntities.includes(ice.id)) out.push({ sev: 1, text: 'Eisgefahr', icon: 'mdi:snowflake-alert', k: ice.id, id: ice.id, since: this._hass.states[ice.id].last_changed });
     return out;
   }
-  _infoPills() {
-    const h = this._hass; const inf = this._inf(); const out = [];
-    this._warns().forEach((w) => out.push(`<button class="pill ${w.sev === 0 ? 'bad' : 'warn'}" data-act="warns"><ha-icon icon="${w.icon}"></ha-icon>${esc(w.title)}${w.sub ? ` · ${esc(w.sub)}` : ''}</button>`));
+  _infoPills(al) {
+    const h = this._hass; const inf = this._inf(); const out = []; const on = (k) => this._chipOn(k);
+    if (on('warn')) this._warns().forEach((w) => out.push(`<button class="pill ${w.sev === 0 ? 'bad' : 'warn'}" data-act="warns"><ha-icon icon="${w.icon}"></ha-icon>${esc(w.title)}${w.sub ? ` · ${esc(w.sub)}` : ''}</button>`));
     const ice = this._ice();
-    if (ice && (ice.warn || ice.possible)) out.push(`<button class="pill ${ice.warn ? 'warn' : ''}" data-act="warns"><ha-icon icon="mdi:snowflake-alert"></ha-icon>${ice.warn ? 'Eisgefahr' : 'Glätte möglich'}</button>`);
+    if (on('ice') && ice && (ice.warn || ice.possible)) out.push(`<button class="pill ${ice.warn ? 'warn' : ''}" data-act="warns"><ha-icon icon="mdi:snowflake-alert"></ha-icon>${ice.warn ? 'Eisgefahr' : 'Glätte möglich'}</button>`);
     const bk = h.states[inf.bike];
-    if (this._ok(bk)) out.push(`<button class="pill" data-act="warns"><ha-icon icon="mdi:bike"></ha-icon>${esc(bk.state.split(' · ')[0])}</button>`);
+    if (on('bike') && this._ok(bk)) out.push(`<button class="pill" data-act="warns"><ha-icon icon="mdi:bike"></ha-icon>${esc(bk.state.split(' · ')[0])}</button>`);
     const pl = h.states[inf.pollen];
-    if (this._ok(pl) && Number(pl.attributes.numeric_state) > 0) out.push(`<button class="pill warn" data-act="warns"><ha-icon icon="mdi:flower-pollen"></ha-icon>Pollen: ${esc(pl.attributes.named_state || pl.state)}</button>`);
-    const tr = inf.travel.map(([l, id]) => [l, h.states[id]]).find(([, x]) => this._ok(x) && !isNaN(parseFloat(x.state)));
-    if (tr) out.push(`<button class="pill" data-act="trav"><ha-icon icon="mdi:car-clock"></ha-icon>${esc(tr[0].split(' ')[0])} ${Math.round(parseFloat(tr[1].state))} min</button>`);
-    else if (inf.trains.some(([, id]) => this._ok(h.states[id]))) out.push('<button class="pill" data-act="trav"><ha-icon icon="mdi:train"></ha-icon>Fahrzeiten</button>');
+    if (on('pollen') && this._ok(pl) && Number(pl.attributes.numeric_state) > 0) out.push(`<button class="pill warn" data-act="warns"><ha-icon icon="mdi:flower-pollen"></ha-icon>Pollen: ${esc(pl.attributes.named_state || pl.state)}</button>`);
+    const mo = [...new Set((al || []).filter((x) => x.motion).map((x) => x.motion))];
+    if (on('motion') && mo.length) out.push(`<button class="pill" data-act="alerts"><ha-icon icon="mdi:motion-sensor"></ha-icon>Bewegung · ${esc(mo.slice(0, 2).join(', '))}${mo.length > 2 ? ` +${mo.length - 2}` : ''}</button>`);
+    const hasTr = inf.travel.some(([, id]) => this._ok(h.states[id])) || inf.trains.some(([, id]) => this._ok(h.states[id]));
+    if (on('trav') && hasTr) out.push('<button class="pill" data-act="trav"><ha-icon icon="mdi:car-clock"></ha-icon>Fahrzeiten</button>');
     return out.join('');
   }
   _byDomain() {
@@ -487,10 +527,11 @@ class LumoraCard extends HTMLElement {
     const apill = alarm ? `<button class="pill ${alarm.state === 'triggered' ? 'bad' : ''}" data-act="info" data-id="${alarm.entity_id}"><ha-icon icon="mdi:shield-home"></ha-icon>${esc(AL[alarm.state] || alarm.state)}</button>` : '';
     const wpill = wx && typeof wx.attributes.temperature === 'number' ? `<button class="pill" data-act="info" data-id="${wx.entity_id}"><ha-icon icon="${WX[wx.state] || 'mdi:weather-cloudy'}"></ha-icon>${wx.attributes.temperature.toFixed(1)}° draußen</button>` : '';
     const pills = [
-      lights.length ? `<button class="pill" data-act="lights"><ha-icon icon="mdi:lamp"></ha-icon>${lights.length} an</button>` : '',
-      wpill,
-      this._infoPills(),
-      al.length ? `<button class="pill ${al.some((a) => a.sev === 0) ? 'bad' : 'warn'}" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>${al.length} Meldung${al.length > 1 ? 'en' : ''}</button>` : '',
+      lights.length && this._chipOn('lights') ? `<button class="pill" data-act="lights"><ha-icon icon="mdi:lamp"></ha-icon>${lights.length} an</button>` : '',
+      this._chipOn('outdoor') ? wpill : '',
+      this._infoPills(al),
+      al.length && this._chipOn('count') ? `<button class="pill ${al.some((a) => a.sev === 0) ? 'bad' : 'warn'}" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>${al.length} Meldung${al.length > 1 ? 'en' : ''}</button>` : '',
+      this._edit ? '<button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips</button>' : '',
     ].join('');
     const cards = [];
     if (lights.length) {
@@ -510,7 +551,7 @@ class LumoraCard extends HTMLElement {
     cards.push(`<div class="card add" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</div>`);
     const en = this._energy();
     return `<div class="top"><div class="logo"><ha-icon icon="mdi:home-variant"></ha-icon></div><div class="ttl">Lumora.</div>${apill}</div>
-      <div class="meta">${esc(meta)}</div>
+      <div class="meta">${esc(meta)}</div>${this._vent()}
       <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${home}/${persons.length} zu Hause</div></div></div>
       ${this._presence(persons)}${note}<div class="pills">${pills}</div>
       ${en ? `<h3>Energie</h3>${en}` : ''}
@@ -862,7 +903,7 @@ class LumoraCard extends HTMLElement {
     let c = '';
     if (this._sheet === 'alerts') {
       const al = this._alerts(); const s = this._set;
-      const CAT = [['door', 'Türen'], ['window', 'Fenster'], ['motion', 'Bewegung'], ['smoke', 'Rauch / Wasser / Gas'], ['alarm', 'Alarmanlage'], ['lock', 'Schloss entsperrt'], ['weather', 'DWD, NINA & Eiswarnung']];
+      const CAT = [['door', 'Türen'], ['window', 'Fenster'], ['motion', 'Bewegung'], ['smoke', 'Rauch / Wasser / Gas'], ['alarm', 'Alarmanlage'], ['lock', 'Schloss entsperrt'], ['weather', 'DWD, NINA & Eiswarnung'], ['climate', 'Schimmel, Lüften & Raumklima']];
       c = `<h2>Meldungen</h2>${al.map((a) => `<div class="row"><ha-icon icon="${a.icon}"></ha-icon><div class="t"><b>${esc(a.text)}</b><span>${ago(a.since)}</span></div><button data-act="hide" data-id="${a.id}">Ausblenden</button></div>`).join('') || '<div class="empty">Keine aktiven Meldungen.</div>'}
         <h4>Was gemeldet wird</h4>${CAT.map(([k, l]) => `<div class="row"><div class="t"><b>${l}</b></div><button class="${s.alerts[k] ? 'sel' : ''}" data-act="cat" data-k="${k}">${s.alerts[k] ? 'An' : 'Aus'}</button></div>`).join('')}
         <h4>Räume von Meldungen ausnehmen</h4>${Object.keys(this._hass.areas || {}).sort((x, y) => this._aname(x).localeCompare(this._aname(y), 'de')).map((id) => `<div class="row"><div class="t"><b>${esc(this._aname(id))}</b></div><button class="${s.excludeAreas.includes(id) ? '' : 'sel'}" data-act="exarea" data-id="${id}">${s.excludeAreas.includes(id) ? 'Aus' : 'Gemeldet'}</button></div>`).join('')}
@@ -876,6 +917,9 @@ class LumoraCard extends HTMLElement {
           + (l.length ? '' : '<div class="empty">Keine Sensoren in diesem Bereich. Weise sie in Home Assistant dem Bereich zu.</div>');
       };
       c = `<h2>Sensoren · ${esc(this._aname(aid))}</h2>${mk('temperature', 'temp', 'Temperatur')}${mk('humidity', 'hum', 'Luftfeuchtigkeit')}`;
+    } else if (this._sheet === 'chips') {
+      const CH = [['lights', 'Lampen an'], ['outdoor', 'Außentemperatur'], ['motion', 'Bewegung'], ['count', 'Zähler der Meldungen'], ['warn', 'Wetter- und NINA-Warnungen'], ['ice', 'Eiswarnung'], ['bike', 'Fahrrad'], ['pollen', 'Pollen'], ['trav', 'Fahrzeiten']];
+      c = `<h2>Chips</h2><div class="hint">Warnungen stehen schon in der Meldungszeile, deshalb sind sie hier standardmäßig aus.</div>${CH.map(([k, l]) => `<div class="row"><div class="t"><b>${l}</b></div><button class="${this._chipOn(k) ? 'sel' : ''}" data-act="chip" data-k="${k}">${this._chipOn(k) ? 'An' : 'Aus'}</button></div>`).join('')}`;
     } else if (this._sheet === 'warns') {
       const inf = this._inf(); const h = this._hass; const ice = this._ice(); const bk = h.states[inf.bike]; const pl = h.states[inf.pollen];
       const row = (ic, t, sub) => `<div class="row"><ha-icon icon="${ic}"></ha-icon><div class="t"><b>${esc(t)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div></div>`;
@@ -940,6 +984,8 @@ class LumoraCard extends HTMLElement {
       case 'rspick': { const r = s.roomSensors[this._rsArea] || (s.roomSensors[this._rsArea] = {}); if (id) r[t.dataset.k] = id; else delete r[t.dataset.k]; this._save(); break; }
       case 'alerts': this._sheet = 'alerts'; break;
       case 'warns': this._sheet = 'warns'; break;
+      case 'chips': this._sheet = 'chips'; break;
+      case 'chip': s.chips[t.dataset.k] = !this._chipOn(t.dataset.k); this._save(); break;
       case 'trav': this._sheet = 'trav'; break;
       case 'lights': this._sheet = 'lights'; break;
       case 'lightsoff': h.callService('light', 'turn_off', { entity_id: (this._byDomain().light || []).filter((x) => x.state === 'on').map((x) => x.entity_id) }); this._sheet = null; break;
