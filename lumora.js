@@ -177,8 +177,13 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .pill .tools{display:inline-flex;gap:3px;margin-left:8px}.pill .tools .mini{width:22px;height:22px}
 .hint{font-size:12.5px;color:var(--fg2);background:var(--a);border-radius:12px;padding:8px 12px;margin:0 0 10px}
 .tile .tools,.cam .tools,.vc .tools,.cl .tools{position:absolute;top:6px;right:6px;display:flex;gap:4px;z-index:2}
-.cam .mini{background:rgba(0,0,0,.55);color:#fff}
 .hid{opacity:.45}
+.tools .mini{width:36px;height:36px;background:rgba(40,30,20,.72);color:#fff}.tools .mini ha-icon{--mdc-icon-size:20px}
+.pill .tools .mini{width:26px;height:26px}.pill .tools .mini ha-icon{--mdc-icon-size:16px}
+:host(.ed) .tile,:host(.ed) .card,:host(.ed) .pl,:host(.ed) .cam,:host(.ed) .pill,:host(.ed) .mw,:host(.ed) .vc,:host(.ed) .cl,:host(.ed) .ap{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:grab}
+:host(.ed) .tile{padding-right:54px}:host(.ed) .plt em{margin-right:42px}
+.dgo{z-index:50!important;box-shadow:0 12px 30px rgba(0,0,0,.35)!important;opacity:.92;transition:none!important;pointer-events:none}
+.dgt{outline:3px solid var(--fg)!important;outline-offset:-3px}
 .tile .ic{width:42px;height:42px;border-radius:50%;background:var(--a);display:grid;place-items:center;flex:none}
 .tile .tx{min-width:0;flex:1}
 .tile.on{background:var(--b);box-shadow:var(--shadow)}.tile.on .ic{background:var(--accent);color:var(--accentfg)}
@@ -215,13 +220,20 @@ class LumoraCard extends HTMLElement {
     this._set = merge({}); this._loaded = false; this._sig = '';
     this.shadowRoot.addEventListener('click', (e) => this._click(e));
     this.shadowRoot.addEventListener('pointerdown', (e) => {
+      this._down = true;
+      if (this._edit) { this._dgStart(e); return; }
       const v = e.target.closest && e.target.closest('.vs'); if (!v) return;
       e.preventDefault(); this._drag = { el: v, id: v.dataset.id, min: +v.dataset.min, max: +v.dataset.max, step: +v.dataset.step, val: null };
       try { v.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
       this._dragTo(e);
     });
-    this.shadowRoot.addEventListener('pointermove', (e) => { if (this._drag) this._dragTo(e); });
-    const end = () => {
+    this.shadowRoot.addEventListener('pointermove', (e) => { if (this._dg) this._dgMove(e); else if (this._drag) this._dragTo(e); });
+    this.shadowRoot.addEventListener('touchmove', (e) => { if (this._dg && this._dg.on && e.cancelable) e.preventDefault(); }, { passive: false });
+    this.shadowRoot.addEventListener('contextmenu', (e) => { if (this._edit) e.preventDefault(); });
+    const end = (e) => {
+      this._down = false;
+      if (this._dg) { this._dgEnd(e); return; }
+      if (this._pend) { this._pend = false; this._sig = ''; this.hass = this._hass; }
       const d = this._drag; if (!d) return; this._drag = null;
       if (d.val !== null) this._hass.callService('climate', 'set_temperature', { entity_id: d.id, temperature: d.val });
       setTimeout(() => this._render(), 400);
@@ -254,7 +266,8 @@ class LumoraCard extends HTMLElement {
     const first = !this._hass;
     this._hass = h;
     if (first) this._load();
-    if (!this._loaded || this._sheet === 'add' || this._drag) return;
+    if (!this._loaded || this._sheet === 'add' || this._drag || this._dg) return;
+    if (this._down && this._edit) { this._pend = true; return; }
     const sig = this._signature();
     if (sig !== this._sig) {
       this._sig = sig;
@@ -267,6 +280,7 @@ class LumoraCard extends HTMLElement {
     const doms = ['weather', 'light', 'media_player', 'vacuum', 'person', 'alarm_control_panel', 'lock', 'binary_sensor', 'camera', 'switch', 'cover', 'climate', 'fan'];
     for (const id in h.states) {
       const d = dom(id);
+      if (d === 'camera' && this._view === 'cams') continue;
       if (doms.includes(d)) { const s = h.states[id]; parts.push(id + s.state + (d === 'climate' ? `${s.attributes.current_temperature}/${s.attributes.temperature}/${s.attributes.hvac_action}` : '')); }
       else if (this._view === 'rooms' && d === 'sensor') parts.push(id + h.states[id].state);
       else if ((this._eids || []).includes(id)) parts.push(id + h.states[id].state);
@@ -348,6 +362,7 @@ class LumoraCard extends HTMLElement {
   _render() {
     if (!this._hass || !this._loaded) return;
     this._pwMap = null;
+    if (this.classList) this.classList.toggle('ed', !!this._edit);
     const body = this._view === 'home' ? this._home() : this._view === 'rooms' ? this._rooms() : this._view === 'more' ? this._more() : this._cams();
     const nav = [['home', 'mdi:home-outline', 'Zuhause'], ['rooms', 'mdi:view-grid-outline', 'Räume'], ['cams', 'mdi:cctv', 'Kameras'], ['more', 'mdi:view-dashboard-outline', 'Mehr']]
       .map(([v, i, l]) => `<button class="${this._view === v ? 'sel' : ''}" data-act="nav" data-v="${v}"><ha-icon icon="${i}"></ha-icon>${l}</button>`).join('');
@@ -614,6 +629,73 @@ class LumoraCard extends HTMLElement {
     const cells = ord.filter((x) => this._edit || !this._set.hidden.includes(x.id)).map((x) => `<div class="mw ${x.wide ? 'wide' : ''} ${this._set.hidden.includes(x.id) ? 'hid' : ''}">${this._tools('more', x.id, 'hidden')}${x.html}</div>`);
     return `<div class="rh"><h2>Mehr</h2><div class="inf">${this._editBtn()}</div></div>${this._hint()}<div class="grid">${cells.join('') || '<div class="empty">Keine weiteren Daten gefunden.</div>'}</div>`;
   }
+  _dgItem(el) {
+    while (el && el !== this.shadowRoot) {
+      if (el.querySelector) { const m = el.querySelector(':scope > i.dg'); if (m) return { el, scope: m.dataset.s, id: m.dataset.id }; }
+      el = el.parentNode || el.host;
+    }
+    return null;
+  }
+  _dgStart(e) {
+    const t = e.target; if (!t.closest || t.closest('.mini') || t.closest('.x') || t.closest('[data-act="edit"]')) return;
+    const it = this._dgItem(t); if (!it) return;
+    this._dg = { ...it, x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY, on: false, pid: e.pointerId, touch: e.pointerType !== 'mouse', over: null };
+    if (this._dg.touch) this._dg.timer = setTimeout(() => this._dgBegin(), 280);
+  }
+  _dgBegin() {
+    const d = this._dg; if (!d || d.on) return; d.on = true;
+    const body = this.shadowRoot.querySelector('.body'); d.s0 = body ? body.scrollTop : 0;
+    d.el.classList.add('dgo');
+    try { d.el.setPointerCapture(d.pid); } catch (_) { /* ignore */ }
+    try { if (navigator.vibrate) navigator.vibrate(15); } catch (_) { /* ignore */ }
+    this._dgLoop();
+  }
+  _dgMove(e) {
+    const d = this._dg; if (!d) return; d.cx = e.clientX; d.cy = e.clientY;
+    if (!d.on) {
+      if (Math.hypot(d.cx - d.x, d.cy - d.y) > (d.touch ? 10 : 5)) { if (d.touch) { clearTimeout(d.timer); this._dg = null; } else this._dgBegin(); }
+      return;
+    }
+    this._dgPlace();
+  }
+  _dgPlace() {
+    const d = this._dg; if (!d || !d.on) return;
+    const body = this.shadowRoot.querySelector('.body'); const sc = body ? body.scrollTop : 0;
+    d.el.style.transform = `translate(${d.cx - d.x}px,${d.cy - d.y + (sc - d.s0)}px)`;
+    let over = null;
+    this.shadowRoot.querySelectorAll('i.dg').forEach((m) => {
+      if (m.dataset.s !== d.scope || m.dataset.id === d.id) return;
+      const el = m.parentNode; el.classList.remove('dgt');
+      const r = el.getBoundingClientRect();
+      if (d.cx >= r.left && d.cx <= r.right && d.cy >= r.top && d.cy <= r.bottom) over = { el, id: m.dataset.id };
+    });
+    if (over) over.el.classList.add('dgt');
+    d.over = over;
+  }
+  _dgLoop() {
+    const d = this._dg; if (!d || !d.on) return;
+    const body = this.shadowRoot.querySelector('.body');
+    if (body) { const r = body.getBoundingClientRect(); let v = 0; if (d.cy < r.top + 90) v = -Math.ceil((r.top + 90 - d.cy) / 6); else if (d.cy > r.bottom - 130) v = Math.ceil((d.cy - (r.bottom - 130)) / 6); if (v) { body.scrollTop += v; this._dgPlace(); } }
+    requestAnimationFrame(() => this._dgLoop());
+  }
+  _dgEnd() {
+    const d = this._dg; this._dg = null; if (!d) return;
+    clearTimeout(d.timer);
+    if (!d.on) return;
+    this._dgAt = Date.now();
+    const s = this._set;
+    if (d.over) {
+      if (d.scope === 'pinned') {
+        const i = s.pinned.findIndex((q) => q.entity === d.id); const j = s.pinned.findIndex((q) => q.entity === d.over.id);
+        if (i >= 0 && j >= 0) { const [m] = s.pinned.splice(i, 1); s.pinned.splice(j, 0, m); }
+      } else {
+        const ids = [...((this._ids && this._ids[d.scope]) || [])]; const i = ids.indexOf(d.id); const j = ids.indexOf(d.over.id);
+        if (i >= 0 && j >= 0) { ids.splice(i, 1); ids.splice(j, 0, d.id); s.order[d.scope] = ids; }
+      }
+      this._save();
+    }
+    this._sig = ''; this._render();
+  }
   _dragTo(e) {
     const d = this._drag; const r = d.el.getBoundingClientRect(); const inner = Math.max(1, r.height - 40);
     const p = Math.min(1, Math.max(0, (r.bottom - 20 - e.clientY) / inner));
@@ -679,10 +761,9 @@ class LumoraCard extends HTMLElement {
   _editBtn() { return `<button class="pill" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button>`; }
   _tools(scope, id, hideKey) {
     if (!this._edit) return '';
-    const mv = (d, ic) => `<span class="mini" data-act="mv" data-s="${esc(scope)}" data-id="${esc(id)}" data-d="${d}"><ha-icon icon="${ic}"></ha-icon></span>`;
     const list = hideKey === 'hiddenAreas' ? this._set.hiddenAreas : this._set.hidden;
     const eye = hideKey ? `<span class="mini" data-act="${hideKey === 'hiddenAreas' ? 'hidearea' : 'hidee'}" data-id="${esc(id)}"><ha-icon icon="${list.includes(id) ? 'mdi:eye' : 'mdi:eye-off'}"></ha-icon></span>` : '';
-    return `<span class="tools">${mv(-1, 'mdi:chevron-left')}${eye}${mv(1, 'mdi:chevron-right')}</span>`;
+    return `<span class="tools">${eye}</span><i class="dg" data-s="${esc(scope)}" data-id="${esc(id)}" style="display:none"></i>`;
   }
   _ord(scope, items, idf) {
     const o = this._set.order[scope];
@@ -690,7 +771,7 @@ class LumoraCard extends HTMLElement {
     (this._ids || (this._ids = {}))[scope] = res.map(idf);
     return res;
   }
-  _hint() { return this._edit ? '<div class="hint">Bearbeiten: Pfeile verschieben, das Auge blendet aus oder wieder ein.</div>' : ''; }
+  _hint() { return this._edit ? '<div class="hint">Bearbeiten: Element gedrückt halten und ziehen zum Verschieben. Das Auge blendet aus oder wieder ein.</div>' : ''; }
   _tile(st, area, scope) {
     const d = dom(st.entity_id); const on = !INACTIVE.includes(st.state);
     if (d === 'switch') { const pw = this._plugPower(st.entity_id); if (pw) return this._plugCard(st, pw, this._tools(scope, st.entity_id, 'hidden'), this._set.hidden.includes(st.entity_id) ? 'hid' : '', area); }
@@ -761,6 +842,8 @@ class LumoraCard extends HTMLElement {
     const act = t.dataset.act; const id = t.dataset.id; const h = this._hass; const s = this._set;
     if (act === 'noop') return;
     e.stopPropagation();
+    if (Date.now() - (this._dgAt || 0) < 450) return;
+    if (this._edit && ['info', 'toggle', 'vstart', 'vdock'].includes(act)) return;
     switch (act) {
       case 'nav': this._view = t.dataset.v; this._sheet = null; this._edit = false; break;
       case 'floor': this._floor = id; this._area = null; break;
