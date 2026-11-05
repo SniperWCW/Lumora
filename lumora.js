@@ -10,6 +10,7 @@ const DEF = {
   excludeEntities: [],
   excludeAreas: ['fahrzeug'],
   pinned: [],
+  homeCams: [],
   hidden: [],
   hiddenAreas: [],
   order: {},
@@ -100,7 +101,7 @@ const dom = (id) => id.split('.')[0];
 const merge = (v) => {
   v = v || {};
   const arr = (k) => [...(v[k] || DEF[k])];
-  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources } };
+  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources } };
 };
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -215,6 +216,7 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .tile .tx{min-width:0;flex:1}
 .tile.on{background:var(--b);box-shadow:var(--shadow)}.tile.on .ic{background:var(--accent);color:var(--accentfg)}
 .tile.sens .ic{background:transparent}
+.cams.hc{grid-template-columns:repeat(2,minmax(0,1fr))}.cams.hc .cam:last-child:nth-child(odd){grid-column:1/-1}.grid .cam{grid-column:span 2}
 .cams{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
 .cam{border-radius:18px;overflow:hidden;background:rgba(0,0,0,.3);position:relative;aspect-ratio:16/9;cursor:pointer}
 .cam img{width:100%;height:100%;object-fit:cover;display:block}
@@ -280,6 +282,7 @@ class LumoraCard extends HTMLElement {
   getCardSize() { return 12; }
   connectedCallback() {
     this._tick = setInterval(() => {
+      this._tk = (this._tk || 0) + 1; if (this._tk % 2 === 0) this._refreshCams();
       if (this._edit || this._dg) return;
       const el = this.shadowRoot.querySelector('.note-t');
       const al = this._hass ? this._alerts() : [];
@@ -302,7 +305,8 @@ class LumoraCard extends HTMLElement {
     }
   }
   _signature() {
-    const h = this._hass; const parts = [this._view, this._floor, this._area, this._sheet, this._edit, Math.floor(Date.now() / 60000), this._set.pinned.length, this._set.hidden.length, this._set.hiddenAreas.length];
+    const h = this._hass;
+    if (this._view === 'cams') return ['cams', this._sheet, this._edit, this._set.hidden.join(), (this._set.order.cams || []).join(), Object.values(h.states).filter((x) => dom(x.entity_id) === 'camera').map((x) => x.entity_id + (x.state === 'unavailable' ? 'x' : '') + (x.attributes.entity_picture || '')).join()].join('|'); const parts = [this._view, this._floor, this._area, this._sheet, this._edit, Math.floor(Date.now() / 60000), this._set.pinned.length, this._set.hidden.length, this._set.hiddenAreas.length];
     const doms = ['weather', 'light', 'media_player', 'vacuum', 'person', 'alarm_control_panel', 'lock', 'binary_sensor', 'camera', 'switch', 'cover', 'climate', 'fan'];
     for (const id in h.states) {
       const d = dom(id);
@@ -547,7 +551,10 @@ class LumoraCard extends HTMLElement {
     const nav = [['home', 'mdi:home-outline', 'Zuhause'], ['rooms', 'mdi:view-grid-outline', 'Räume'], ['cams', 'mdi:cctv', 'Kameras'], ['more', 'mdi:view-dashboard-outline', 'Mehr']]
       .map(([v, i, l]) => `<button class="${this._view === v ? 'sel' : ''}" data-act="nav" data-v="${v}"><ha-icon icon="${i}"></ha-icon>${l}</button>`).join('');
     const scroll = this.shadowRoot.querySelector('.body'); const top = scroll ? scroll.scrollTop : 0;
+    const keep = {}; const qa = this.shadowRoot.querySelectorAll;
+    if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((i) => { (keep[i.dataset.b] || (keep[i.dataset.b] = [])).push(i); });
     this.shadowRoot.innerHTML = `<style>${CSS}</style><div class="app" style="position:relative"><div class="body">${body}</div><div class="nav">${nav}</div>${this._sheetHtml()}</div>`;
+    if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((n) => { const o = (keep[n.dataset.b] || []).shift(); if (o && o !== n) n.replaceWith(o); });
     const nb = this.shadowRoot.querySelector('.body'); if (nb) nb.scrollTop = top;
     if (this._sheet === 'add' || this._sheet === 'srcpick') this._fillList();
   }
@@ -611,7 +618,7 @@ class LumoraCard extends HTMLElement {
       this._chipOn('outdoor') ? wpill : '',
       this._infoPills(al),
       al.length && this._chipOn('count') ? `<button class="pill ${al.some((a) => a.sev === 0) ? 'bad' : 'warn'}" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>${al.length} Meldung${al.length > 1 ? 'en' : ''}</button>` : '',
-      this._edit ? '<button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips</button><button class="pill" data-act="src"><ha-icon icon="mdi:link-variant"></ha-icon>Quellen</button>' : '',
+      this._edit ? '<button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips</button><button class="pill" data-act="src"><ha-icon icon="mdi:link-variant"></ha-icon>Quellen</button><button class="pill" data-act="hc"><ha-icon icon="mdi:cctv"></ha-icon>Kameras</button>' : '',
     ].join('');
     const cards = [];
     if (lights.length) {
@@ -634,12 +641,13 @@ class LumoraCard extends HTMLElement {
       <div class="meta">${esc(meta)}</div>${this._vent()}
       <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${vis.length ? `${home}/${vis.length} zu Hause` : ''}</div></div></div>
       ${this._presence(persons)}${note}<div class="pills">${pills}</div>
-      ${en ? `<h3>Energie</h3>${en}` : ''}
+      ${en ? `<h3>Energie</h3>${en}` : ''}${this._homeCams()}
       <h3>Aktiv jetzt${this._locked ? '' : `<span class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</span>`}</h3>
       ${this._hint()}<div class="grid">${cards.join('')}</div>`;
   }
   _card(st, sub, pinId, edit) {
     const x = edit && pinId ? `<span class="x" data-act="unpin" data-id="${pinId}"><ha-icon icon="mdi:close"></ha-icon></span>${this._tools('pinned', pinId, null)}` : '';
+    if (dom(st.entity_id) === 'camera') return this._camHtml(st, 'pinned', x);
     const sp = this._special(st, x, ''); if (sp) return sp;
     return `<div class="card" data-act="info" data-id="${st.entity_id}">${x}<ha-icon icon="${this._icon(st)}"></ha-icon><div><b>${esc(st.attributes.friendly_name || st.entity_id)}</b><span>${esc(sub)}</span></div></div>`;
   }
@@ -986,9 +994,23 @@ class LumoraCard extends HTMLElement {
     return `<div class="tile ${on || bad ? 'on' : ''} ${sens} ${this._set.hidden.includes(st.entity_id) ? 'hid' : ''}">${this._tools(scope, st.entity_id, 'hidden')}<div class="ic" data-act="toggle" data-id="${st.entity_id}"><ha-icon icon="${this._icon(st)}"></ha-icon></div>
       <div class="tx" data-act="info" data-id="${st.entity_id}"><b>${esc(n)}</b><span>${esc(this._state(st))}</span></div></div>`;
   }
-  _camHtml(st, scope) {
+  _camHtml(st, scope, extra) {
     const src = st.attributes.entity_picture || '';
-    return `<div class="cam ${this._set.hidden.includes(st.entity_id) ? 'hid' : ''}" data-act="info" data-id="${st.entity_id}">${src ? `<img loading="lazy" src="${esc(src)}" alt="">` : ''}${this._tools(scope, st.entity_id, 'hidden')}<span class="n">${esc(cleanName(st.attributes.friendly_name))}</span></div>`;
+    const tools = extra !== undefined ? extra : this._tools(scope, st.entity_id, 'hidden');
+    return `<div class="cam ${this._set.hidden.includes(st.entity_id) ? 'hid' : ''}" data-act="info" data-id="${st.entity_id}">${src ? `<img data-b="${esc(src)}" src="${esc(src)}" alt="">` : ''}${tools}<span class="n">${esc(cleanName(st.attributes.friendly_name))}</span></div>`;
+  }
+  _homeCams() {
+    const sts = this._set.homeCams.map((id) => this._hass.states[id]).filter((x) => x && x.state !== 'unavailable'); if (!sts.length) return '';
+    const ord = this._ord('homecams', sts, (x) => x.entity_id);
+    return `<h3>Kameras</h3><div class="cams hc">${ord.map((x) => this._camHtml(x, 'homecams', this._edit ? `<span class="x" data-act="hcam" data-id="${x.entity_id}"><ha-icon icon="mdi:close"></ha-icon></span>${this._tools('homecams', x.entity_id, null)}` : '')).join('')}</div>`;
+  }
+  _refreshCams() {
+    if (this._edit || this._dg || (typeof document !== 'undefined' && document.hidden)) return;
+    const q = this.shadowRoot.querySelectorAll; if (!q) return;
+    this.shadowRoot.querySelectorAll('img[data-b]').forEach((img) => {
+      const b = img.dataset.b; const u = `${b}${b.includes('?') ? '&' : '?'}_t=${Date.now()}`;
+      const n = new Image(); n.onload = () => { img.src = u; }; n.src = u;
+    });
   }
   _cams() {
     const cams = this._ord('cams', (this._byDomain().camera || []).filter((s) => s.state !== 'unavailable' && (this._edit || !this._set.hidden.includes(s.entity_id))), (s) => s.entity_id);
@@ -1015,6 +1037,9 @@ class LumoraCard extends HTMLElement {
           + (l.length ? '' : '<div class="empty">Keine Sensoren in diesem Bereich. Weise sie in Home Assistant dem Bereich zu.</div>');
       };
       c = `<h2>Sensoren · ${esc(this._aname(aid))}</h2>${mk('temperature', 'temp', 'Temperatur')}${mk('humidity', 'hum', 'Luftfeuchtigkeit')}`;
+    } else if (this._sheet === 'hc') {
+      const cams = (this._byDomain().camera || []).filter((x) => x.state !== 'unavailable'); const on = this._set.homeCams;
+      c = `<h2>Kameras auf der Startseite</h2>${cams.map((x) => `<div class="row"><ha-icon icon="mdi:cctv"></ha-icon><div class="t"><b>${esc(cleanName(x.attributes.friendly_name))}</b></div><button class="${on.includes(x.entity_id) ? 'sel' : ''}" data-act="hcam" data-id="${x.entity_id}">${on.includes(x.entity_id) ? 'An' : 'Aus'}</button></div>`).join('') || '<div class="empty">Keine Kameras gefunden.</div>'}`;
     } else if (this._sheet === 'src') {
       const h = this._hass; const gs = {}; Object.keys(SLOTS).forEach((k) => { (gs[SLOTS[k].g] || (gs[SLOTS[k].g] = [])).push(k); });
       c = `<h2>Sensoren und Quellen</h2><div class="hint">Was Lumora findet, ist schon eingetragen. Passt etwas nicht oder fehlt es, wähle es hier aus. Nicht Gefundenes bleibt einfach unsichtbar.</div>${Object.entries(gs).map(([g, ks]) => `<h4>${g}</h4>${ks.map((k) => {
@@ -1098,6 +1123,8 @@ class LumoraCard extends HTMLElement {
       case 'alerts': this._sheet = 'alerts'; break;
       case 'warns': this._sheet = 'warns'; break;
       case 'chips': this._sheet = 'chips'; break;
+      case 'hc': this._sheet = 'hc'; break;
+      case 'hcam': s.homeCams = s.homeCams.includes(id) ? s.homeCams.filter((x) => x !== id) : [...s.homeCams, id]; this._save(); break;
       case 'src': this._sheet = 'src'; this._ac = null; break;
       case 'srcpick': this._sheet = 'srcpick'; this._sk = t.dataset.k; this._q = ''; break;
       case 'srcset': { const k = t.dataset.k; if (id) s.sources[k] = id; else delete s.sources[k]; this._save(); this._ac = null; this._sheet = 'src'; break; }
