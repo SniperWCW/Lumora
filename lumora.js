@@ -125,7 +125,8 @@ h1{margin:0;font-size:clamp(26px,7.4vw,38px);line-height:1.1;font-weight:600;let
 .av i{position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;background:#9a9a9a;border:2px solid var(--from)}
 .hello .av{width:64px;height:64px;font-size:24px}.pp.home .av i{background:#4caf50}
 .pps{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px}
-.pp{display:flex;align-items:center;gap:10px;background:var(--a);border-radius:99px;padding:5px 16px 5px 5px;cursor:pointer}
+.pp .tools{position:static;display:inline-flex;margin-left:2px}.pp .tools .mini{width:28px;height:28px}
+.pp{position:relative;display:flex;align-items:center;gap:10px;background:var(--a);border-radius:99px;padding:5px 16px 5px 5px;cursor:pointer}
 .pp b{display:block;font-size:14px;font-weight:600}.pp span{font-size:12px;color:var(--fg2)}
 .en{background:var(--a);border-radius:20px;padding:16px;cursor:pointer}
 .en .hd{display:flex;align-items:center;gap:12px}.en .ib{width:44px;height:44px;border-radius:14px;background:var(--b);display:grid;place-items:center;flex:none}
@@ -264,6 +265,7 @@ class LumoraCard extends HTMLElement {
   getCardSize() { return 12; }
   connectedCallback() {
     this._tick = setInterval(() => {
+      if (this._edit || this._dg) return;
       const el = this.shadowRoot.querySelector('.note-t');
       const al = this._hass ? this._alerts() : [];
       if (el && al.length > 1) { this._ai = (this._ai + 1) % al.length; el.textContent = al[this._ai].text; }
@@ -275,7 +277,7 @@ class LumoraCard extends HTMLElement {
     const first = !this._hass;
     this._hass = h;
     if (first) this._load();
-    if (!this._loaded || this._sheet === 'add' || this._drag || this._dg) return;
+    if (!this._loaded || this._sheet === 'add' || this._drag || this._dg || this._edit) return;
     if (this._down && this._edit) { this._pend = true; return; }
     const sig = this._signature();
     if (sig !== this._sig) {
@@ -301,15 +303,22 @@ class LumoraCard extends HTMLElement {
   }
 
   async _load() {
+    let mine = null;
     try {
       const r = await this._hass.callWS({ type: 'frontend/get_user_data', key: KEY });
-      if (r && r.value) this._set = merge(r.value);
+      if (r && r.value) mine = r.value;
     } catch (e) {
-      try { const j = localStorage.getItem(KEY); if (j) this._set = merge(JSON.parse(j)); } catch (_) { /* ignore */ }
+      try { const j = localStorage.getItem(KEY); if (j) mine = JSON.parse(j); } catch (_) { /* ignore */ }
     }
+    const base = this._cfg && this._cfg.layout && this._cfg.shared !== false ? this._cfg.layout : null;
+    const admin = !!(this._hass.user && this._hass.user.is_admin);
+    this._locked = !!base && !admin;
+    const pick = admin ? (mine || base) : (base || mine);
+    if (pick) this._set = merge(pick);
     this._loaded = true; this._sig = this._signature(); this._render();
   }
   async _save() {
+    if (this._locked) return;
     try { localStorage.setItem(KEY, JSON.stringify(this._set)); } catch (_) { /* ignore */ }
     try { await this._hass.callWS({ type: 'frontend/set_user_data', key: KEY, value: this._set }); } catch (_) { /* ignore */ }
   }
@@ -480,11 +489,13 @@ class LumoraCard extends HTMLElement {
     const pic = p && p.attributes.entity_picture; const nm = (p && p.attributes.friendly_name) || '?';
     return `<div class="av">${pic ? `<img src="${esc(pic)}" alt="">` : `<span>${esc(nm[0])}</span>`}${big ? '' : '<i></i>'}</div>`;
   }
+  _vpersons(persons) { return this._ord('persons', persons.filter((p) => this._edit || !this._set.hidden.includes(p.entity_id)), (p) => p.entity_id); }
   _presence(persons) {
+    persons = this._vpersons(persons); if (!persons.length) return '';
     return `<div class="pps">${persons.map((p) => {
       const home = p.state === 'home';
       const lbl = home ? 'Zuhause' : p.state === 'not_home' ? 'Unterwegs' : p.state;
-      return `<div class="pp ${home ? 'home' : ''}" data-act="info" data-id="${p.entity_id}">${this._avatar(p, false)}<div><b>${esc(p.attributes.friendly_name)}</b><span>${esc(lbl)}</span></div></div>`;
+      return `<div class="pp ${home ? 'home' : ''} ${this._set.hidden.includes(p.entity_id) ? 'hid' : ''}" data-act="info" data-id="${p.entity_id}">${this._avatar(p, false)}<div><b>${esc(p.attributes.friendly_name)}</b><span>${esc(lbl)}</span></div>${this._tools('persons', p.entity_id, 'hidden')}</div>`;
     }).join('')}</div>`;
   }
   _energy() {
@@ -504,7 +515,8 @@ class LumoraCard extends HTMLElement {
   _home() {
     const h = this._hass; const D = this._byDomain(); const al = this._alerts();
     const persons = D.person || [];
-    const home = persons.filter((p) => p.state === 'home').length;
+    const vis = persons.filter((p) => !this._set.hidden.includes(p.entity_id));
+    const home = vis.filter((p) => p.state === 'home').length;
     const alarm = (D.alarm_control_panel || [])[0];
     const AL = { disarmed: 'Aus', armed_home: 'Zuhause', armed_away: 'Scharf', armed_night: 'Nacht', armed_vacation: 'Urlaub', triggered: 'ALARM', pending: 'Wartet', arming: 'Schaltet scharf' };
     const cl = (D.climate || []).map((c) => c.attributes.current_temperature).filter((v) => typeof v === 'number');
@@ -552,10 +564,10 @@ class LumoraCard extends HTMLElement {
     const en = this._energy();
     return `<div class="top"><div class="logo"><ha-icon icon="mdi:home-variant"></ha-icon></div><div class="ttl">Lumora.</div>${apill}</div>
       <div class="meta">${esc(meta)}</div>${this._vent()}
-      <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${home}/${persons.length} zu Hause</div></div></div>
+      <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${vis.length ? `${home}/${vis.length} zu Hause` : ''}</div></div></div>
       ${this._presence(persons)}${note}<div class="pills">${pills}</div>
       ${en ? `<h3>Energie</h3>${en}` : ''}
-      <h3>Aktiv jetzt<span class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</span></h3>
+      <h3>Aktiv jetzt${this._locked ? '' : `<span class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</span>`}</h3>
       ${this._hint()}<div class="grid">${cards.join('')}</div>`;
   }
   _card(st, sub, pinId, edit) {
@@ -612,7 +624,7 @@ class LumoraCard extends HTMLElement {
           if (!best || v > best.v) best = { v, t: x.lu !== undefined ? x.lu * 1000 : new Date(x.last_updated || x.last_changed).getTime() };
         }
         pk[id] = { at: Date.now(), v: best && best.v, t: best && best.t };
-        clearTimeout(this._rt); this._rt = setTimeout(() => this._render(), 100);
+        if (!this._edit) { clearTimeout(this._rt); this._rt = setTimeout(() => this._render(), 100); }
       }).catch(() => { pk[id] = { at: Date.now() }; });
     return pk[id];
   }
@@ -863,7 +875,7 @@ class LumoraCard extends HTMLElement {
       ${cams.length ? `<div class="cams" style="margin-bottom:10px">${cams.map((s) => this._camHtml(s, 'rcams:' + a.id)).join('')}</div>` : ''}
       <div class="grid">${tiles || '<div class="empty">Keine Geräte in diesem Raum.</div>'}</div>`;
   }
-  _editBtn() { return `<button class="pill" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button>`; }
+  _editBtn() { return this._locked ? '' : `<button class="pill" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button>`; }
   _tools(scope, id, hideKey) {
     if (!this._edit) return '';
     const list = hideKey === 'hiddenAreas' ? this._set.hiddenAreas : this._set.hidden;
@@ -876,7 +888,25 @@ class LumoraCard extends HTMLElement {
     (this._ids || (this._ids = {}))[scope] = res.map(idf);
     return res;
   }
-  _hint() { return this._edit ? '<div class="hint">Bearbeiten: Element gedrückt halten und ziehen zum Verschieben. Das Auge blendet aus oder wieder ein.</div>' : ''; }
+  _hint() {
+    if (!this._edit) return '';
+    const admin = this._hass.user && this._hass.user.is_admin;
+    return `<div class="hint">${this._msg ? esc(this._msg) : 'Bearbeiten: Element gedrückt halten und ziehen zum Verschieben. Das Auge blendet aus oder wieder ein.'}${admin && this._cfg.shared !== false ? ' <button class="pill" data-act="publish" style="margin-top:8px"><ha-icon icon="mdi:account-group"></ha-icon>Layout für alle speichern</button>' : ''}</div>`;
+  }
+  async _publish() {
+    const h = this._hass; const seg = (location.pathname.split('/')[1] || ''); const url = !seg || seg === 'lovelace' ? null : seg;
+    this._msg = 'Speichere …'; this._render();
+    try {
+      const cfg = await h.callWS({ type: 'lovelace/config', url_path: url, force: true });
+      let hit = false;
+      const walk = (o) => { if (!o || typeof o !== 'object' || hit) return; if (o.type === 'custom:lumora-card') { o.layout = JSON.parse(JSON.stringify(this._set)); hit = true; return; } Object.values(o).forEach(walk); };
+      walk(cfg);
+      if (!hit) throw new Error('Karte nicht im Dashboard gefunden');
+      await h.callWS({ type: 'lovelace/config/save', url_path: url, config: cfg });
+      this._msg = 'Layout gespeichert. Andere Benutzer sehen es nach dem Neuladen.';
+    } catch (e) { this._msg = `Speichern nicht möglich (${(e && (e.message || e.code)) || e}). Das Dashboard muss im Bearbeitungsmodus der Oberfläche liegen und du Administrator sein.`; }
+    this._render(); clearTimeout(this._mt); this._mt = setTimeout(() => { this._msg = null; if (!this._dg) this._render(); }, 6000);
+  }
   _tile(st, area, scope) {
     const d = dom(st.entity_id); const on = !INACTIVE.includes(st.state);
     if (d === 'switch') { const pw = this._plugPower(st.entity_id); if (pw) return this._plugCard(st, pw, this._tools(scope, st.entity_id, 'hidden'), this._set.hidden.includes(st.entity_id) ? 'hid' : '', area); }
@@ -998,7 +1028,8 @@ class LumoraCard extends HTMLElement {
       case 'onlyact': this._only = !this._only; this._render(); return;
       case 'pick': if (!s.pinned.some((p) => p.entity === id)) s.pinned.push({ entity: id, only: this._only }); this._save(); this._sheet = null; this._only = false; break;
       case 'unpin': s.pinned = s.pinned.filter((p) => p.entity !== id); this._save(); break;
-      case 'edit': this._edit = !this._edit; break;
+      case 'edit': if (this._locked) return; this._edit = !this._edit; break;
+      case 'publish': this._publish(); return;
       case 'mv': {
         const sc = t.dataset.s; const dd = Number(t.dataset.d);
         if (sc === 'pinned') {
