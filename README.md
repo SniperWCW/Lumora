@@ -41,22 +41,22 @@ Dashboard-Ansicht vom Typ `panel` mit folgender Karte:
 type: custom:lumora-card
 # optional
 theme: sand        # Standard; alternativ: forest
-name: Steffen      # optional, sonst Name aus der Person des Benutzers
-energy:            # optional, Standard sind die SOLARWATT-Flow-Sensoren
-  pv: sensor.solarwatt_flow_pv_out
-  consumption: sensor.solarwatt_flow_consumption_in
-  grid_in: sensor.solarwatt_flow_grid_in
-  grid_out: sensor.solarwatt_flow_grid_out
-  battery_in: sensor.solarwatt_flow_battery_in
-  battery_out: sensor.solarwatt_flow_battery_out
-  soc: sensor.solarwatt_battery_soc
-  forecast: sensor.solcast_pv_forecast_prognose_spitzenleistung_heute
-info:              # optional, Standard sind deine Sensoren
-  ice: sensor.system_eiswarnung
+name: Anna         # optional, sonst Name aus der Person des Benutzers
+energy:            # optional
+  pv: sensor.pv_leistung
+  consumption: sensor.hausverbrauch
+  grid_in: sensor.netz_bezug
+  grid_out: sensor.netz_einspeisung
+  battery_in: sensor.batterie_laden
+  battery_out: sensor.batterie_entladen
+  soc: sensor.batterie_ladestand
+  forecast: sensor.pv_prognose_heute
+info:              # optional
+  ice: sensor.eiswarnung
   bike: sensor.fahrrad_wetter
-  pollen: sensor.polleninformation_stuttgart_allergy_risk
-  travel: [["Steffen zur Arbeit", sensor.system_steffen_heimerdingen_steffen]]
-  trains: [["Korntal → Feuerbach", sensor.korntal_to_feuerbach]]
+  pollen: sensor.pollen_risiko
+  travel: [["Zur Arbeit", sensor.fahrzeit_arbeit]]
+  trains: [["Bahnhof A → B", sensor.abfahrten_a_nach_b]]
 color_from: "#f2eadb"
 color_to: "#d6c5a8"
 ```
