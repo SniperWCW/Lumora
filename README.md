@@ -11,6 +11,7 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - Steckdosen-Karten: Ein/Aus, aktuelle Leistung in Watt und Tagesspitze mit Uhrzeit (Leistungssensor am selben Gerät wird automatisch zugeordnet)
 - Räume je Etage und Area, Kameraübersicht; Temperatur und Luftfeuchte im Raumkopf automatisch aus der Area (abgeleitete Werte wie Taupunkt werden ignoriert), pro Raum wählbar unter Bearbeiten, Sensoren
 - Tab "Mehr": Haushaltsgeräte (Waschmaschine, Trockner, Spülmaschine mit Programm, Fortschritt, Restzeit), Pakete, Energie, Zähler (Strom, Gas, Wasser, Ersparnis), 3D-Drucker, Pool, Wetter, Tankzeit, HA-Health, Pi-hole, Lage Deutschland. Karten ohne verfügbare Daten bleiben ausgeblendet
+- Warn-Chips neben "x Lampen an" und in der Meldungszeile: DWD-Wetterwarnungen (automatisch erkannt), NINA-Warnungen, Eiswarnung, Fahrrad-Hinweis, Pollen (nur bei Belastung) und Fahrzeiten (Waze, Bahn); Details per Tipp. Ein- und ausschaltbar unter Meldungen
 - Startseite zeigt laufende Geräte, Pakete in Zustellung und den Drucker während des Drucks automatisch
 - Bearbeiten-Modus auf Start, Räumen und Kameras: ausblenden (Auge) und verschieben per Drag and Drop (gedrückt halten und ziehen) für Etagen, Räume, Kacheln, Kameras und angepinnte Karten; Räume von Meldungen ausnehmen
 
@@ -44,6 +45,12 @@ energy:            # optional, Standard sind die SOLARWATT-Flow-Sensoren
   battery_out: sensor.solarwatt_flow_battery_out
   soc: sensor.solarwatt_battery_soc
   forecast: sensor.solcast_pv_forecast_prognose_spitzenleistung_heute
+info:              # optional, Standard sind deine Sensoren
+  ice: sensor.system_eiswarnung
+  bike: sensor.fahrrad_wetter
+  pollen: sensor.polleninformation_stuttgart_allergy_risk
+  travel: [["Steffen zur Arbeit", sensor.system_steffen_heimerdingen_steffen]]
+  trains: [["Korntal → Feuerbach", sensor.korntal_to_feuerbach]]
 color_from: "#f2eadb"
 color_to: "#d6c5a8"
 ```
