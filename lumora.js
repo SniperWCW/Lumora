@@ -12,6 +12,18 @@ const DEF = {
   hidden: [],
   hiddenAreas: [],
 };
+const ENERGY = {
+  pv: 'sensor.solarwatt_flow_pv_out', consumption: 'sensor.solarwatt_flow_consumption_in',
+  grid_in: 'sensor.solarwatt_flow_grid_in', grid_out: 'sensor.solarwatt_flow_grid_out',
+  battery_in: 'sensor.solarwatt_flow_battery_in', battery_out: 'sensor.solarwatt_flow_battery_out',
+  soc: 'sensor.solarwatt_battery_soc', forecast: 'sensor.solcast_pv_forecast_prognose_spitzenleistung_heute',
+};
+const WX = {
+  'clear-night': 'mdi:weather-night', sunny: 'mdi:weather-sunny', cloudy: 'mdi:weather-cloudy', partlycloudy: 'mdi:weather-partly-cloudy',
+  rainy: 'mdi:weather-rainy', pouring: 'mdi:weather-pouring', snowy: 'mdi:weather-snowy', fog: 'mdi:weather-fog', windy: 'mdi:weather-windy',
+  lightning: 'mdi:weather-lightning', 'lightning-rainy': 'mdi:weather-lightning-rainy', hail: 'mdi:weather-hail',
+};
+const VAC = { docked: 'In der Station', cleaning: 'Saugt', returning: 'Fährt zur Station', paused: 'Pausiert', idle: 'Bereit', error: 'Fehler', unavailable: 'Nicht verfügbar' };
 const OUTDOOR = ['garten', 'aussenbereich_vorne', 'fahrzeug', 'system', 'allgemein'];
 const DOM_ICON = {
   light: 'mdi:lightbulb', switch: 'mdi:toggle-switch', input_boolean: 'mdi:toggle-switch', cover: 'mdi:window-shutter',
@@ -75,7 +87,38 @@ const CSS = `
 .pill.warn{background:var(--warn)}.pill.bad{background:var(--bad);color:var(--badfg)}.pill.ok{background:var(--okbg)}
 .pill ha-icon{--mdc-icon-size:18px}
 .meta{margin:26px 0 6px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg2)}
-h1{margin:0 0 14px;font-size:clamp(42px,12vw,64px);line-height:1.05;font-weight:600;letter-spacing:-.02em}
+h1{margin:0;font-size:clamp(26px,7.4vw,38px);line-height:1.1;font-weight:600;letter-spacing:-.02em}
+.hello{display:flex;gap:14px;align-items:center;margin:14px 0 14px}.hello .sub{font-size:14px;color:var(--fg2);margin-top:4px}
+.av{width:42px;height:42px;border-radius:50%;background:var(--b);display:grid;place-items:center;position:relative;font-weight:600;flex:none}
+.av img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.av i{position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;background:#9a9a9a;border:2px solid var(--from)}
+.hello .av{width:64px;height:64px;font-size:24px}.pp.home .av i{background:#4caf50}
+.pps{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+.pp{display:flex;align-items:center;gap:10px;background:var(--a);border-radius:99px;padding:5px 16px 5px 5px;cursor:pointer}
+.pp b{display:block;font-size:14px;font-weight:600}.pp span{font-size:12px;color:var(--fg2)}
+.en{background:var(--a);border-radius:20px;padding:16px;cursor:pointer}
+.en .hd{display:flex;align-items:center;gap:12px}.en .ib{width:44px;height:44px;border-radius:14px;background:var(--b);display:grid;place-items:center;flex:none}
+.en .hd b{display:block;font-size:16px;font-weight:600}.en .hd span{font-size:12.5px;color:var(--fg2)}
+.en .big{margin-left:auto;font-size:30px;font-weight:600;white-space:nowrap}
+.en .rw{margin-top:12px}.en .rl{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}
+.en .rl span:last-child{font-weight:600}.en .rl ha-icon{--mdc-icon-size:18px;margin-right:6px}
+.bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
+.bar.g i{background:#8da3b8}.bar.b i{background:#82b06c}
+.cl,.vc{background:var(--a);border-radius:20px;padding:14px;display:flex;gap:10px;min-height:156px;position:relative;min-width:0}
+.cl.heat{background:rgba(226,140,70,.2)}.cl.hid,.vc.hid{opacity:.45}
+.clm,.vm{flex:1;min-width:0;display:flex;flex-direction:column;cursor:pointer}
+.clt{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg2);margin-bottom:auto}
+.clt ha-icon{--mdc-icon-size:22px;color:var(--fg)}.clt em{font-style:normal;margin-left:auto}
+.cv{font-size:34px;font-weight:600;letter-spacing:-.02em;margin-top:10px}.cn{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cs{font-size:12px;color:var(--fg2);margin-top:2px}
+.vs{position:relative;width:46px;flex:none;border-radius:23px;background:var(--line);touch-action:none;cursor:ns-resize;user-select:none}
+.vf{position:absolute;left:0;right:0;bottom:0;border-radius:23px;background:var(--b)}
+.vt{position:absolute;left:5px;width:36px;height:36px;border-radius:50%;background:#fff;color:#222;display:grid;place-items:center;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.vt i{font-style:normal;font-size:11px;font-weight:600}
+.vm ha-icon{--mdc-icon-size:26px;margin-bottom:auto}.vm b{font-size:15px;font-weight:600;display:block;margin-top:10px}.vm span{font-size:12.5px;color:var(--fg2)}
+.vc.run{background:rgba(120,170,110,.25)}.vb{display:flex;flex-direction:column;gap:8px;justify-content:center}
+.cl .mini,.cl .x{top:8px;right:68px}.vc .mini{position:absolute;top:6px;right:6px;z-index:2}
+.sq{width:46px;height:46px;border-radius:14px;border:0;background:var(--b);color:inherit;display:grid;place-items:center;cursor:pointer;padding:0}
 .note{display:flex;gap:10px;align-items:center;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg2);margin-bottom:14px;cursor:pointer}
 .note ha-icon{--mdc-icon-size:20px;flex:none}
 .pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
@@ -89,7 +132,7 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .card ha-icon{--mdc-icon-size:24px}
 .card.add{border:1.5px dashed var(--fg2);background:transparent;justify-content:center;align-items:center;flex-direction:row;color:var(--fg2)}
 .x,.mini{border:0;color:inherit;display:grid;place-items:center;cursor:pointer;padding:0}
-.card .x{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.35);color:#fff}
+.x{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.35);color:#fff;z-index:2}
 .mini{width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.1)}
 .mini ha-icon{--mdc-icon-size:16px}
 .pill .mini{width:20px;height:20px;margin:0 -6px 0 2px}
@@ -131,12 +174,27 @@ class LumoraCard extends HTMLElement {
     this._edit = false; this._q = ''; this._flt = 'all'; this._only = false; this._ai = 0;
     this._set = merge({}); this._loaded = false; this._sig = '';
     this.shadowRoot.addEventListener('click', (e) => this._click(e));
+    this.shadowRoot.addEventListener('pointerdown', (e) => {
+      const v = e.target.closest && e.target.closest('.vs'); if (!v) return;
+      e.preventDefault(); this._drag = { el: v, id: v.dataset.id, min: +v.dataset.min, max: +v.dataset.max, step: +v.dataset.step, val: null };
+      try { v.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+      this._dragTo(e);
+    });
+    this.shadowRoot.addEventListener('pointermove', (e) => { if (this._drag) this._dragTo(e); });
+    const end = () => {
+      const d = this._drag; if (!d) return; this._drag = null;
+      if (d.val !== null) this._hass.callService('climate', 'set_temperature', { entity_id: d.id, temperature: d.val });
+      setTimeout(() => this._render(), 400);
+    };
+    this.shadowRoot.addEventListener('pointerup', end);
+    this.shadowRoot.addEventListener('pointercancel', end);
     this.shadowRoot.addEventListener('input', (e) => {
       if (e.target.classList.contains('srch')) { this._q = e.target.value; this._fillList(); }
     });
   }
   setConfig(cfg) {
     this._cfg = cfg || {};
+    this._eids = Object.values({ ...ENERGY, ...((cfg && cfg.energy) || {}) });
     if (cfg && cfg.theme) this.setAttribute('theme', cfg.theme);
     if (cfg && cfg.color_from) this.style.setProperty('--zp-from', cfg.color_from);
     if (cfg && cfg.color_to) this.style.setProperty('--zp-to', cfg.color_to);
@@ -155,7 +213,7 @@ class LumoraCard extends HTMLElement {
     const first = !this._hass;
     this._hass = h;
     if (first) this._load();
-    if (!this._loaded || this._sheet === 'add') return;
+    if (!this._loaded || this._sheet === 'add' || this._drag) return;
     const sig = this._signature();
     if (sig !== this._sig) {
       this._sig = sig;
@@ -165,11 +223,12 @@ class LumoraCard extends HTMLElement {
   }
   _signature() {
     const h = this._hass; const parts = [this._view, this._floor, this._area, this._sheet, this._edit, Math.floor(Date.now() / 60000), this._set.pinned.length, this._set.hidden.length, this._set.hiddenAreas.length];
-    const doms = ['light', 'media_player', 'vacuum', 'person', 'alarm_control_panel', 'lock', 'binary_sensor', 'camera', 'switch', 'cover', 'climate', 'fan'];
+    const doms = ['weather', 'light', 'media_player', 'vacuum', 'person', 'alarm_control_panel', 'lock', 'binary_sensor', 'camera', 'switch', 'cover', 'climate', 'fan'];
     for (const id in h.states) {
       const d = dom(id);
-      if (doms.includes(d)) { const s = h.states[id]; parts.push(id + s.state + (d === 'climate' ? s.attributes.current_temperature : '')); }
+      if (doms.includes(d)) { const s = h.states[id]; parts.push(id + s.state + (d === 'climate' ? `${s.attributes.current_temperature}/${s.attributes.temperature}/${s.attributes.hvac_action}` : '')); }
       else if (this._view === 'rooms' && d === 'sensor') parts.push(id + h.states[id].state);
+      else if ((this._eids || []).includes(id)) parts.push(id + h.states[id].state);
       else if (this._set.pinned.some((p) => p.entity === id)) parts.push(id + h.states[id].state);
     }
     return parts.join('|');
@@ -255,19 +314,50 @@ class LumoraCard extends HTMLElement {
     const nb = this.shadowRoot.querySelector('.body'); if (nb) nb.scrollTop = top;
     if (this._sheet === 'add') this._fillList();
   }
+  _num(id) { const st = this._hass.states[id]; const v = st ? parseFloat(st.state) : NaN; return isNaN(v) ? null : v; }
+  _w(v) { return Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')} kW` : `${Math.round(v)} W`; }
+  _avatar(p, big) {
+    const pic = p && p.attributes.entity_picture; const nm = (p && p.attributes.friendly_name) || '?';
+    return `<div class="av">${pic ? `<img src="${esc(pic)}" alt="">` : `<span>${esc(nm[0])}</span>`}${big ? '' : '<i></i>'}</div>`;
+  }
+  _presence(persons) {
+    return `<div class="pps">${persons.map((p) => {
+      const home = p.state === 'home';
+      const lbl = home ? 'Zuhause' : p.state === 'not_home' ? 'Unterwegs' : p.state;
+      return `<div class="pp ${home ? 'home' : ''}" data-act="info" data-id="${p.entity_id}">${this._avatar(p, false)}<div><b>${esc(p.attributes.friendly_name)}</b><span>${esc(lbl)}</span></div></div>`;
+    }).join('')}</div>`;
+  }
+  _energy() {
+    const e = { ...ENERGY, ...(this._cfg.energy || {}) }; const n = (k) => this._num(e[k]);
+    const cons = n('consumption'); const pv = n('pv');
+    if (cons === null && pv === null) return '';
+    const gin = n('grid_in') || 0; const gout = n('grid_out') || 0; const bin = n('battery_in') || 0; const bout = n('battery_out') || 0;
+    const soc = n('soc'); const fc = n('forecast');
+    const max = Math.max(cons || 0, pv || 0, gin, gout, bin, bout, 1);
+    const row = (ic, label, v, cls) => `<div class="rw"><div class="rl"><span><ha-icon icon="${ic}"></ha-icon>${label}</span><span>${this._w(v)}</span></div><div class="bar ${cls}"><i style="width:${Math.max(2, Math.round((v / max) * 100))}%"></i></div></div>`;
+    const grid = gout > gin ? ['Netz · Einspeisung', gout] : ['Netz · Bezug', gin];
+    const bat = bin > bout ? ['Batterie · lädt', bin] : ['Batterie · entlädt', bout];
+    const sub = fc !== null ? `Prognose heute bis ${this._w(fc)}` : 'Aktuelle Leistung';
+    return `<div class="en" data-act="info" data-id="${e.consumption}"><div class="hd"><div class="ib"><ha-icon icon="mdi:flash"></ha-icon></div><div><b>Stromverbrauch</b><span>${sub}</span></div><div class="big">${this._w(cons || 0)}</div></div>
+      ${row('mdi:solar-power', 'PV-Erzeugung', pv || 0, '')}${row('mdi:transmission-tower', grid[0], grid[1], 'g')}${row('mdi:home-battery', `${bat[0]}${soc !== null ? ` · ${Math.round(soc)} %` : ''}`, bat[1], 'b')}</div>`;
+  }
   _home() {
     const h = this._hass; const D = this._byDomain(); const al = this._alerts();
-    const home = (D.person || []).filter((p) => p.state === 'home').length;
+    const persons = D.person || [];
+    const home = persons.filter((p) => p.state === 'home').length;
     const alarm = (D.alarm_control_panel || [])[0];
     const AL = { disarmed: 'Aus', armed_home: 'Zuhause', armed_away: 'Scharf', armed_night: 'Nacht', armed_vacation: 'Urlaub', triggered: 'ALARM', pending: 'Wartet', arming: 'Schaltet scharf' };
     const cl = (D.climate || []).map((c) => c.attributes.current_temperature).filter((v) => typeof v === 'number');
     const temp = cl.length ? (cl.reduce((a, b) => a + b, 0) / cl.length).toFixed(1) : null;
     const hu = (D.sensor || []).filter((s) => s.attributes.device_class === 'humidity' && !OUTDOOR.includes(this._areaOf(s.entity_id)) && !isNaN(parseFloat(s.state))).map((s) => parseFloat(s.state));
     const hum = hu.length ? Math.round(hu.reduce((a, b) => a + b, 0) / hu.length) : null;
+    const wx = (D.weather || [])[0];
     const lang = (h.locale && h.locale.language) || 'de';
     const date = new Date().toLocaleDateString(lang, { weekday: 'long', day: 'numeric', month: 'long' });
     const hr = new Date().getHours();
     const greet = hr < 5 ? 'Gute Nacht' : hr < 11 ? 'Guten Morgen' : hr < 17 ? 'Guten Tag' : hr < 22 ? 'Guten Abend' : 'Gute Nacht';
+    const me = persons.find((p) => h.user && p.attributes.user_id === h.user.id);
+    const nm = this._cfg.name || (me && me.attributes.friendly_name) || (h.user && h.user.name) || '';
     const lights = (D.light || []).filter((l) => l.state === 'on');
     const meta = [date, temp && `${temp}° innen`, hum !== null && `${hum}% Luftfeuchtigkeit`].filter(Boolean).join(' • ');
     const ai = al.length ? this._ai % al.length : 0;
@@ -275,8 +365,10 @@ class LumoraCard extends HTMLElement {
       ? `<div class="note" data-act="alerts"><ha-icon icon="${al[ai].icon}"></ha-icon><span class="note-t">${esc(al[ai].text)}</span></div>`
       : `<div class="note" data-act="alerts"><ha-icon icon="mdi:check-circle-outline"></ha-icon><span class="note-t">Alles in Ordnung</span></div>`;
     const apill = alarm ? `<button class="pill ${alarm.state === 'triggered' ? 'bad' : ''}" data-act="info" data-id="${alarm.entity_id}"><ha-icon icon="mdi:shield-home"></ha-icon>${esc(AL[alarm.state] || alarm.state)}</button>` : '';
+    const wpill = wx && typeof wx.attributes.temperature === 'number' ? `<button class="pill" data-act="info" data-id="${wx.entity_id}"><ha-icon icon="${WX[wx.state] || 'mdi:weather-cloudy'}"></ha-icon>${wx.attributes.temperature.toFixed(1)}° draußen</button>` : '';
     const pills = [
       lights.length ? `<button class="pill" data-act="lights"><ha-icon icon="mdi:lamp"></ha-icon>${lights.length} an</button>` : '',
+      wpill,
       al.length ? `<button class="pill ${al.some((a) => a.sev === 0) ? 'bad' : 'warn'}" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>${al.length} Meldung${al.length > 1 ? 'en' : ''}</button>` : '',
     ].join('');
     const cards = [];
@@ -285,22 +377,56 @@ class LumoraCard extends HTMLElement {
       cards.push(`<div class="card" data-act="lights"><ha-icon icon="mdi:lightbulb-group"></ha-icon><div><b>${lights.length} Licht${lights.length > 1 ? 'er' : ''} an</b><span>${esc(names)}</span></div></div>`);
     }
     (D.media_player || []).filter((m) => m.state === 'playing').forEach((m) => cards.push(this._card(m, m.attributes.media_title || 'Läuft')));
-    (D.vacuum || []).filter((v) => v.state === 'cleaning').forEach((v) => cards.push(this._card(v, 'Saugt')));
+    (D.vacuum || []).filter((v) => ['cleaning', 'returning'].includes(v.state)).forEach((v) => cards.push(this._card(v, '')));
     this._set.pinned.forEach((p) => {
       const st = h.states[p.entity]; if (!st) return;
       if (p.only && INACTIVE.includes(st.state)) return;
       cards.push(this._card(st, this._state(st), p.entity, this._edit));
     });
     cards.push(`<div class="card add" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</div>`);
-    return `<div class="top"><div class="logo"><ha-icon icon="mdi:home-variant"></ha-icon></div><div class="ttl">Lumora.</div>
-      <button class="pill" data-act="nav" data-v="cams"><ha-icon icon="mdi:account-multiple"></ha-icon>${home}</button>${apill}</div>
-      <div class="meta">${esc(meta)}</div><h1>${greet}</h1>${note}<div class="pills">${pills}</div>
+    const en = this._energy();
+    return `<div class="top"><div class="logo"><ha-icon icon="mdi:home-variant"></ha-icon></div><div class="ttl">Lumora.</div>${apill}</div>
+      <div class="meta">${esc(meta)}</div>
+      <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${home}/${persons.length} zu Hause</div></div></div>
+      ${this._presence(persons)}${note}<div class="pills">${pills}</div>
+      ${en ? `<h3>Energie</h3>${en}` : ''}
       <h3>Aktiv jetzt<span class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</span></h3>
       <div class="grid">${cards.join('')}</div>`;
   }
   _card(st, sub, pinId, edit) {
     const x = edit && pinId ? `<span class="x" data-act="unpin" data-id="${pinId}"><ha-icon icon="mdi:close"></ha-icon></span>` : '';
+    const sp = this._special(st, x, ''); if (sp) return sp;
     return `<div class="card" data-act="info" data-id="${st.entity_id}">${x}<ha-icon icon="${this._icon(st)}"></ha-icon><div><b>${esc(st.attributes.friendly_name || st.entity_id)}</b><span>${esc(sub)}</span></div></div>`;
+  }
+  _special(st, extra, cls) {
+    const d = dom(st.entity_id);
+    if (d === 'climate') return this._climCard(st, extra, cls);
+    if (d === 'vacuum') return this._vacCard(st, extra, cls);
+    return null;
+  }
+  _climCard(st, extra, cls) {
+    const a = st.attributes; const cur = a.current_temperature; const tgt = a.temperature;
+    const min = a.min_temp ?? 5; const max = a.max_temp ?? 30; const step = a.target_temp_step || 0.5;
+    const act = a.hvac_action;
+    const label = st.state === 'unavailable' ? 'Offline' : st.state === 'off' ? 'Aus' : act === 'heating' ? 'Heizt' : act === 'cooling' ? 'Kühlt' : act === 'idle' ? 'Leerlauf' : st.state === 'heat' ? 'Heizen' : st.state;
+    const pct = typeof tgt === 'number' ? Math.min(1, Math.max(0, (tgt - min) / (max - min))) : 0;
+    const slider = typeof tgt === 'number' ? `<div class="vs" data-id="${st.entity_id}" data-min="${min}" data-max="${max}" data-step="${step}"><div class="vf" style="height:calc(40px + (100% - 40px) * ${pct})"></div><div class="vt" style="bottom:calc(2px + (100% - 40px) * ${pct})"><i>${tgt.toFixed(1)}</i></div></div>` : '';
+    return `<div class="cl ${act === 'heating' ? 'heat' : ''} ${cls || ''}">${extra}<div class="clm" data-act="info" data-id="${st.entity_id}"><div class="clt"><ha-icon icon="mdi:radiator"></ha-icon><em>${label}</em></div><div class="cv">${typeof cur === 'number' ? cur.toFixed(1) : '–'}°</div><div class="cn">${esc(a.friendly_name || st.entity_id)}</div><div class="cs">${typeof tgt === 'number' ? `Soll ${tgt.toFixed(1)}°` : ''}</div></div>${slider}</div>`;
+  }
+  _vacCard(st, extra, cls) {
+    const a = st.attributes; const run = st.state === 'cleaning';
+    const bat = typeof a.battery_level === 'number' ? a.battery_level : (a.battery ? parseInt(a.battery, 10) : null);
+    const txt = (VAC[st.state] || st.state) + (bat !== null && !isNaN(bat) ? ` · ${bat} %` : '');
+    return `<div class="vc ${run ? 'run' : ''} ${cls || ''}">${extra}<div class="vm" data-act="info" data-id="${st.entity_id}"><ha-icon icon="mdi:robot-vacuum"></ha-icon><b>${esc(a.friendly_name || st.entity_id)}</b><span>${esc(txt)}</span></div>
+      <div class="vb"><button class="sq" data-act="vstart" data-id="${st.entity_id}" aria-label="${run ? 'Pausieren' : 'Starten'}"><ha-icon icon="${run ? 'mdi:pause' : 'mdi:play'}"></ha-icon></button><button class="sq" data-act="vdock" data-id="${st.entity_id}" aria-label="Zur Station"><ha-icon icon="mdi:home-import-outline"></ha-icon></button></div></div>`;
+  }
+  _dragTo(e) {
+    const d = this._drag; const r = d.el.getBoundingClientRect(); const inner = Math.max(1, r.height - 40);
+    const p = Math.min(1, Math.max(0, (r.bottom - 20 - e.clientY) / inner));
+    let v = d.min + p * (d.max - d.min); v = Math.min(d.max, Math.max(d.min, Math.round(v / d.step) * d.step)); d.val = v;
+    const q = (v - d.min) / (d.max - d.min);
+    d.el.querySelector('.vf').style.height = `calc(40px + (100% - 40px) * ${q})`;
+    const t = d.el.querySelector('.vt'); t.style.bottom = `calc(2px + (100% - 40px) * ${q})`; t.querySelector('i').textContent = v.toFixed(1);
   }
   _roomData() {
     const h = this._hass; const areas = {};
@@ -352,6 +478,7 @@ class LumoraCard extends HTMLElement {
   _hideBtn(id) { const hd = this._set.hidden.includes(id); return this._edit ? `<span class="mini" data-act="hidee" data-id="${id}"><ha-icon icon="${hd ? 'mdi:eye' : 'mdi:eye-off'}"></ha-icon></span>` : ''; }
   _tile(st, area) {
     const d = dom(st.entity_id); const on = !INACTIVE.includes(st.state);
+    if (d === 'climate' || d === 'vacuum') return this._special(st, this._hideBtn(st.entity_id), this._set.hidden.includes(st.entity_id) ? 'hid' : '');
     let n = st.attributes.friendly_name || st.entity_id;
     if (n.toLowerCase().startsWith(area.toLowerCase() + ' ') && n.length > area.length + 1) n = n.slice(area.length + 1);
     const sens = d === 'sensor' ? 'sens' : '';
@@ -422,6 +549,8 @@ class LumoraCard extends HTMLElement {
         else this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId: id }, bubbles: true, composed: true }));
         return;
       }
+      case 'vstart': h.callService('vacuum', h.states[id] && h.states[id].state === 'cleaning' ? 'pause' : 'start', { entity_id: id }); return;
+      case 'vdock': h.callService('vacuum', 'return_to_base', { entity_id: id }); return;
       case 'alerts': this._sheet = 'alerts'; break;
       case 'lights': this._sheet = 'lights'; break;
       case 'lightsoff': h.callService('light', 'turn_off', { entity_id: (this._byDomain().light || []).filter((x) => x.state === 'on').map((x) => x.entity_id) }); this._sheet = null; break;

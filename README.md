@@ -2,6 +2,9 @@
 
 Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein button-card, card-mod oder layout-card).
 
+- Persönliche Begrüßung mit Avatar des angemeldeten Benutzers, Anwesenheit aller Personen, Wetter und Alarmstatus
+- Energie-Karte (PV, Verbrauch, Netz, Batterie) auf der Startseite
+- Spezialkarten für Thermostate (Slider für die Solltemperatur) und Staubsauger (Start, Pause, Station)
 - Startseite mit gefilterten Meldungen: offene Türen und Fenster, Bewegung, Rauch, Wasser, Gas und Alarm
 - Meldungen sind konfigurierbar (Kategorien an oder aus, einzelne Sensoren ausblenden), gespeichert pro HA-Benutzer
 - "Aktiv jetzt" mit Lichtern, Medien und frei hinzufügbaren Karten, optional nur bei Aktivität
@@ -28,6 +31,16 @@ Dashboard-Ansicht vom Typ `panel` mit folgender Karte:
 type: custom:lumora-card
 # optional
 theme: sand        # Standard; alternativ: forest
+name: Steffen      # optional, sonst Name aus der Person des Benutzers
+energy:            # optional, Standard sind die SOLARWATT-Flow-Sensoren
+  pv: sensor.solarwatt_flow_pv_out
+  consumption: sensor.solarwatt_flow_consumption_in
+  grid_in: sensor.solarwatt_flow_grid_in
+  grid_out: sensor.solarwatt_flow_grid_out
+  battery_in: sensor.solarwatt_flow_battery_in
+  battery_out: sensor.solarwatt_flow_battery_out
+  soc: sensor.solarwatt_battery_soc
+  forecast: sensor.solcast_pv_forecast_prognose_spitzenleistung_heute
 color_from: "#f2eadb"
 color_to: "#d6c5a8"
 ```
