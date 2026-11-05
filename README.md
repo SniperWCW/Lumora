@@ -9,7 +9,7 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - Meldungen sind konfigurierbar (Kategorien an oder aus, einzelne Sensoren ausblenden), gespeichert pro HA-Benutzer
 - "Aktiv jetzt" mit Lichtern, Medien und frei hinzufügbaren Karten, optional nur bei Aktivität
 - Räume je Etage und Area, Kameraübersicht
-- Bearbeiten-Modus auf Start, Räumen und Kameras: Räume, Geräte und Kameras ausblenden, Räume von Meldungen ausnehmen
+- Bearbeiten-Modus auf Start, Räumen und Kameras: ausblenden (Auge) und verschieben (Pfeile) für Etagen, Räume, Kacheln, Kameras und angepinnte Karten; Räume von Meldungen ausnehmen
 
 ## Installation
 

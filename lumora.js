@@ -11,6 +11,7 @@ const DEF = {
   pinned: [],
   hidden: [],
   hiddenAreas: [],
+  order: {},
 };
 const ENERGY = {
   pv: 'sensor.solarwatt_flow_pv_out', consumption: 'sensor.solarwatt_flow_consumption_in',
@@ -52,7 +53,11 @@ const FLT_LABEL = { all: 'Alle', light: 'Licht', switch: 'Schalter', climate: 'K
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const dom = (id) => id.split('.')[0];
-const merge = (v) => ({ ...DEF, ...v, alerts: { ...DEF.alerts, ...(v && v.alerts) } });
+const merge = (v) => {
+  v = v || {};
+  const arr = (k) => [...(v[k] || DEF[k])];
+  return { alerts: { ...DEF.alerts, ...v.alerts }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order } };
+};
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
   if (m < 1) return 'gerade eben';
@@ -117,7 +122,7 @@ h1{margin:0;font-size:clamp(26px,7.4vw,38px);line-height:1.1;font-weight:600;let
 .vt i{font-style:normal;font-size:11px;font-weight:600}
 .vm ha-icon{--mdc-icon-size:26px;margin-bottom:auto}.vm b{font-size:15px;font-weight:600;display:block;margin-top:10px}.vm span{font-size:12.5px;color:var(--fg2)}
 .vc.run{background:rgba(120,170,110,.25)}.vb{display:flex;flex-direction:column;gap:8px;justify-content:center}
-.cl .mini,.cl .x{top:8px;right:68px}.vc .mini{position:absolute;top:6px;right:6px;z-index:2}
+.cl .tools{top:8px;right:68px}.cl .x{top:8px;left:8px}
 .sq{width:46px;height:46px;border-radius:14px;border:0;background:var(--b);color:inherit;display:grid;place-items:center;cursor:pointer;padding:0}
 .note{display:flex;gap:10px;align-items:center;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg2);margin-bottom:14px;cursor:pointer}
 .note ha-icon{--mdc-icon-size:20px;flex:none}
@@ -132,12 +137,13 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .card ha-icon{--mdc-icon-size:24px}
 .card.add{border:1.5px dashed var(--fg2);background:transparent;justify-content:center;align-items:center;flex-direction:row;color:var(--fg2)}
 .x,.mini{border:0;color:inherit;display:grid;place-items:center;cursor:pointer;padding:0}
-.x{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.35);color:#fff;z-index:2}
+.x{position:absolute;top:6px;left:6px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.35);color:#fff;z-index:2}
 .mini{width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.1)}
 .mini ha-icon{--mdc-icon-size:16px}
-.pill .mini{width:20px;height:20px;margin:0 -6px 0 2px}
-.tile .mini,.cam .mini{position:absolute;top:6px;right:6px}
-.cam .mini{background:rgba(0,0,0,.55);color:#fff;top:8px;right:8px}
+.pill .tools{display:inline-flex;gap:3px;margin-left:8px}.pill .tools .mini{width:22px;height:22px}
+.hint{font-size:12.5px;color:var(--fg2);background:var(--a);border-radius:12px;padding:8px 12px;margin:0 0 10px}
+.tile .tools,.cam .tools,.vc .tools,.cl .tools{position:absolute;top:6px;right:6px;display:flex;gap:4px;z-index:2}
+.cam .mini{background:rgba(0,0,0,.55);color:#fff}
 .hid{opacity:.45}
 .tile .ic{width:42px;height:42px;border-radius:50%;background:var(--a);display:grid;place-items:center;flex:none}
 .tile .tx{min-width:0;flex:1}
@@ -391,10 +397,10 @@ class LumoraCard extends HTMLElement {
       ${this._presence(persons)}${note}<div class="pills">${pills}</div>
       ${en ? `<h3>Energie</h3>${en}` : ''}
       <h3>Aktiv jetzt<span class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</span></h3>
-      <div class="grid">${cards.join('')}</div>`;
+      ${this._hint()}<div class="grid">${cards.join('')}</div>`;
   }
   _card(st, sub, pinId, edit) {
-    const x = edit && pinId ? `<span class="x" data-act="unpin" data-id="${pinId}"><ha-icon icon="mdi:close"></ha-icon></span>` : '';
+    const x = edit && pinId ? `<span class="x" data-act="unpin" data-id="${pinId}"><ha-icon icon="mdi:close"></ha-icon></span>${this._tools('pinned', pinId, null)}` : '';
     const sp = this._special(st, x, ''); if (sp) return sp;
     return `<div class="card" data-act="info" data-id="${st.entity_id}">${x}<ha-icon icon="${this._icon(st)}"></ha-icon><div><b>${esc(st.attributes.friendly_name || st.entity_id)}</b><span>${esc(sub)}</span></div></div>`;
   }
@@ -448,8 +454,8 @@ class LumoraCard extends HTMLElement {
       (floors[fid] || (floors[fid] = { id: fid, name: fid === '_' ? 'Sonstige' : (fl[fid] && fl[fid].name) || fid, level: fid === '_' ? 99 : (fl[fid] && fl[fid].level) ?? 50, areas: [] })).areas.push({ id: aid, name: this._aname(aid) || aid, ents: areas[aid] });
     });
     const list = Object.values(floors).sort((a, b) => a.level - b.level);
-    list.forEach((f) => f.areas.sort((a, b) => a.name.localeCompare(b.name, 'de')));
-    return list;
+    list.forEach((f) => { f.areas.sort((a, b) => a.name.localeCompare(b.name, 'de')); f.areas = this._ord('areas:' + f.id, f.areas, (x) => x.id); });
+    return this._ord('floors', list, (f) => f.id);
   }
   _rooms() {
     const floors = this._roomData();
@@ -457,42 +463,55 @@ class LumoraCard extends HTMLElement {
     let f = floors.find((x) => x.id === this._floor) || floors.find((x) => /eg|erd/i.test(x.id + x.name)) || floors[0];
     this._floor = f.id;
     let a = f.areas.find((x) => x.id === this._area) || f.areas[0]; this._area = a.id;
-    const ftabs = floors.map((x) => `<button class="pill ${x.id === f.id ? 'sel' : ''}" data-act="floor" data-id="${x.id}">${esc(x.name)}</button>`).join('');
-    const atabs = f.areas.map((x) => { const hd = this._set.hiddenAreas.includes(x.id); return `<button class="pill ${x.id === a.id ? 'sel' : ''} ${hd ? 'hid' : ''}" data-act="area" data-id="${x.id}">${esc(x.name)}${this._edit ? `<span class="mini" data-act="hidearea" data-id="${x.id}"><ha-icon icon="${hd ? 'mdi:eye' : 'mdi:eye-off'}"></ha-icon></span>` : ''}</button>`; }).join('');
+    const ftabs = floors.map((x) => `<button class="pill ${x.id === f.id ? 'sel' : ''}" data-act="floor" data-id="${x.id}">${esc(x.name)}${this._tools('floors', x.id, null)}</button>`).join('');
+    const atabs = f.areas.map((x) => { const hd = this._set.hiddenAreas.includes(x.id); return `<button class="pill ${x.id === a.id ? 'sel' : ''} ${hd ? 'hid' : ''}" data-act="area" data-id="${x.id}">${esc(x.name)}${this._tools('areas:' + f.id, x.id, 'hiddenAreas')}</button>`; }).join('');
     const ents = a.ents; const info = [];
     const t = ents.find((s) => s.attributes.device_class === 'temperature' && !isNaN(parseFloat(s.state)));
     const c = ents.find((s) => dom(s.entity_id) === 'climate' && typeof s.attributes.current_temperature === 'number');
     const hu = ents.find((s) => s.attributes.device_class === 'humidity' && !isNaN(parseFloat(s.state)));
     if (t) info.push(`${parseFloat(t.state).toFixed(1)}°`); else if (c) info.push(`${c.attributes.current_temperature.toFixed(1)}°`);
     if (hu) info.push(`${Math.round(parseFloat(hu.state))}%`);
-    const cams = ents.filter((s) => dom(s.entity_id) === 'camera' && s.state !== 'unavailable');
-    const tiles = ents.filter((s) => dom(s.entity_id) !== 'camera' && !['temperature', 'humidity'].includes(s.attributes.device_class))
-      .sort((x, y) => ROOM_DOMAINS.indexOf(dom(x.entity_id)) - ROOM_DOMAINS.indexOf(dom(y.entity_id)))
-      .map((s) => this._tile(s, a.name)).join('');
+    const cams = this._ord('rcams:' + a.id, ents.filter((s) => dom(s.entity_id) === 'camera' && s.state !== 'unavailable'), (s) => s.entity_id);
+    const tileEnts = this._ord('tiles:' + a.id, ents.filter((s) => dom(s.entity_id) !== 'camera' && !['temperature', 'humidity'].includes(s.attributes.device_class))
+      .sort((x, y) => ROOM_DOMAINS.indexOf(dom(x.entity_id)) - ROOM_DOMAINS.indexOf(dom(y.entity_id))), (s) => s.entity_id);
+    const tiles = tileEnts.map((s) => this._tile(s, a.name, 'tiles:' + a.id)).join('');
     return `<div class="tabs">${ftabs}</div><div class="tabs">${atabs}</div>
-      <div class="rh"><h2>${esc(a.name)}</h2><div class="inf"><span>${info.join(' · ')}</span>${this._editBtn()}</div></div>
-      ${cams.length ? `<div class="cams" style="margin-bottom:10px">${cams.map((s) => this._camHtml(s)).join('')}</div>` : ''}
+      <div class="rh"><h2>${esc(a.name)}</h2><div class="inf"><span>${info.join(' · ')}</span>${this._editBtn()}</div></div>${this._hint()}
+      ${cams.length ? `<div class="cams" style="margin-bottom:10px">${cams.map((s) => this._camHtml(s, 'rcams:' + a.id)).join('')}</div>` : ''}
       <div class="grid">${tiles || '<div class="empty">Keine Geräte in diesem Raum.</div>'}</div>`;
   }
   _editBtn() { return `<button class="pill" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button>`; }
-  _hideBtn(id) { const hd = this._set.hidden.includes(id); return this._edit ? `<span class="mini" data-act="hidee" data-id="${id}"><ha-icon icon="${hd ? 'mdi:eye' : 'mdi:eye-off'}"></ha-icon></span>` : ''; }
-  _tile(st, area) {
+  _tools(scope, id, hideKey) {
+    if (!this._edit) return '';
+    const mv = (d, ic) => `<span class="mini" data-act="mv" data-s="${esc(scope)}" data-id="${esc(id)}" data-d="${d}"><ha-icon icon="${ic}"></ha-icon></span>`;
+    const list = hideKey === 'hiddenAreas' ? this._set.hiddenAreas : this._set.hidden;
+    const eye = hideKey ? `<span class="mini" data-act="${hideKey === 'hiddenAreas' ? 'hidearea' : 'hidee'}" data-id="${esc(id)}"><ha-icon icon="${list.includes(id) ? 'mdi:eye' : 'mdi:eye-off'}"></ha-icon></span>` : '';
+    return `<span class="tools">${mv(-1, 'mdi:chevron-left')}${eye}${mv(1, 'mdi:chevron-right')}</span>`;
+  }
+  _ord(scope, items, idf) {
+    const o = this._set.order[scope];
+    const res = !o || !o.length ? items : items.map((x, i) => [x, i]).sort((a, b) => { const ia = o.indexOf(idf(a[0])); const ib = o.indexOf(idf(b[0])); return (ia < 0 ? 1e6 : ia) - (ib < 0 ? 1e6 : ib) || a[1] - b[1]; }).map((x) => x[0]);
+    (this._ids || (this._ids = {}))[scope] = res.map(idf);
+    return res;
+  }
+  _hint() { return this._edit ? '<div class="hint">Bearbeiten: Pfeile verschieben, das Auge blendet aus oder wieder ein.</div>' : ''; }
+  _tile(st, area, scope) {
     const d = dom(st.entity_id); const on = !INACTIVE.includes(st.state);
-    if (d === 'climate' || d === 'vacuum') return this._special(st, this._hideBtn(st.entity_id), this._set.hidden.includes(st.entity_id) ? 'hid' : '');
+    if (d === 'climate' || d === 'vacuum') return this._special(st, this._tools(scope, st.entity_id, 'hidden'), this._set.hidden.includes(st.entity_id) ? 'hid' : '');
     let n = st.attributes.friendly_name || st.entity_id;
     if (n.toLowerCase().startsWith(area.toLowerCase() + ' ') && n.length > area.length + 1) n = n.slice(area.length + 1);
     const sens = d === 'sensor' ? 'sens' : '';
     const bad = d === 'binary_sensor' && st.state === 'on' && ['door', 'window', 'opening', 'smoke', 'moisture', 'gas'].includes(st.attributes.device_class);
-    return `<div class="tile ${on || bad ? 'on' : ''} ${sens} ${this._set.hidden.includes(st.entity_id) ? 'hid' : ''}">${this._hideBtn(st.entity_id)}<div class="ic" data-act="toggle" data-id="${st.entity_id}"><ha-icon icon="${this._icon(st)}"></ha-icon></div>
+    return `<div class="tile ${on || bad ? 'on' : ''} ${sens} ${this._set.hidden.includes(st.entity_id) ? 'hid' : ''}">${this._tools(scope, st.entity_id, 'hidden')}<div class="ic" data-act="toggle" data-id="${st.entity_id}"><ha-icon icon="${this._icon(st)}"></ha-icon></div>
       <div class="tx" data-act="info" data-id="${st.entity_id}"><b>${esc(n)}</b><span>${esc(this._state(st))}</span></div></div>`;
   }
-  _camHtml(st) {
+  _camHtml(st, scope) {
     const src = st.attributes.entity_picture || '';
-    return `<div class="cam ${this._set.hidden.includes(st.entity_id) ? 'hid' : ''}" data-act="info" data-id="${st.entity_id}">${src ? `<img loading="lazy" src="${esc(src)}" alt="">` : ''}${this._hideBtn(st.entity_id)}<span class="n">${esc(cleanName(st.attributes.friendly_name))}</span></div>`;
+    return `<div class="cam ${this._set.hidden.includes(st.entity_id) ? 'hid' : ''}" data-act="info" data-id="${st.entity_id}">${src ? `<img loading="lazy" src="${esc(src)}" alt="">` : ''}${this._tools(scope, st.entity_id, 'hidden')}<span class="n">${esc(cleanName(st.attributes.friendly_name))}</span></div>`;
   }
   _cams() {
-    const cams = (this._byDomain().camera || []).filter((s) => s.state !== 'unavailable' && (this._edit || !this._set.hidden.includes(s.entity_id)));
-    return `<div class="rh"><h2>Kameras</h2><div class="inf"><span>${cams.length}</span>${this._editBtn()}</div></div><div class="cams">${cams.map((s) => this._camHtml(s)).join('') || '<div class="empty">Keine Kameras verfügbar.</div>'}</div>`;
+    const cams = this._ord('cams', (this._byDomain().camera || []).filter((s) => s.state !== 'unavailable' && (this._edit || !this._set.hidden.includes(s.entity_id))), (s) => s.entity_id);
+    return `<div class="rh"><h2>Kameras</h2><div class="inf"><span>${cams.length}</span>${this._editBtn()}</div></div>${this._hint()}<div class="cams">${cams.map((s) => this._camHtml(s, 'cams')).join('') || '<div class="empty">Keine Kameras verfügbar.</div>'}</div>`;
   }
 
   /* ---------- Sheets ---------- */
@@ -564,6 +583,17 @@ class LumoraCard extends HTMLElement {
       case 'pick': if (!s.pinned.some((p) => p.entity === id)) s.pinned.push({ entity: id, only: this._only }); this._save(); this._sheet = null; this._only = false; break;
       case 'unpin': s.pinned = s.pinned.filter((p) => p.entity !== id); this._save(); break;
       case 'edit': this._edit = !this._edit; break;
+      case 'mv': {
+        const sc = t.dataset.s; const dd = Number(t.dataset.d);
+        if (sc === 'pinned') {
+          const i = s.pinned.findIndex((q) => q.entity === id); const j = i + dd;
+          if (i >= 0 && j >= 0 && j < s.pinned.length) [s.pinned[i], s.pinned[j]] = [s.pinned[j], s.pinned[i]];
+        } else {
+          const ids = [...((this._ids && this._ids[sc]) || [])]; const i = ids.indexOf(id); const j = i + dd;
+          if (i >= 0 && j >= 0 && j < ids.length) { [ids[i], ids[j]] = [ids[j], ids[i]]; s.order[sc] = ids; }
+        }
+        this._save(); break;
+      }
       case 'hidee': s.hidden = s.hidden.includes(id) ? s.hidden.filter((x) => x !== id) : [...s.hidden, id]; this._save(); break;
       case 'hidearea': s.hiddenAreas = s.hiddenAreas.includes(id) ? s.hiddenAreas.filter((x) => x !== id) : [...s.hiddenAreas, id]; this._save(); break;
       case 'exarea': s.excludeAreas = s.excludeAreas.includes(id) ? s.excludeAreas.filter((x) => x !== id) : [...s.excludeAreas, id]; this._save(); break;
