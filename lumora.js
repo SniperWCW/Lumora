@@ -63,6 +63,7 @@ const APPL_TYPES = [
 ];
 const WXL = { 'clear-night': 'Klare Nacht', sunny: 'Sonnig', cloudy: 'Bewölkt', partlycloudy: 'Teils bewölkt', rainy: 'Regen', pouring: 'Starkregen', snowy: 'Schnee', fog: 'Nebel', windy: 'Windig', lightning: 'Gewitter', 'lightning-rainy': 'Gewitter mit Regen', hail: 'Hagel', exceptional: 'Außergewöhnlich' };
 const APL = { wash: 'Wäscht', washing: 'Wäscht', rinse: 'Spült', spin: 'Schleudert', drying: 'Trocknet', run: 'Läuft', running: 'Läuft', finished: 'Fertig', end: 'Fertig', pause: 'Pausiert', paused: 'Pausiert', ready: 'Bereit', idle: 'Bereit', off: 'Aus' };
+const PKG_DAYS = 5;
 const DHL = ['Angekündigt', 'Unterwegs', 'In der Region', 'Zustellbasis', 'In Zustellung', 'Zugestellt'];
 const WX = {
   'clear-night': 'mdi:weather-night', sunny: 'mdi:weather-sunny', cloudy: 'mdi:weather-cloudy', partlycloudy: 'mdi:weather-partly-cloudy',
@@ -736,7 +737,28 @@ class LumoraCard extends HTMLElement {
   _pkgs() {
     const st = this._xs('packages'); if (!st) return null;
     const arr = (v) => (Array.isArray(v) ? v : []);
-    return { st, n: parseInt(st.state, 10) || 0, today: parseInt(st.attributes.today_count, 10) || 0, dhl: arr(st.attributes.dhl), amz: arr(st.attributes.amazon) };
+    const keep = (x) => this._pkgKeep(x);
+    const dhl = arr(st.attributes.dhl).filter((x) => x && x.tracking_id && keep(x));
+    const amz = arr(st.attributes.amazon).filter((x) => x && x.tracking_id && keep(x));
+    return { st, n: dhl.length + amz.length, today: parseInt(st.attributes.today_count, 10) || 0, dhl, amz };
+  }
+  /* Offene Sendungen immer, zugestellte nur die letzten PKG_DAYS Tage (wie Zuhause 3.0) */
+  _pkgKeep(x) {
+    const txt = `${x.status || ''} ${x.short_status || ''}`.toLowerCase();
+    const done = x.delivered === true || String(x.delivered).toLowerCase() === 'true' || String(x.group || '').toLowerCase() === 'delivered' || String(x.short_status || '').toUpperCase() === 'DELIVERED' || txt.includes('zugestellt');
+    if (!done) return true;
+    const cut = new Date(); cut.setHours(0, 0, 0, 0); cut.setDate(cut.getDate() - PKG_DAYS);
+    let d = null;
+    const m = String(x.status || '').match(/(\d{1,2})\.\s*(Januar|Februar|März|Maerz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)/i);
+    if (m) {
+      const mo = ['januar', 'februar', 'märz', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'dezember'].indexOf(m[2].toLowerCase().replace('maerz', 'märz'));
+      const now = new Date(); d = new Date(now.getFullYear(), mo, Number(m[1]), 12);
+      if (d.getTime() > now.getTime() + 7 * 864e5) d.setFullYear(now.getFullYear() - 1);
+    } else {
+      const t = new Date(x.event_time || x.last_changed || 0);
+      if (!Number.isNaN(t.getTime())) d = t;
+    }
+    return !d || d.getTime() >= cut.getTime();
   }
   _pkgMini(pk) {
     const first = pk.dhl.find((x) => !x.delivered) || pk.dhl[0] || pk.amz[0];
