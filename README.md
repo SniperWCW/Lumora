@@ -15,6 +15,7 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - Lüftungszeile unter Temperatur und Luftfeuchte (Room Climate): Empfehlung, Dauer, erste Räume, nächstes Lüftungsfenster
 - Room-Climate-Meldungen: Schimmelrisiko, Fenster schließen, Jetzt lüften, Rollladen, Heizung; Bewegung als Chip mit Raumnamen
 - Chips frei wählbar: im Bearbeiten-Modus der Startseite Chips antippen
+- Automatische Erkennung von Sensoren (Energie, Zähler, Geräte, Pakete, Drucker, Pool, System, Warnungen, Fahrzeiten, Bahnverbindungen). Gefundenes ist vorausgefüllt, Fehlendes bleibt unsichtbar. Anpassen im Bearbeiten-Modus unter "Quellen" oder per YAML
 - Im Bearbeiten-Modus wird nichts neu gezeichnet, damit sich Elemente in Ruhe verschieben lassen
 - Gemeinsames Layout für alle: als Administrator im Bearbeiten-Modus "Layout für alle speichern" (schreibt `layout:` in die Karte des Dashboards). Andere Benutzer sehen es und können es nicht ändern. Mit `shared: false` bleibt alles pro Benutzer
 - Personen-Chips ausblendbar und verschiebbar
@@ -42,7 +43,7 @@ type: custom:lumora-card
 # optional
 theme: sand        # Standard; alternativ: forest
 name: Anna         # optional, sonst Name aus der Person des Benutzers
-energy:            # optional
+energy:            # optional, überschreibt die automatische Erkennung
   pv: sensor.pv_leistung
   consumption: sensor.hausverbrauch
   grid_in: sensor.netz_bezug
