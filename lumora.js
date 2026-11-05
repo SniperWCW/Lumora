@@ -205,6 +205,7 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .hint{font-size:12.5px;color:var(--fg2);background:var(--a);border-radius:12px;padding:8px 12px;margin:0 0 10px}
 .tile .tools,.cam .tools,.vc .tools,.cl .tools{position:absolute;top:6px;right:6px;display:flex;gap:4px;z-index:2}
 .hid{opacity:.45}
+.mini.po{position:absolute;top:6px;left:38px;z-index:2;background:rgba(40,30,20,.72);color:#fff;width:26px;height:26px}
 .tools .mini{width:36px;height:36px;background:rgba(40,30,20,.72);color:#fff}.tools .mini ha-icon{--mdc-icon-size:20px}
 .pill .tools .mini{width:26px;height:26px}.pill .tools .mini ha-icon{--mdc-icon-size:16px}
 :host(.ed) .tile,:host(.ed) .card,:host(.ed) .pl,:host(.ed) .cam,:host(.ed) .pill,:host(.ed) .mw,:host(.ed) .vc,:host(.ed) .cl,:host(.ed) .ap{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:grab}
@@ -621,8 +622,9 @@ class LumoraCard extends HTMLElement {
     const pr = this._printerInfo(); if (pr && pr.active) cards.push(`<div class="ap run" data-act="info" data-id="${this._xid('printer_progress')}"><div class="h"><ha-icon icon="mdi:printer-3d-nozzle"></ha-icon><div><b>3D-Druck</b><span>${Math.round(pr.prog || 0)} %${pr.left !== null ? ` · noch ${this._fmtMin(pr.left)}` : ''}</span></div></div><div class="bar"><i style="width:${Math.round(pr.prog || 0)}%"></i></div></div>`);
     this._set.pinned.forEach((p) => {
       const st = h.states[p.entity]; if (!st) return;
-      if (p.only && INACTIVE.includes(st.state)) return;
-      cards.push(this._card(st, this._state(st), p.entity, this._edit));
+      const idle = !!p.only && INACTIVE.includes(st.state);
+      if (idle && !this._edit) return;
+      cards.push(this._card(st, `${this._state(st)}${this._edit && p.only ? ' · nur wenn aktiv' : ''}`, p.entity, this._edit, idle ? 'hid' : '', p));
     });
     cards.push(`<div class="card add" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</div>`);
     const en = this._energy();
@@ -634,11 +636,11 @@ class LumoraCard extends HTMLElement {
       <h3>Aktiv jetzt${this._locked ? '' : `<span class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</span>`}</h3>
       ${this._hint()}<div class="grid">${cards.join('')}</div>`;
   }
-  _card(st, sub, pinId, edit) {
-    const x = edit && pinId ? `<span class="x" data-act="unpin" data-id="${pinId}"><ha-icon icon="mdi:close"></ha-icon></span>${this._tools('pinned', pinId, null)}` : '';
+  _card(st, sub, pinId, edit, cls, p) {
+    const x = edit && pinId ? `<span class="x" data-act="unpin" data-id="${pinId}"><ha-icon icon="mdi:close"></ha-icon></span><span class="mini po" data-act="ponly" data-id="${pinId}"><ha-icon icon="${p && p.only ? 'mdi:flash' : 'mdi:flash-off'}"></ha-icon></span>${this._tools('pinned', pinId, null)}` : '';
     if (dom(st.entity_id) === 'camera') return this._camHtml(st, 'pinned', x);
-    const sp = this._special(st, x, ''); if (sp) return sp;
-    return `<div class="card" data-act="info" data-id="${st.entity_id}">${x}<ha-icon icon="${this._icon(st)}"></ha-icon><div><b>${esc(st.attributes.friendly_name || st.entity_id)}</b><span>${esc(sub)}</span></div></div>`;
+    const sp = this._special(st, x, cls || ''); if (sp) return sp;
+    return `<div class="card ${cls || ''}" data-act="info" data-id="${st.entity_id}">${x}<ha-icon icon="${this._icon(st)}"></ha-icon><div><b>${esc(st.attributes.friendly_name || st.entity_id)}</b><span>${esc(sub)}</span></div></div>`;
   }
   _special(st, extra, cls) {
     const d = dom(st.entity_id);
@@ -1129,6 +1131,7 @@ class LumoraCard extends HTMLElement {
       case 'flt': this._flt = t.dataset.k; this._render(); return;
       case 'onlyact': this._only = !this._only; this._render(); return;
       case 'pick': if (!s.pinned.some((p) => p.entity === id)) s.pinned.push({ entity: id, only: this._only }); this._save(); this._sheet = null; this._only = false; break;
+      case 'ponly': { const q = s.pinned.find((x) => x.entity === id); if (q) q.only = !q.only; this._save(); break; }
       case 'unpin': s.pinned = s.pinned.filter((p) => p.entity !== id); this._save(); break;
       case 'edit': if (this._locked) return; this._edit = !this._edit; break;
       case 'publish': this._publish(); return;
