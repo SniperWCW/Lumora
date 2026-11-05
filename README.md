@@ -19,7 +19,6 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - Kamera-Vorschau auf der Startseite: Kameras im Bearbeiten-Modus unter "Kameras" wählen; Bilder aktualisieren sich alle 10 Sekunden ohne Flackern. Angepinnte Kameras erscheinen ebenfalls als Vorschau
 - Im Bearbeiten-Modus wird nichts neu gezeichnet, damit sich Elemente in Ruhe verschieben lassen
 - Gemeinsames Layout für alle: als Administrator im Bearbeiten-Modus "Layout für alle speichern" (schreibt `layout:` in die Karte des Dashboards). Andere Benutzer sehen es und können es nicht ändern. Mit `shared: false` bleibt alles pro Benutzer
-- Personen-Chips ausblendbar und verschiebbar
 - Startseite zeigt laufende Geräte, Pakete in Zustellung und den Drucker während des Drucks automatisch
 - Bearbeiten-Modus auf Start, Räumen und Kameras: ausblenden (Auge) und verschieben per Drag and Drop (gedrückt halten und ziehen) für Etagen, Räume, Kacheln, Kameras und angepinnte Karten; Räume von Meldungen ausnehmen
 

@@ -145,7 +145,6 @@ h1{margin:0;font-size:clamp(26px,7.4vw,38px);line-height:1.1;font-weight:600;let
 .av i{position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;background:#9a9a9a;border:2px solid var(--from)}
 .hello .av{width:64px;height:64px;font-size:24px}.pp.home .av i{background:#4caf50}
 .pps{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px}
-.pp .tools{position:static;display:inline-flex;margin-left:2px}.pp .tools .mini{width:28px;height:28px}
 .pp{position:relative;display:flex;align-items:center;gap:10px;background:var(--a);border-radius:99px;padding:5px 16px 5px 5px;cursor:pointer}
 .pp b{display:block;font-size:14px;font-weight:600}.pp span{font-size:12px;color:var(--fg2)}
 .en{background:var(--a);border-radius:20px;padding:16px;cursor:pointer}
@@ -564,15 +563,6 @@ class LumoraCard extends HTMLElement {
     const pic = p && p.attributes.entity_picture; const nm = (p && p.attributes.friendly_name) || '?';
     return `<div class="av">${pic ? `<img src="${esc(pic)}" alt="">` : `<span>${esc(nm[0])}</span>`}${big ? '' : '<i></i>'}</div>`;
   }
-  _vpersons(persons) { return this._ord('persons', persons.filter((p) => this._edit || !this._set.hidden.includes(p.entity_id)), (p) => p.entity_id); }
-  _presence(persons) {
-    persons = this._vpersons(persons); if (!persons.length) return '';
-    return `<div class="pps">${persons.map((p) => {
-      const home = p.state === 'home';
-      const lbl = home ? 'Zuhause' : p.state === 'not_home' ? 'Unterwegs' : p.state;
-      return `<div class="pp ${home ? 'home' : ''} ${this._set.hidden.includes(p.entity_id) ? 'hid' : ''}" data-act="info" data-id="${p.entity_id}">${this._avatar(p, false)}<div><b>${esc(p.attributes.friendly_name)}</b><span>${esc(lbl)}</span></div>${this._tools('persons', p.entity_id, 'hidden')}</div>`;
-    }).join('')}</div>`;
-  }
   _energy() {
     const e = {}; ['pv', 'consumption', 'grid_in', 'grid_out', 'battery_in', 'battery_out', 'soc', 'forecast'].forEach((k) => { e[k] = this._slot(`e_${k}`); }); const n = (k) => this._num(e[k]);
     const cons = n('consumption'); const pv = n('pv');
@@ -590,8 +580,7 @@ class LumoraCard extends HTMLElement {
   _home() {
     const h = this._hass; const D = this._byDomain(); const al = this._alerts();
     const persons = D.person || [];
-    const vis = persons.filter((p) => !this._set.hidden.includes(p.entity_id));
-    const home = vis.filter((p) => p.state === 'home').length;
+    const home = persons.filter((p) => p.state === 'home').length;
     const alarm = (D.alarm_control_panel || [])[0];
     const AL = { disarmed: 'Aus', armed_home: 'Zuhause', armed_away: 'Scharf', armed_night: 'Nacht', armed_vacation: 'Urlaub', triggered: 'ALARM', pending: 'Wartet', arming: 'Schaltet scharf' };
     const cl = (D.climate || []).map((c) => c.attributes.current_temperature).filter((v) => typeof v === 'number');
@@ -639,8 +628,8 @@ class LumoraCard extends HTMLElement {
     const en = this._energy();
     return `<div class="top"><div class="logo"><ha-icon icon="mdi:home-variant"></ha-icon></div><div class="ttl">Lumora.</div>${apill}</div>
       <div class="meta">${esc(meta)}</div>${this._vent()}
-      <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${vis.length ? `${home}/${vis.length} zu Hause` : ''}</div></div></div>
-      ${this._presence(persons)}${note}<div class="pills">${pills}</div>
+      <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${persons.length ? `${home}/${persons.length} zu Hause` : ''}</div></div></div>
+      ${note}<div class="pills">${pills}</div>
       ${en ? `<h3>Energie</h3>${en}` : ''}${this._homeCams()}
       <h3>Aktiv jetzt${this._locked ? '' : `<span class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</span>`}</h3>
       ${this._hint()}<div class="grid">${cards.join('')}</div>`;
