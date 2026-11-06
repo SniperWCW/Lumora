@@ -247,6 +247,9 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .srch::placeholder,.ccin::placeholder{color:var(--fg2)}
 .tile.sz-w,.pl.sz-w{grid-column:span 2}.tile.sz-f,.pl.sz-f{grid-column:1/-1}
 .tile .tools .mini{width:30px;height:30px}.tile .tools .mini ha-icon{--mdc-icon-size:17px}
+.mw{container-type:inline-size}.enw{height:100%}.enw>.en{height:100%;box-sizing:border-box}
+.en .hd>div:nth-child(2){min-width:0}.en .hd b,.en .rl span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.en .rl span:first-child{min-width:0}
+@container (max-width:270px){.en{padding:12px}.en .hd{gap:8px}.en .ib{width:34px;height:34px}.en .big{font-size:22px}.en .hd b{font-size:14px}.en .rl{font-size:12.5px}.en .rl ha-icon{margin-right:4px}.en .hd span{font-size:11.5px}}
 .mw.sz-w{grid-column:span 2}.mw.sz-f{grid-column:1/-1}
 .mw>.card,.mw>.en,.mw>.qs{height:100%;box-sizing:border-box}
 .card.sz-w,.vc.sz-w,.cl.sz-w,.ap.sz-w{grid-column:span 2}.card.sz-f,.vc.sz-f,.cl.sz-f,.ap.sz-f{grid-column:1/-1}
@@ -675,12 +678,14 @@ class LumoraCard extends HTMLElement {
     });
     cards.push(`<div class="card add" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</div>`);
     const en = this._energy();
-    const regCells = this._ord('homereg', this._regItems('home'), (x) => x.id).map((x) => this._cell(x, 'homereg')).filter(Boolean).join('');
+    const regItems = this._regItems('home');
+    if (en) regItems.push({ id: 'energyhome', html: `<div class="enw">${en}</div>`, size: this._set.size.energyhome || 'f', def: { fixed: true } });
+    const regCells = this._ord('homereg', regItems, (x) => x.id).map((x) => this._cell(x, 'homereg')).filter(Boolean).join('');
     return `<div class="top"><div class="logo"><ha-icon icon="mdi:home-variant"></ha-icon></div><div class="ttl">Lumora.</div>${apill}</div>
       <div class="meta">${esc(meta)}</div>${this._vent()}
       <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${persons.length ? `${home}/${persons.length} zu Hause` : ''}</div></div></div>
       ${note}<div class="pills">${pills}</div>${regCells ? `<div class="grid reg">${regCells}</div>` : ''}
-      ${en && (this._edit || !this._set.hidden.includes('energyhome')) ? `<h3>Energie</h3><div class="grid"><div class="mw sz-${this._set.size.energyhome || 'f'} ${this._set.hidden.includes('energyhome') ? 'hid' : ''}">${this._tools('homeen', 'energyhome', 'hidden', { size: this._set.size.energyhome || 'f' })}${en}</div></div>` : ''}${this._homeCams()}
+      ${this._homeCams()}
       <h3>Aktiv jetzt${this._locked ? '' : `<span class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</span>`}</h3>
       ${this._hint()}<div class="grid">${cards.join('')}</div>`;
   }
