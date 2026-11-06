@@ -128,10 +128,10 @@ const cleanName = (n) => {
 const CSS = `
 :host{display:block;height:calc(100vh - var(--header-height,56px));height:calc(100dvh - var(--header-height,56px));
  --fg:#3b3226;--fg2:rgba(59,50,38,.68);--a:rgba(110,88,56,.11);--b:rgba(255,255,255,.75);--from:#f2eadb;--to:#d6c5a8;
- --sheet:#f6f0e4;--selbg:#4a3c2b;--selfg:#f6f0e4;--accent:#e6b655;--accentfg:#3a2a00;--line:rgba(59,50,38,.12);--nav:rgba(255,255,255,.5);
+ --sheet:#f6f0e4;--selbg:#4a3c2b;--selfg:#f6f0e4;--accent:#e6b655;--accentfg:#3a2a00;--on:rgba(238,176,52,.46);--onring:rgba(205,140,20,.6);--line:rgba(59,50,38,.12);--nav:rgba(255,255,255,.5);
  --bad:rgba(205,65,50,.25);--badfg:#7d1f16;--warn:rgba(224,160,40,.32);--okbg:rgba(100,150,80,.22);--scrim:rgba(40,30,15,.45);--shadow:0 1px 3px rgba(80,60,30,.14);
  color:var(--fg);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-:host([theme=forest]){--fg:#fff;--fg2:rgba(255,255,255,.72);--a:rgba(255,255,255,.12);--b:rgba(255,255,255,.2);--from:#5b7248;--to:#232f21;
+:host([theme=forest]){--on:rgba(255,190,70,.3);--onring:rgba(255,205,110,.65);--fg:#fff;--fg2:rgba(255,255,255,.72);--a:rgba(255,255,255,.12);--b:rgba(255,255,255,.2);--from:#5b7248;--to:#232f21;
  --sheet:#1f2a1e;--selbg:rgba(255,255,255,.88);--selfg:#223;--line:rgba(255,255,255,.1);--nav:rgba(0,0,0,.18);
  --bad:rgba(244,67,54,.5);--badfg:#fff;--warn:rgba(255,193,7,.28);--okbg:rgba(120,200,120,.25);--scrim:rgba(0,0,0,.55);--shadow:none}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -183,7 +183,7 @@ h1{margin:0;font-size:clamp(26px,7.4vw,38px);line-height:1.1;font-weight:600;let
 .ap.run{background:rgba(70,170,190,.22)}.ap .h{display:flex;gap:10px;align-items:center}.ap ha-icon{--mdc-icon-size:26px;flex:none}
 .ap b{display:block;font-size:15px;font-weight:600}.ap span{font-size:12.5px;color:var(--fg2)}
 .pl{background:var(--a);border-radius:20px;padding:14px;min-height:140px;display:flex;flex-direction:column;position:relative;min-width:0}
-.pl.on{background:var(--b);box-shadow:var(--shadow)}
+.pl.on{background:var(--on);box-shadow:inset 0 0 0 1.5px var(--onring),var(--shadow)}.pl.on .plt ha-icon{color:var(--accentfg)}
 .plt{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg2);cursor:pointer}
 .plt ha-icon{--mdc-icon-size:24px;color:var(--fg)}.plt em{font-style:normal;margin-left:auto}
 .plv{font-size:30px;font-weight:600;margin-top:auto;cursor:pointer}.plv small{font-size:16px;font-weight:500;color:var(--fg2);margin-left:4px}
@@ -221,7 +221,7 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .dgt{outline:3px solid var(--fg)!important;outline-offset:-3px}
 .tile .ic{width:42px;height:42px;border-radius:50%;background:var(--a);display:grid;place-items:center;flex:none}
 .tile .tx{min-width:0;flex:1}
-.tile.on{background:var(--b);box-shadow:var(--shadow)}.tile.on .ic{background:var(--accent);color:var(--accentfg)}
+.tile.on{background:var(--on);box-shadow:inset 0 0 0 1.5px var(--onring),var(--shadow)}.tile.bad{background:var(--bad);box-shadow:inset 0 0 0 1.5px rgba(205,65,50,.6)}.tile.bad .ic{background:rgba(205,65,50,.75);color:#fff}.tile.on .ic{background:var(--accent);color:var(--accentfg)}
 .tile.sens .ic{background:transparent}
 .cams.hc{grid-template-columns:repeat(2,minmax(0,1fr))}.cams.hc .cam:last-child:nth-child(odd){grid-column:1/-1}.grid .cam{grid-column:span 2}
 .cams{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
@@ -266,7 +266,7 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .br em{font-style:normal;font-size:14px;font-weight:600}.br>ha-icon{--mdc-icon-size:22px;flex:none}
 .spk{display:block;width:100%;color:var(--fg);overflow:visible}.spk.a{color:var(--accent)}
 .spi{width:64px;display:inline-block}
-.card.cu.on{background:var(--b);box-shadow:var(--shadow)}.card.cu.on>ha-icon{color:var(--accent)}
+.card.on,.card.cu.on{background:var(--on);box-shadow:inset 0 0 0 1.5px var(--onring),var(--shadow)}.card.on>ha-icon{color:var(--accentfg)}
 .card.cu.sp{gap:6px;width:100%;box-sizing:border-box}.card.cu .spt{display:flex;gap:12px;align-items:center;width:100%}
 .card.cu .spl{font-size:12px;color:var(--fg2)}
 .en .rw .spk{margin-top:6px}
@@ -688,7 +688,8 @@ class LumoraCard extends HTMLElement {
     const x = edit && pinId ? `<span class="x" data-act="unpin" data-id="${pinId}"><ha-icon icon="mdi:close"></ha-icon></span><span class="mini po" data-act="ponly" data-id="${pinId}"><ha-icon icon="${p && p.only ? 'mdi:flash' : 'mdi:flash-off'}"></ha-icon></span><span class="mini sz" data-act="size" data-id="${pinId}" data-d="${this._set.size[pinId] || 's'}"><ha-icon icon="${SIZE_ICON[this._set.size[pinId] || 's']}"></ha-icon></span>${this._tools('pinned', pinId, null)}` : '';
     if (dom(st.entity_id) === 'camera') return this._camHtml(st, 'pinned', x);
     const sp = this._special(st, x, cls || ''); if (sp) return sp;
-    return `<div class="card ${cls || ''}" data-act="info" data-id="${st.entity_id}">${x}<ha-icon icon="${this._icon(st)}"></ha-icon><div><b>${esc(st.attributes.friendly_name || st.entity_id)}</b><span>${esc(sub)}</span></div></div>`;
+    const lit = ['light', 'switch', 'fan', 'input_boolean', 'humidifier', 'media_player', 'cover', 'lock'].includes(dom(st.entity_id)) && !INACTIVE.includes(st.state) && st.state !== 'closed';
+    return `<div class="card ${lit ? 'on' : ''} ${cls || ''}" data-act="info" data-id="${st.entity_id}">${x}<ha-icon icon="${this._icon(st)}"></ha-icon><div><b>${esc(st.attributes.friendly_name || st.entity_id)}</b><span>${esc(sub)}</span></div></div>`;
   }
   _special(st, extra, cls) {
     const d = dom(st.entity_id);
@@ -1159,7 +1160,7 @@ _more() {
     if (n.toLowerCase().startsWith(area.toLowerCase() + ' ') && n.length > area.length + 1) n = n.slice(area.length + 1);
     const sens = d === 'sensor' ? 'sens' : '';
     const bad = d === 'binary_sensor' && st.state === 'on' && ['door', 'window', 'opening', 'smoke', 'moisture', 'gas'].includes(st.attributes.device_class);
-    return `<div class="tile ${on || bad ? 'on' : ''} ${sens} ${hc}">${tl}<div class="ic" data-act="toggle" data-id="${st.entity_id}"><ha-icon icon="${this._icon(st)}"></ha-icon></div>
+    return `<div class="tile ${bad ? 'bad' : on ? 'on' : ''} ${sens} ${hc}">${tl}<div class="ic" data-act="toggle" data-id="${st.entity_id}"><ha-icon icon="${this._icon(st)}"></ha-icon></div>
       <div class="tx" data-act="info" data-id="${st.entity_id}"><b>${esc(n)}</b><span>${esc(this._state(st))}</span></div></div>`;
   }
   _camHtml(st, scope, extra) {
