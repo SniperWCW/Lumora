@@ -21,6 +21,12 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - Gemeinsames Layout für alle: als Administrator im Bearbeiten-Modus "Layout für alle speichern" (schreibt `layout:` in die Karte des Dashboards). Andere Benutzer sehen es und können es nicht ändern. Mit `shared: false` bleibt alles pro Benutzer
 - Startseite zeigt laufende Geräte, Pakete in Zustellung und den Drucker während des Drucks automatisch
 - Bearbeiten-Modus auf Start, Räumen und Kameras: ausblenden (Auge) und verschieben per Drag and Drop (gedrückt halten und ziehen) für Etagen, Räume, Kacheln, Kameras und angepinnte Karten; Räume von Meldungen ausnehmen
+- Schnellaktionen: Szenen, Skripte, Tasten und "Alles Licht aus" als Chips mit einem Tipp (Bearbeiten, dann Aktion hinzufügen)
+- Batterie-Karte (erscheint nur bei schwachen Batterien, Grenze einstellbar) und Karte "Geräte offline" (Geräte, deren Entitäten alle nicht erreichbar sind); einzelne Geräte lassen sich ausblenden
+- Verläufe: Sparklines für Raumtemperatur im Raumkopf, Energie-Verlauf (PV und Verbrauch, 24 h) und eigene Karten mit frei wählbarem Zeitraum
+- Eigene Karten: beliebige Entität als Wert, Verlauf oder Schalter (Karte hinzufügen, "Als eigene Karte"); Titel, Darstellung und Zeitraum über das Zahnrad
+- Kartengröße: im Bearbeiten-Modus pro Karte klein, breit oder volle Breite; jede Karte lässt sich zwischen Zuhause und Mehr verschieben
+- Karten-Register: jede Karte ist ein Objekt (`id`, `label`, `icon`, `home`, `size`, `items`). Fehler in einer Karte legen nicht das Dashboard lahm. Erweiterbar per `window.LumoraCards.register({...})`
 
 ## Installation
 

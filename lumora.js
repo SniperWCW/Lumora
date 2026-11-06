@@ -16,6 +16,12 @@ const DEF = {
   order: {},
   roomSensors: {},
   sources: {},
+  quick: [],
+  custom: [],
+  size: {},
+  place: {},
+  ignore: [],
+  battLimit: 20,
 };
 const norm = (t) => String(t || '').toLowerCase().replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ß/g, 'ss');
 const PV = '(?:^|[^a-z])pv(?:[^a-z]|$)|solar|photovolt';
@@ -102,7 +108,7 @@ const dom = (id) => id.split('.')[0];
 const merge = (v) => {
   v = v || {};
   const arr = (k) => [...(v[k] || DEF[k])];
-  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources } };
+  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit };
 };
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -237,9 +243,40 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .row .t{flex:1;min-width:0}.row .t b{display:block;font-size:15px;font-weight:500}.row .t span{font-size:12.5px;color:var(--fg2)}
 .row button{border:0;border-radius:99px;padding:7px 12px;background:var(--a);color:inherit;font:inherit;font-size:13px;cursor:pointer}
 .row button.sel{background:var(--selbg);color:var(--selfg)}
-.srch{width:100%;padding:12px 14px;border-radius:12px;border:0;background:var(--a);color:var(--fg);font:inherit;font-size:15px;margin-bottom:10px;outline:none}
-.srch::placeholder{color:var(--fg2)}
+.srch,.ccin{width:100%;padding:12px 14px;border-radius:12px;border:0;background:var(--a);color:var(--fg);font:inherit;font-size:15px;margin-bottom:10px;outline:none}
+.srch::placeholder,.ccin::placeholder{color:var(--fg2)}
+.mw.sz-w{grid-column:span 2}.mw.sz-f{grid-column:1/-1}
+.mw>.card,.mw>.en,.mw>.qs{height:100%;box-sizing:border-box}
+.card.sz-w,.vc.sz-w,.cl.sz-w,.ap.sz-w{grid-column:span 2}.card.sz-f,.vc.sz-f,.cl.sz-f,.ap.sz-f{grid-column:1/-1}
+.mw .tools{flex-wrap:wrap;justify-content:flex-end;max-width:100%}.mw .tools .mini{width:30px;height:30px}.mw .tools .mini ha-icon{--mdc-icon-size:17px}
+.mini.sz{position:absolute;top:6px;left:70px;z-index:2;background:rgba(40,30,20,.72);color:#fff;width:26px;height:26px}
+.grid.reg{margin:4px 0 12px}
+.en.nopt{cursor:default}
+.qs{background:var(--a);border-radius:20px;padding:14px}
+.qh{display:flex;gap:8px;align-items:center;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);margin-bottom:10px}.qh ha-icon{--mdc-icon-size:18px}
+.qc{display:flex;flex-wrap:wrap;gap:8px}
+.qa{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:99px;padding:10px 14px;background:var(--b);color:inherit;font:inherit;font-size:14px;cursor:pointer;box-shadow:var(--shadow);transition:background .2s}
+.qa ha-icon{--mdc-icon-size:20px}.qa.ok{background:var(--accent);color:var(--accentfg)}
+.qa.add{background:transparent;box-shadow:none;border:1.5px dashed var(--fg2);color:var(--fg2)}
+.qx{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.25);color:#fff;margin-right:-6px}.qx ha-icon{--mdc-icon-size:14px}
+.br{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);cursor:pointer;margin-top:4px}
+.br .t{flex:1;min-width:0}.br .t b{display:block;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.br .t span{font-size:12px;color:var(--fg2)}
+.br em{font-style:normal;font-size:14px;font-weight:600}.br>ha-icon{--mdc-icon-size:22px;flex:none}
+.spk{display:block;width:100%;color:var(--fg);overflow:visible}.spk.a{color:var(--accent)}
+.spi{width:64px;display:inline-block}
+.card.cu.on{background:var(--b);box-shadow:var(--shadow)}.card.cu.on>ha-icon{color:var(--accent)}
+.card.cu.sp{gap:6px;width:100%;box-sizing:border-box}.card.cu .spt{display:flex;gap:12px;align-items:center;width:100%}
+.card.cu .spl{font-size:12px;color:var(--fg2)}
+.en .rw .spk{margin-top:6px}
 `;
+
+const SIZES = ['s', 'w', 'f'];
+const SIZE_ICON = { s: 'mdi:size-s', w: 'mdi:size-m', f: 'mdi:size-l' };
+const BATX = /phone|ipad|watch|handy|tablet|pixel|galaxy|saug|vacuum|robo|laptop|macbook/;
+/* Karten-Register: jede Karte ist ein Objekt { id, label, icon, home, fixed, size, items(card) -> [{ id, html, size, cfg }] }.
+   Auch von außen erweiterbar: window.LumoraCards.register({...}). */
+const REG = [];
+const registerCard = (def) => { const i = REG.findIndex((x) => x.id === def.id); if (i >= 0) REG[i] = def; else REG.push(def); };
 
 class LumoraCard extends HTMLElement {
   constructor() {
@@ -272,6 +309,10 @@ class LumoraCard extends HTMLElement {
     this.shadowRoot.addEventListener('pointercancel', end);
     this.shadowRoot.addEventListener('input', (e) => {
       if (e.target.classList.contains('srch')) { this._q = e.target.value; this._fillList(); }
+      else if (e.target.classList.contains('ccin')) {
+        const cu = this._set.custom.find((x) => x.id === this._ccId); if (!cu) return;
+        cu.title = e.target.value; clearTimeout(this._ct); this._ct = setTimeout(() => this._save(), 600);
+      }
     });
   }
   setConfig(cfg) {
@@ -296,7 +337,7 @@ class LumoraCard extends HTMLElement {
     const first = !this._hass;
     this._hass = h;
     if (first) this._load();
-    if (!this._loaded || this._sheet === 'add' || this._sheet === 'srcpick' || this._drag || this._dg || this._edit) return;
+    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
     if (this._down && this._edit) { this._pend = true; return; }
     const sig = this._signature();
     if (sig !== this._sig) {
@@ -308,6 +349,7 @@ class LumoraCard extends HTMLElement {
   _signature() {
     const h = this._hass;
     if (this._view === 'cams') return ['cams', this._sheet, this._edit, this._set.hidden.join(), (this._set.order.cams || []).join(), Object.values(h.states).filter((x) => dom(x.entity_id) === 'camera').map((x) => x.entity_id + (x.state === 'unavailable' ? 'x' : '') + (x.attributes.entity_picture || '')).join()].join('|'); const parts = [this._view, this._floor, this._area, this._sheet, this._edit, Math.floor(Date.now() / 60000), this._set.pinned.length, this._set.hidden.length, this._set.hiddenAreas.length];
+    const cuSet = new Set(this._set.custom.map((x) => x.entity));
     const doms = ['weather', 'light', 'media_player', 'vacuum', 'person', 'alarm_control_panel', 'lock', 'binary_sensor', 'camera', 'switch', 'cover', 'climate', 'fan'];
     for (const id in h.states) {
       const d = dom(id);
@@ -317,8 +359,10 @@ class LumoraCard extends HTMLElement {
       else if (d === 'sensor' && (h.states[id].attributes.warning_count !== undefined || h.states[id].attributes.is_ice_warning !== undefined)) parts.push(id + h.states[id].state + h.states[id].attributes.warning_count);
       else if (id.startsWith('sensor.room_climate_')) parts.push(id + h.states[id].state + h.states[id].attributes.mold_risk);
       else if (this._auto().tracked.has(id)) parts.push(id + h.states[id].state);
-      else if (this._set.pinned.some((p) => p.entity === id)) parts.push(id + h.states[id].state);
+      else if (cuSet.has(id) || this._set.pinned.some((p) => p.entity === id)) parts.push(id + h.states[id].state);
     }
+    if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
+    parts.push(this._bd.s);
     return parts.join('|');
   }
 
@@ -557,7 +601,7 @@ class LumoraCard extends HTMLElement {
     this.shadowRoot.innerHTML = `<style>${CSS}</style><div class="app" style="position:relative"><div class="body">${body}</div><div class="nav">${nav}</div>${this._sheetHtml()}</div>`;
     if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((n) => { const o = (keep[n.dataset.b] || []).shift(); if (o && o !== n) n.replaceWith(o); });
     const nb = this.shadowRoot.querySelector('.body'); if (nb) nb.scrollTop = top;
-    if (this._sheet === 'add' || this._sheet === 'srcpick') this._fillList();
+    if (['add', 'srcpick', 'quick'].includes(this._sheet)) this._fillList();
   }
   _num(id) { const st = this._hass.states[id]; const v = st ? parseFloat(st.state) : NaN; return isNaN(v) ? null : v; }
   _w(v) { return Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')} kW` : `${Math.round(v)} W`; }
@@ -625,20 +669,21 @@ class LumoraCard extends HTMLElement {
       const st = h.states[p.entity]; if (!st) return;
       const idle = !!p.only && INACTIVE.includes(st.state);
       if (idle && !this._edit) return;
-      cards.push(this._card(st, `${this._state(st)}${this._edit && p.only ? ' · nur wenn aktiv' : ''}`, p.entity, this._edit, idle ? 'hid' : '', p));
+      cards.push(this._card(st, `${this._state(st)}${this._edit && p.only ? ' · nur wenn aktiv' : ''}`, p.entity, this._edit, `${idle ? 'hid' : ''} ${this._set.size[p.entity] ? `sz-${this._set.size[p.entity]}` : ''}`, p));
     });
     cards.push(`<div class="card add" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</div>`);
     const en = this._energy();
+    const regCells = this._ord('homereg', this._regItems('home'), (x) => x.id).map((x) => this._cell(x, 'homereg')).filter(Boolean).join('');
     return `<div class="top"><div class="logo"><ha-icon icon="mdi:home-variant"></ha-icon></div><div class="ttl">Lumora.</div>${apill}</div>
       <div class="meta">${esc(meta)}</div>${this._vent()}
       <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${persons.length ? `${home}/${persons.length} zu Hause` : ''}</div></div></div>
-      ${note}<div class="pills">${pills}</div>
+      ${note}<div class="pills">${pills}</div>${regCells ? `<div class="grid reg">${regCells}</div>` : ''}
       ${en ? `<h3>Energie</h3>${en}` : ''}${this._homeCams()}
       <h3>Aktiv jetzt${this._locked ? '' : `<span class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</span>`}</h3>
       ${this._hint()}<div class="grid">${cards.join('')}</div>`;
   }
   _card(st, sub, pinId, edit, cls, p) {
-    const x = edit && pinId ? `<span class="x" data-act="unpin" data-id="${pinId}"><ha-icon icon="mdi:close"></ha-icon></span><span class="mini po" data-act="ponly" data-id="${pinId}"><ha-icon icon="${p && p.only ? 'mdi:flash' : 'mdi:flash-off'}"></ha-icon></span>${this._tools('pinned', pinId, null)}` : '';
+    const x = edit && pinId ? `<span class="x" data-act="unpin" data-id="${pinId}"><ha-icon icon="mdi:close"></ha-icon></span><span class="mini po" data-act="ponly" data-id="${pinId}"><ha-icon icon="${p && p.only ? 'mdi:flash' : 'mdi:flash-off'}"></ha-icon></span><span class="mini sz" data-act="size" data-id="${pinId}" data-d="${this._set.size[pinId] || 's'}"><ha-icon icon="${SIZE_ICON[this._set.size[pinId] || 's']}"></ha-icon></span>${this._tools('pinned', pinId, null)}` : '';
     if (dom(st.entity_id) === 'camera') return this._camHtml(st, 'pinned', x);
     const sp = this._special(st, x, cls || ''); if (sp) return sp;
     return `<div class="card ${cls || ''}" data-act="info" data-id="${st.entity_id}">${x}<ha-icon icon="${this._icon(st)}"></ha-icon><div><b>${esc(st.attributes.friendly_name || st.entity_id)}</b><span>${esc(sub)}</span></div></div>`;
@@ -788,52 +833,153 @@ class LumoraCard extends HTMLElement {
   _de(v, d = 0) { return Number(v).toLocaleString('de-DE', { maximumFractionDigits: d }); }
 
   /* ---------- Tab Mehr ---------- */
-  _more() {
-    const h = this._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, wide }); };
-    this._appls().forEach((a) => add(`appl:${a.base}`, this._applCard(a)));
-    const pk = this._pkgs(); if (pk) add('pkg', this._pkgPanel(pk), true);
-    add('energy', this._energy(), true);
-    const m = this._xs('meter'); if (m) add('stat:meter', this._stat('mdi:meter-electric', 'Netzbezug aktuell', this._de(parseFloat(m.state)), 'W', m.entity_id));
-    const gas = this._xs('gas'); if (gas) add('stat:gas', this._stat('mdi:meter-gas', 'Gaszähler', this._de(parseFloat(gas.state), 1), 'm³', gas.entity_id));
-    const wat = this._xs('water'); if (wat) add('stat:water', this._stat('mdi:water', 'Wasserzähler', this._de(parseFloat(wat.state), 1), 'm³', wat.entity_id));
-    const sv = this._xs('saving_total'); if (sv) add('stat:sav', this._stat('mdi:piggy-bank-outline', 'PV-Ersparnis gesamt', this._de(parseFloat(sv.state), 0), '€', sv.entity_id));
-    const sy = this._xs('saving_year'); if (sy) add('stat:savy', this._stat('mdi:cash-refund', 'Ersparnis pro Jahr', this._de(parseFloat(sy.state), 0), '€', sy.entity_id));
-    const pr = this._printerInfo();
-    if (pr) {
-      const cam = h.states[this._xid('printer_cam')]; const pic = cam && cam.state !== 'unavailable' && cam.attributes.entity_picture;
-      add('printer', this._panel('mdi:printer-3d-nozzle', '3D-Drucker', pr.active ? 'Druckt' : 'Bereit', pr.prog !== null ? `${Math.round(pr.prog)} %` : '',
-        `${pr.prog !== null ? `<div class="bar"><i style="width:${Math.round(pr.prog)}%"></i></div>` : ''}<div class="pkr"><span>${[pr.left !== null ? `noch ${this._fmtMin(pr.left)}` : '', pr.nozzle !== null ? `Düse ${Math.round(pr.nozzle)}°` : '', pr.bed !== null ? `Bett ${Math.round(pr.bed)}°` : ''].filter(Boolean).join(' · ')}</span></div>${pic ? `<img src="${esc(pic)}" alt="">` : ''}`, pr.st.entity_id), true);
+_more() {
+    const items = this._ord('more', this._regItems('more'), (x) => x.id);
+    const cells = items.map((x) => this._cell(x, 'more')).filter(Boolean);
+    return `<div class="rh"><h2>Mehr</h2><div class="inf">${this._editBtn()}</div></div>${this._hint()}<div class="grid">${cells.join('') || '<div class="empty">Keine weiteren Daten gefunden.</div>'}${this._edit ? '<div class="card add" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</div>' : ''}</div>`;
+  }
+
+  /* ---------- Karten-Register ---------- */
+  _regItems(where) {
+    const s = this._set; const out = [];
+    for (const def of REG) {
+      let its = [];
+      try { its = def.items(this) || []; } catch (e) { its = []; }
+      for (const it of its) {
+        if (!it || !it.html) continue;
+        const pl = def.fixed ? 'more' : (s.place[it.id] || (def.home ? 'home' : 'more'));
+        if (pl === where) out.push({ ...it, def, size: s.size[it.id] || it.size || def.size || 's' });
+      }
     }
-    const pt = this._xs('pool_temp');
-    if (pt) {
-      const sw = (k, l) => { const s = h.states[this._xid(k)]; return s ? `<button class="pill ${s.state === 'on' ? 'sel' : ''}" data-act="toggle" data-id="${s.entity_id}">${l} ${s.state === 'on' ? 'an' : 'aus'}</button>` : ''; };
-      add('pool', this._panel('mdi:pool', 'Pool', 'Wassertemperatur', `${this._de(parseFloat(pt.state), 1)}°`, `<div class="pills">${sw('pool_pump', 'Pumpe')}${sw('pool_heat', 'Heizung')}</div>`, pt.entity_id), true);
+    return out;
+  }
+  _cell(x, scope) {
+    const hd = this._set.hidden.includes(x.id);
+    if (hd && !this._edit) return '';
+    const opts = { size: x.size, place: x.def.fixed ? null : (scope === 'more' ? 'home' : 'more'), cfg: x.cfg };
+    return `<div class="mw sz-${x.size} ${hd ? 'hid' : ''}">${this._tools(scope, x.id, 'hidden', opts)}${x.html}</div>`;
+  }
+
+  /* ---------- Verlauf (Sparklines) ---------- */
+  _hist(id, hours) {
+    const hc = this._hc || (this._hc = {}); const k = `${id}|${hours}`; const c = hc[k];
+    if (c && (c.busy || Date.now() - c.at < 600000)) return c.pts;
+    const e = hc[k] = { at: c ? c.at : 0, pts: c ? c.pts : null, busy: true };
+    const end = Date.now(); const t0 = end - hours * 3600000;
+    this._hass.callWS({ type: 'history/history_during_period', start_time: new Date(t0).toISOString(), end_time: new Date(end).toISOString(), entity_ids: [id], include_start_time_state: true, significant_changes_only: false, minimal_response: true, no_attributes: true })
+      .then((r) => {
+        const raw = [];
+        for (const x of (r && r[id]) || []) {
+          const v = parseFloat(x.s !== undefined ? x.s : x.state); if (isNaN(v)) continue;
+          const t = x.lu !== undefined ? x.lu * 1000 : new Date(x.last_updated || x.last_changed).getTime();
+          raw.push([Math.max(t, t0), v]);
+        }
+        raw.sort((a, b) => a[0] - b[0]);
+        const N = 48; const dt = (end - t0) / N; const pts = []; let j = 0; let last = raw.length ? raw[0][1] : null;
+        for (let b = 0; b < N && raw.length; b++) {
+          const hi = t0 + (b + 1) * dt; let sum = 0; let n = 0;
+          while (j < raw.length && raw[j][0] < hi) { sum += raw[j][1]; n++; last = raw[j][1]; j++; }
+          pts.push([t0 + (b + 0.5) * dt, n ? sum / n : last]);
+        }
+        e.pts = pts; e.at = Date.now(); e.busy = false;
+        if (!this._edit && !this._dg && !this._sheet) { clearTimeout(this._hr); this._hr = setTimeout(() => this._render(), 300); }
+      }).catch(() => { e.busy = false; e.at = Date.now() - 540000; });
+    return e.pts;
+  }
+  _spark(pts, h, cls) {
+    h = h || 44;
+    if (!pts || pts.length < 2) return `<div class="spk" style="height:${h}px"></div>`;
+    const vs = pts.map((p) => p[1]); let mn = Math.min(...vs); let mx = Math.max(...vs); if (mx - mn < 1e-9) { mn -= 1; mx += 1; }
+    const W = 200; const a = pts[0][0]; const span = Math.max(1, pts[pts.length - 1][0] - a);
+    const line = pts.map((p) => `${((p[0] - a) / span * W).toFixed(1)},${(h - 3 - (p[1] - mn) / (mx - mn) * (h - 6)).toFixed(1)}`).join(' ');
+    return `<svg class="spk ${cls || ''}" viewBox="0 0 ${W} ${h}" preserveAspectRatio="none" style="height:${h}px"><polygon points="0,${h} ${line} ${W},${h}" fill="currentColor" opacity=".13"/><polyline points="${line}" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+  }
+  _hrs(h) { return h < 24 ? `${h} h` : h === 24 ? '24 h' : `${Math.round(h / 24)} Tage`; }
+
+  /* ---------- Schnellaktionen ---------- */
+  _quickHtml(q) {
+    const h = this._hass;
+    const chips = q.map((id) => {
+      const st = h.states[id];
+      const ic = id === '__alloff' ? 'mdi:lightbulb-group-off' : this._icon(st);
+      const nm = id === '__alloff' ? 'Alles Licht aus' : (st.attributes.friendly_name || id);
+      return `<button class="qa" data-act="qrun" data-id="${esc(id)}"><ha-icon icon="${ic}"></ha-icon>${esc(nm)}${this._edit ? `<span class="qx" data-act="qdel" data-id="${esc(id)}"><ha-icon icon="mdi:close"></ha-icon></span>` : ''}</button>`;
+    }).join('');
+    return `<div class="qs"><div class="qh"><ha-icon icon="mdi:flash"></ha-icon>Schnellaktionen</div><div class="qc">${chips}${this._edit ? '<button class="qa add" data-act="quick"><ha-icon icon="mdi:plus"></ha-icon>Aktion</button>' : ''}</div></div>`;
+  }
+
+  /* ---------- Batterien und Offline ---------- */
+  _devName(id) {
+    const h = this._hass; const r = h.entities && h.entities[id]; const dv = r && r.device_id && h.devices && h.devices[r.device_id];
+    const n = dv && (dv.name_by_user || dv.name); if (n) return n;
+    return cleanName(String((h.states[id] && h.states[id].attributes.friendly_name) || id).replace(/\s*(batterie|battery|akku)\s*(level|stand)?\s*$/i, ''));
+  }
+  _batteries() {
+    const h = this._hass; const lim = this._set.battLimit; const ig = this._set.ignore; const out = [];
+    for (const id in h.states) {
+      const d = dom(id); if (d !== 'sensor' && d !== 'binary_sensor') continue;
+      const st = h.states[id]; const a = st.attributes || {}; if (a.device_class !== 'battery' || ig.includes(id)) continue;
+      const r = h.entities && h.entities[id]; if (r && r.hidden) continue;
+      if (BATX.test(norm(`${id} ${a.friendly_name || ''}`))) continue;
+      let v = null;
+      if (d === 'sensor') {
+        v = parseFloat(st.state); if (isNaN(v) || v > lim) continue;
+        if (a.unit_of_measurement && a.unit_of_measurement !== '%') continue;
+      } else if (st.state !== 'on') continue;
+      out.push({ id, v, name: this._devName(id) });
     }
-    const wx = (this._byDomain().weather || [])[0];
-    if (wx) {
-      const a = wx.attributes;
-      add('wx', this._stat(WX[wx.state] || 'mdi:weather-cloudy', `${WXL[wx.state] || wx.state}${typeof a.humidity === 'number' ? ` · ${Math.round(a.humidity)} % Feuchte` : ''}${typeof a.wind_speed === 'number' ? ` · ${Math.round(a.wind_speed)} km/h` : ''}`, typeof a.temperature === 'number' ? this._de(a.temperature, 1) : '–', '°C', wx.entity_id));
+    return out.sort((x, y) => (x.v === null ? -1 : x.v) - (y.v === null ? -1 : y.v));
+  }
+  _battHtml(l) {
+    const lim = this._set.battLimit; const ig = this._set.ignore.length;
+    const rows = l.slice(0, 8).map((x) => `<div class="br" data-act="info" data-id="${x.id}"><ha-icon icon="${x.v === null ? 'mdi:battery-alert' : x.v <= 10 ? 'mdi:battery-10' : 'mdi:battery-30'}"></ha-icon><div class="t"><b>${esc(x.name)}</b><span>${esc(this._aname(this._areaOf(x.id)))}</span></div><em>${x.v === null ? 'schwach' : `${Math.round(x.v)} %`}</em>${this._edit ? `<span class="mini" data-act="ign" data-id="${x.id}"><ha-icon icon="mdi:eye-off"></ha-icon></span>` : ''}</div>`).join('');
+    const more = l.length > 8 ? `<div class="pkr"><span>+ ${l.length - 8} weitere</span></div>` : '';
+    const ed = this._edit ? `<div class="pills" style="margin-top:10px"><button class="pill" data-act="bl">Grenze ${lim} %</button>${ig ? `<button class="pill" data-act="ignclear">${ig} ausgeblendet, zurücksetzen</button>` : ''}</div>` : '';
+    return `<div class="en nopt"><div class="hd"><div class="ib"><ha-icon icon="mdi:battery-alert-variant-outline"></ha-icon></div><div><b>Batterien schwach</b><span>bis ${lim} %</span></div><div class="big">${l.length}</div></div>${rows || '<div class="empty">Alle Batterien in Ordnung.</div>'}${more}${ed}</div>`;
+  }
+  _offline() {
+    const h = this._hass; const ig = this._set.ignore; const dev = {};
+    for (const id in h.states) {
+      const r = h.entities && h.entities[id]; if (!r || !r.device_id || r.hidden || r.entity_category) continue;
+      if (dom(id) === 'update') continue;
+      const o = dev[r.device_id] || (dev[r.device_id] = { n: 0, off: 0, id });
+      o.n++; if (h.states[id].state === 'unavailable') o.off++;
     }
-    const tk = this._xs('tank'); if (tk) add('tank', this._stat('mdi:gas-station', `Tankzeit${tk.attributes.stunde ? ` · ${tk.attributes.stunde} Uhr` : ''}`, this._de(parseFloat(tk.state), 3), '', tk.entity_id));
-    const hs = this._xs('health');
-    if (hs) {
-      const v = parseFloat(hs.state); const at = hs.attributes;
-      add('health', this._panel('mdi:heart-pulse', 'HA-Health', `Hardware ${at.hardware_score ?? '–'} · Anwendungen ${at.application_score ?? '–'}${at.zombie_count ? ` · ${at.zombie_count} Zombie-Entitäten` : ''}`, `${Math.round(v)}`, `<div class="bar ${v >= 80 ? 'b' : ''}"><i style="width:${Math.min(100, v)}%"></i></div>`, hs.entity_id));
+    const out = []; const tot = Object.keys(dev).length;
+    for (const did in dev) {
+      const o = dev[did]; if (!o.n || o.off < o.n || ig.includes(did)) continue;
+      const dv = h.devices && h.devices[did]; const name = dv ? (dv.name_by_user || dv.name) : null;
+      if (BATX.test(norm(`${name || ''} ${o.id}`))) continue;
+      out.push({ did, id: o.id, name: name || cleanName(h.states[o.id].attributes.friendly_name || o.id) });
     }
-    const ph = this._xs('pihole_ratio');
-    if (ph) {
-      const sw = h.states[this._xid('pihole_switch')]; const q = this._num(this._xid('pihole_queries')); const cl = this._num(this._xid('pihole_clients'));
-      add('pihole', this._panel('mdi:shield-check-outline', 'Pi-hole', `${q !== null ? `${this._de(q)} Abfragen` : ''}${cl !== null ? ` · ${this._de(cl)} Clients` : ''}`, `${this._de(parseFloat(ph.state), 1)} %`,
-        sw ? `<div class="pills"><button class="pill ${sw.state === 'on' ? 'sel' : ''}" data-act="toggle" data-id="${sw.entity_id}">Filter ${sw.state === 'on' ? 'an' : 'aus'}</button></div>` : '', ph.entity_id));
+    if (out.length > Math.max(5, tot * 0.5)) return [];
+    return out.sort((x, y) => x.name.localeCompare(y.name, 'de'));
+  }
+  _offHtml(l) {
+    const rows = l.slice(0, 6).map((x) => `<div class="br" data-act="info" data-id="${x.id}"><ha-icon icon="mdi:lan-disconnect"></ha-icon><div class="t"><b>${esc(x.name)}</b><span>${esc(this._aname(this._areaOf(x.id)))}</span></div>${this._edit ? `<span class="mini" data-act="ign" data-id="${x.did}"><ha-icon icon="mdi:eye-off"></ha-icon></span>` : ''}</div>`).join('');
+    const more = l.length > 6 ? `<div class="pkr"><span>+ ${l.length - 6} weitere</span></div>` : '';
+    return `<div class="en nopt"><div class="hd"><div class="ib"><ha-icon icon="mdi:lan-disconnect"></ha-icon></div><div><b>Geräte offline</b><span>nicht erreichbar</span></div><div class="big">${l.length}</div></div>${rows}${more}</div>`;
+  }
+
+  /* ---------- Eigene Karten ---------- */
+  _customHtml(cu, st) {
+    const a = st.attributes; const name = cu.title || a.friendly_name || cu.entity; const d = dom(cu.entity);
+    const num = parseFloat(st.state); const isNum = !isNaN(num); const unit = a.unit_of_measurement || '';
+    const val = isNum ? `${this._de(num, Math.abs(num) >= 100 ? 0 : 1)}${unit ? ` ${esc(unit)}` : ''}` : esc(this._state(st));
+    const ic = `<ha-icon icon="${this._icon(st)}"></ha-icon>`;
+    if (cu.kind === 'toggle') {
+      const on = !INACTIVE.includes(st.state);
+      return `<div class="card cu ${on ? 'on' : ''}" data-act="toggle" data-id="${cu.entity}">${ic}<div><b>${esc(name)}</b><span>${esc(this._state(st))}</span></div></div>`;
     }
-    const lg = this._xs('lage');
-    if (lg) {
-      const an = lg.attributes.analysis_summary; const hl = an && typeof an === 'object' ? an.headline : '';
-      add('lage', this._panel('mdi:alert-circle-outline', 'Lage Deutschland', hl || 'Lagebild', `${Math.round(parseFloat(lg.state))}`, '', lg.entity_id));
+    if (cu.kind === 'spark' && isNum) {
+      const hrs = cu.hours || 24; const pts = this._hist(cu.entity, hrs);
+      const rng = pts && pts.length > 1 ? `${this._de(Math.min(...pts.map((p) => p[1])), 1)} bis ${this._de(Math.max(...pts.map((p) => p[1])), 1)}${unit ? ` ${esc(unit)}` : ''}` : '';
+      return `<div class="card cu sp" data-act="info" data-id="${cu.entity}"><div class="spt">${ic}<div><b>${val}</b><span>${esc(name)}</span></div></div>${this._spark(pts, 46)}<span class="spl">${this._hrs(hrs)}${rng ? ` · ${rng}` : ''}</span></div>`;
     }
-    const ord = this._ord('more', items, (x) => x.id);
-    const cells = ord.filter((x) => this._edit || !this._set.hidden.includes(x.id)).map((x) => `<div class="mw ${x.wide ? 'wide' : ''} ${this._set.hidden.includes(x.id) ? 'hid' : ''}">${this._tools('more', x.id, 'hidden')}${x.html}</div>`);
-    return `<div class="rh"><h2>Mehr</h2><div class="inf">${this._editBtn()}</div></div>${this._hint()}<div class="grid">${cells.join('') || '<div class="empty">Keine weiteren Daten gefunden.</div>'}</div>`;
+    return `<div class="card cu" data-act="info" data-id="${cu.entity}">${ic}<div><b>${val}</b><span>${esc(name)}</span></div></div>`;
+  }
+  _customMissing(cu) {
+    return `<div class="card cu"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><div><b>Entität fehlt</b><span>${esc(cu.entity)}</span></div></div>`;
   }
   _dgItem(el) {
     while (el && el !== this.shadowRoot) {
@@ -960,16 +1106,20 @@ class LumoraCard extends HTMLElement {
       .sort((x, y) => ROOM_DOMAINS.indexOf(dom(x.entity_id)) - ROOM_DOMAINS.indexOf(dom(y.entity_id))), (s) => s.entity_id);
     const tiles = tileEnts.map((s) => this._tile(s, a.name, 'tiles:' + a.id)).join('');
     return `<div class="tabs">${ftabs}</div><div class="tabs">${atabs}</div>
-      <div class="rh"><h2>${esc(a.name)}</h2><div class="inf"><span>${info.join(' · ')}</span>${this._edit ? `<button class="pill" data-act="rsens" data-id="${a.id}"><ha-icon icon="mdi:thermometer"></ha-icon>Sensoren</button>` : ''}${this._editBtn()}</div></div>${this._hint()}
+      <div class="rh"><h2>${esc(a.name)}</h2><div class="inf"><span>${info.join(' · ')}</span>${t ? `<span class="spi">${this._spark(this._hist(t.entity_id, 24), 24)}</span>` : ''}${this._edit ? `<button class="pill" data-act="rsens" data-id="${a.id}"><ha-icon icon="mdi:thermometer"></ha-icon>Sensoren</button>` : ''}${this._editBtn()}</div></div>${this._hint()}
       ${cams.length ? `<div class="cams" style="margin-bottom:10px">${cams.map((s) => this._camHtml(s, 'rcams:' + a.id)).join('')}</div>` : ''}
       <div class="grid">${tiles || '<div class="empty">Keine Geräte in diesem Raum.</div>'}</div>`;
   }
   _editBtn() { return this._locked ? '' : `<button class="pill" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button>`; }
-  _tools(scope, id, hideKey) {
+  _tools(scope, id, hideKey, o) {
     if (!this._edit) return '';
     const list = hideKey === 'hiddenAreas' ? this._set.hiddenAreas : this._set.hidden;
     const eye = hideKey ? `<span class="mini" data-act="${hideKey === 'hiddenAreas' ? 'hidearea' : 'hidee'}" data-id="${esc(id)}"><ha-icon icon="${list.includes(id) ? 'mdi:eye' : 'mdi:eye-off'}"></ha-icon></span>` : '';
-    return `<span class="tools">${eye}</span><i class="dg" data-s="${esc(scope)}" data-id="${esc(id)}" style="display:none"></i>`;
+    const e = esc(id);
+    const cf = o && o.cfg ? `<span class="mini" data-act="cc" data-id="${e}"><ha-icon icon="mdi:cog-outline"></ha-icon></span>` : '';
+    const sz = o && o.size ? `<span class="mini" data-act="size" data-id="${e}" data-d="${o.size}"><ha-icon icon="${SIZE_ICON[o.size]}"></ha-icon></span>` : '';
+    const pl = o && o.place ? `<span class="mini" data-act="place" data-id="${e}" data-p="${o.place}"><ha-icon icon="${o.place === 'home' ? 'mdi:home-import-outline' : 'mdi:view-dashboard-outline'}"></ha-icon></span>` : '';
+    return `<span class="tools">${cf}${sz}${pl}${eye}</span><i class="dg" data-s="${esc(scope)}" data-id="${esc(id)}" style="display:none"></i>`;
   }
   _ord(scope, items, idf) {
     const o = this._set.order[scope];
@@ -980,7 +1130,7 @@ class LumoraCard extends HTMLElement {
   _hint() {
     if (!this._edit) return '';
     const admin = this._hass.user && this._hass.user.is_admin;
-    return `<div class="hint">${this._msg ? esc(this._msg) : 'Bearbeiten: Element gedrückt halten und ziehen zum Verschieben. Das Auge blendet aus oder wieder ein.'}${admin && this._cfg.shared !== false ? ' <button class="pill" data-act="publish" style="margin-top:8px"><ha-icon icon="mdi:account-group"></ha-icon>Layout für alle speichern</button>' : ''}</div>`;
+    return `<div class="hint">${this._msg ? esc(this._msg) : 'Bearbeiten: Element gedrückt halten und ziehen zum Verschieben. Das Auge blendet aus oder ein, das Größen-Symbol ändert die Breite, das Haus-Symbol verschiebt eine Karte zwischen Zuhause und Mehr.'}${admin && this._cfg.shared !== false ? ' <button class="pill" data-act="publish" style="margin-top:8px"><ha-icon icon="mdi:account-group"></ha-icon>Layout für alle speichern</button>' : ''}</div>`;
   }
   async _publish() {
     const h = this._hass; const seg = (location.pathname.split('/')[1] || ''); const url = !seg || seg === 'lovelace' ? null : seg;
@@ -1087,7 +1237,20 @@ class LumoraCard extends HTMLElement {
       c = `<h2>Karte hinzufügen</h2><input class="srch" placeholder="Entität suchen" value="${esc(this._q)}">
         <div class="tabs">${Object.keys(FLT).map((k) => `<button class="pill ${this._flt === k ? 'sel' : ''}" data-act="flt" data-k="${k}">${FLT_LABEL[k]}</button>`).join('')}</div>
         <div class="row"><div class="t"><b>Nur anzeigen, wenn aktiv</b><span>Karte erscheint nur bei Zustand an, offen oder läuft</span></div><button class="${this._only ? 'sel' : ''}" data-act="onlyact">${this._only ? 'An' : 'Aus'}</button></div>
+        <div class="row"><div class="t"><b>Als eigene Karte</b><span>Wert, Verlauf oder Schalter statt Kachel</span></div><button class="${this._cust ? 'sel' : ''}" data-act="ascust">${this._cust ? 'An' : 'Aus'}</button></div>
         <div class="list"></div>`;
+    } else if (this._sheet === 'quick') {
+      c = `<h2>Schnellaktionen</h2><div class="hint">Szenen, Skripte und Tasten mit einem Tipp auslösen. Mehrfachauswahl möglich.</div><input class="srch" placeholder="Suchen" value="${esc(this._q)}"><div class="list"></div>`;
+    } else if (this._sheet === 'cc') {
+      const cu = this._set.custom.find((x) => x.id === this._ccId);
+      if (cu) {
+        const st = this._hass.states[cu.entity];
+        const K = [['value', 'Wert'], ['spark', 'Verlauf'], ['toggle', 'Schalter']]; const HR = [6, 24, 72, 168];
+        c = `<h2>Eigene Karte</h2><div class="hint">${esc(cu.entity)}</div><h4>Titel</h4><input class="ccin" placeholder="${esc((st && st.attributes.friendly_name) || cu.entity)}" value="${esc(cu.title)}">
+          <h4>Darstellung</h4><div class="tabs">${K.map(([k, l]) => `<button class="pill ${cu.kind === k ? 'sel' : ''}" data-act="cckind" data-k="${k}">${l}</button>`).join('')}</div>
+          ${cu.kind === 'spark' ? `<h4>Zeitraum</h4><div class="tabs">${HR.map((v) => `<button class="pill ${(cu.hours || 24) === v ? 'sel' : ''}" data-act="cchrs" data-k="${v}">${this._hrs(v)}</button>`).join('')}</div>` : ''}
+          <div class="row" style="border:0"><button data-act="ccdel">Karte löschen</button><button class="sel" data-act="close">Fertig</button></div>`;
+      }
     }
     return `<div class="sbg" data-act="close"><div class="sheet" data-act="noop">${c}</div></div>`;
   }
@@ -1096,6 +1259,14 @@ class LumoraCard extends HTMLElement {
     if (this._sheet === 'srcpick') {
       const q = norm(this._q); const k = this._sk;
       el.innerHTML = this._cands(k, true).filter((x) => !q || norm(`${x.id} ${x.name}`).includes(q)).slice(0, 60).map((x) => `<div class="row" data-act="srcset" data-k="${k}" data-id="${x.id}"><ha-icon icon="mdi:link-variant"></ha-icon><div class="t"><b>${esc(x.name)}</b><span>${esc(x.id)}${x.ok ? ' · passt' : ''}</span></div></div>`).join('') || '<div class="empty">Nichts gefunden.</div>';
+      return;
+    }
+    if (this._sheet === 'quick') {
+      const q = norm(this._q); const sel = this._set.quick;
+      const all = [{ id: '__alloff', name: 'Alle Lichter ausschalten', ic: 'mdi:lightbulb-group-off', sub: 'Eingebaute Aktion' }]
+        .concat(Object.values(this._hass.states).filter((s) => ['scene', 'script', 'button', 'input_button'].includes(dom(s.entity_id))).map((s) => ({ id: s.entity_id, name: s.attributes.friendly_name || s.entity_id, ic: this._icon(s), sub: s.entity_id })))
+        .filter((x) => !q || norm(`${x.id} ${x.name}`).includes(q)).slice(0, 80);
+      el.innerHTML = all.map((x) => `<div class="row" data-act="qtog" data-id="${esc(x.id)}"><ha-icon icon="${x.ic}"></ha-icon><div class="t"><b>${esc(x.name)}</b><span>${esc(x.sub)}</span></div><ha-icon icon="${sel.includes(x.id) ? 'mdi:check-circle' : 'mdi:circle-outline'}"></ha-icon></div>`).join('') || '<div class="empty">Nichts gefunden.</div>';
       return;
     }
     const q = this._q.toLowerCase(); const f = FLT[this._flt];
@@ -1115,7 +1286,7 @@ class LumoraCard extends HTMLElement {
     if (act === 'noop') return;
     e.stopPropagation();
     if (Date.now() - (this._dgAt || 0) < 450) return;
-    if (this._edit && ['info', 'toggle', 'vstart', 'vdock'].includes(act)) return;
+    if (this._edit && ['info', 'toggle', 'vstart', 'vdock', 'qrun'].includes(act)) return;
     switch (act) {
       case 'nav': this._view = t.dataset.v; this._sheet = null; this._edit = false; break;
       case 'floor': this._floor = id; this._area = null; break;
@@ -1149,10 +1320,38 @@ class LumoraCard extends HTMLElement {
       case 'cat': s.alerts[t.dataset.k] = !s.alerts[t.dataset.k]; this._save(); break;
       case 'hide': if (!s.excludeEntities.includes(id)) s.excludeEntities.push(id); this._save(); break;
       case 'unhide': s.excludeEntities = s.excludeEntities.filter((x) => x !== id); this._save(); break;
-      case 'add': this._sheet = 'add'; this._q = ''; this._flt = 'all'; break;
+      case 'add': this._sheet = 'add'; this._q = ''; this._flt = 'all'; this._cust = false; break;
+      case 'ascust': this._cust = !this._cust; break;
+      case 'size': { const cur = t.dataset.d || 's'; s.size[id] = SIZES[(SIZES.indexOf(cur) + 1) % SIZES.length]; this._save(); break; }
+      case 'place': s.place[id] = t.dataset.p; this._save(); break;
+      case 'quick': this._sheet = 'quick'; this._q = ''; break;
+      case 'qtog': s.quick = s.quick.includes(id) ? s.quick.filter((x) => x !== id) : [...s.quick, id]; this._save(); this._fillList(); return;
+      case 'qdel': s.quick = s.quick.filter((x) => x !== id); this._save(); break;
+      case 'qrun': {
+        if (id === '__alloff') h.callService('light', 'turn_off', { entity_id: 'all' });
+        else { const d = dom(id); if (d === 'button' || d === 'input_button') h.callService(d, 'press', { entity_id: id }); else h.callService(d, 'turn_on', { entity_id: id }); }
+        t.classList.add('ok'); setTimeout(() => t.classList.remove('ok'), 1200); return;
+      }
+      case 'ign': if (!s.ignore.includes(id)) s.ignore.push(id); this._bd = null; this._save(); break;
+      case 'ignclear': s.ignore = []; this._bd = null; this._save(); break;
+      case 'bl': { const Lm = [10, 15, 20, 30]; s.battLimit = Lm[(Lm.indexOf(s.battLimit) + 1) % Lm.length]; this._bd = null; this._save(); break; }
+      case 'cc': this._sheet = 'cc'; this._ccId = id; break;
+      case 'cckind': { const cu = s.custom.find((x) => x.id === this._ccId); if (cu) { cu.kind = t.dataset.k; this._save(); } break; }
+      case 'cchrs': { const cu = s.custom.find((x) => x.id === this._ccId); if (cu) { cu.hours = Number(t.dataset.k); this._save(); } break; }
+      case 'ccdel': { const cid = this._ccId; s.custom = s.custom.filter((x) => x.id !== cid); delete s.size[cid]; delete s.place[cid]; s.hidden = s.hidden.filter((x) => x !== cid); this._save(); this._sheet = null; break; }
       case 'flt': this._flt = t.dataset.k; this._render(); return;
       case 'onlyact': this._only = !this._only; this._render(); return;
-      case 'pick': if (!s.pinned.some((p) => p.entity === id)) s.pinned.push({ entity: id, only: this._only }); this._save(); this._sheet = null; this._only = false; break;
+      case 'pick': {
+        if (this._cust) {
+          const st = h.states[id]; const d = dom(id); const num = st && !isNaN(parseFloat(st.state));
+          const cid = `cu${Date.now().toString(36)}`;
+          s.custom.push({ id: cid, entity: id, kind: ['light', 'switch', 'fan', 'input_boolean', 'humidifier', 'cover'].includes(d) ? 'toggle' : num ? 'spark' : 'value', hours: 24, title: '' });
+          if (this._view === 'more') s.place[cid] = 'more';
+          this._sheet = 'cc'; this._ccId = cid; this._cust = false; this._save(); break;
+        }
+        if (!s.pinned.some((p) => p.entity === id)) s.pinned.push({ entity: id, only: this._only });
+        this._save(); this._sheet = null; this._only = false; break;
+      }
       case 'ponly': { const q = s.pinned.find((x) => x.entity === id); if (q) q.only = !q.only; this._save(); break; }
       case 'unpin': s.pinned = s.pinned.filter((p) => p.entity !== id); this._save(); break;
       case 'edit': if (this._locked) return; this._edit = !this._edit; break;
@@ -1176,6 +1375,135 @@ class LumoraCard extends HTMLElement {
     this._sig = ''; this._render();
   }
 }
+
+registerCard({ id: 'appliances', label: 'Haushaltsgeräte', icon: 'mdi:washing-machine', items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    c._appls().forEach((a) => add(`appl:${a.base}`, c._applCard(a)));
+  return items;
+} });
+registerCard({ id: 'pkg', label: 'Pakete', icon: 'mdi:package-variant-closed', items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    const pk = c._pkgs(); if (pk) add('pkg', c._pkgPanel(pk), true);
+  return items;
+} });
+registerCard({ id: 'energy', label: 'Energie', icon: 'mdi:lightning-bolt', fixed: true, items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    add('energy', c._energy(), true);
+  return items;
+} });
+registerCard({ id: 'meter', label: 'Netzbezug', icon: 'mdi:meter-electric', items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    const m = c._xs('meter'); if (m) add('stat:meter', c._stat('mdi:meter-electric', 'Netzbezug aktuell', c._de(parseFloat(m.state)), 'W', m.entity_id));
+  return items;
+} });
+registerCard({ id: 'gas', label: 'Gaszähler', icon: 'mdi:meter-gas', items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    const gas = c._xs('gas'); if (gas) add('stat:gas', c._stat('mdi:meter-gas', 'Gaszähler', c._de(parseFloat(gas.state), 1), 'm³', gas.entity_id));
+  return items;
+} });
+registerCard({ id: 'water', label: 'Wasserzähler', icon: 'mdi:water', items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    const wat = c._xs('water'); if (wat) add('stat:water', c._stat('mdi:water', 'Wasserzähler', c._de(parseFloat(wat.state), 1), 'm³', wat.entity_id));
+  return items;
+} });
+registerCard({ id: 'saving', label: 'PV-Ersparnis', icon: 'mdi:piggy-bank-outline', items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    const sv = c._xs('saving_total'); if (sv) add('stat:sav', c._stat('mdi:piggy-bank-outline', 'PV-Ersparnis gesamt', c._de(parseFloat(sv.state), 0), '€', sv.entity_id));
+  return items;
+} });
+registerCard({ id: 'saving_year', label: 'Ersparnis pro Jahr', icon: 'mdi:cash-refund', items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    const sy = c._xs('saving_year'); if (sy) add('stat:savy', c._stat('mdi:cash-refund', 'Ersparnis pro Jahr', c._de(parseFloat(sy.state), 0), '€', sy.entity_id));
+  return items;
+} });
+registerCard({ id: 'printer', label: '3D-Drucker', icon: 'mdi:printer-3d-nozzle', items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    const pr = c._printerInfo();
+    if (pr) {
+      const cam = h.states[c._xid('printer_cam')]; const pic = cam && cam.state !== 'unavailable' && cam.attributes.entity_picture;
+      add('printer', c._panel('mdi:printer-3d-nozzle', '3D-Drucker', pr.active ? 'Druckt' : 'Bereit', pr.prog !== null ? `${Math.round(pr.prog)} %` : '',
+        `${pr.prog !== null ? `<div class="bar"><i style="width:${Math.round(pr.prog)}%"></i></div>` : ''}<div class="pkr"><span>${[pr.left !== null ? `noch ${c._fmtMin(pr.left)}` : '', pr.nozzle !== null ? `Düse ${Math.round(pr.nozzle)}°` : '', pr.bed !== null ? `Bett ${Math.round(pr.bed)}°` : ''].filter(Boolean).join(' · ')}</span></div>${pic ? `<img src="${esc(pic)}" alt="">` : ''}`, pr.st.entity_id), true);
+    }
+  return items;
+} });
+registerCard({ id: 'pool', label: 'Pool', icon: 'mdi:pool', items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    const pt = c._xs('pool_temp');
+    if (pt) {
+      const sw = (k, l) => { const s = h.states[c._xid(k)]; return s ? `<button class="pill ${s.state === 'on' ? 'sel' : ''}" data-act="toggle" data-id="${s.entity_id}">${l} ${s.state === 'on' ? 'an' : 'aus'}</button>` : ''; };
+      add('pool', c._panel('mdi:pool', 'Pool', 'Wassertemperatur', `${c._de(parseFloat(pt.state), 1)}°`, `<div class="pills">${sw('pool_pump', 'Pumpe')}${sw('pool_heat', 'Heizung')}</div>`, pt.entity_id), true);
+    }
+  return items;
+} });
+registerCard({ id: 'wx', label: 'Wetter', icon: 'mdi:weather-partly-cloudy', items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    const wx = (c._byDomain().weather || [])[0];
+    if (wx) {
+      const a = wx.attributes;
+      add('wx', c._stat(WX[wx.state] || 'mdi:weather-cloudy', `${WXL[wx.state] || wx.state}${typeof a.humidity === 'number' ? ` · ${Math.round(a.humidity)} % Feuchte` : ''}${typeof a.wind_speed === 'number' ? ` · ${Math.round(a.wind_speed)} km/h` : ''}`, typeof a.temperature === 'number' ? c._de(a.temperature, 1) : '–', '°C', wx.entity_id));
+    }
+  return items;
+} });
+registerCard({ id: 'tank', label: 'Tankzeit', icon: 'mdi:gas-station', items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    const tk = c._xs('tank'); if (tk) add('tank', c._stat('mdi:gas-station', `Tankzeit${tk.attributes.stunde ? ` · ${tk.attributes.stunde} Uhr` : ''}`, c._de(parseFloat(tk.state), 3), '', tk.entity_id));
+  return items;
+} });
+registerCard({ id: 'health', label: 'HA-Health', icon: 'mdi:heart-pulse', items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    const hs = c._xs('health');
+    if (hs) {
+      const v = parseFloat(hs.state); const at = hs.attributes;
+      add('health', c._panel('mdi:heart-pulse', 'HA-Health', `Hardware ${at.hardware_score ?? '–'} · Anwendungen ${at.application_score ?? '–'}${at.zombie_count ? ` · ${at.zombie_count} Zombie-Entitäten` : ''}`, `${Math.round(v)}`, `<div class="bar ${v >= 80 ? 'b' : ''}"><i style="width:${Math.min(100, v)}%"></i></div>`, hs.entity_id));
+    }
+  return items;
+} });
+registerCard({ id: 'pihole', label: 'Pi-hole', icon: 'mdi:shield-check-outline', items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    const ph = c._xs('pihole_ratio');
+    if (ph) {
+      const sw = h.states[c._xid('pihole_switch')]; const q = c._num(c._xid('pihole_queries')); const cl = c._num(c._xid('pihole_clients'));
+      add('pihole', c._panel('mdi:shield-check-outline', 'Pi-hole', `${q !== null ? `${c._de(q)} Abfragen` : ''}${cl !== null ? ` · ${c._de(cl)} Clients` : ''}`, `${c._de(parseFloat(ph.state), 1)} %`,
+        sw ? `<div class="pills"><button class="pill ${sw.state === 'on' ? 'sel' : ''}" data-act="toggle" data-id="${sw.entity_id}">Filter ${sw.state === 'on' ? 'an' : 'aus'}</button></div>` : '', ph.entity_id));
+    }
+  return items;
+} });
+registerCard({ id: 'lage', label: 'Lage Deutschland', icon: 'mdi:alert-circle-outline', items: (c) => {
+  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+    const lg = c._xs('lage');
+    if (lg) {
+      const an = lg.attributes.analysis_summary; const hl = an && typeof an === 'object' ? an.headline : '';
+      add('lage', c._panel('mdi:alert-circle-outline', 'Lage Deutschland', hl || 'Lagebild', `${Math.round(parseFloat(lg.state))}`, '', lg.entity_id));
+    }
+  return items;
+} });
+registerCard({ id: 'quick', label: 'Schnellaktionen', icon: 'mdi:flash', home: true, size: 'f', items: (c) => {
+  const q = c._set.quick.filter((id) => id === '__alloff' || c._hass.states[id]);
+  if (!q.length && !c._edit) return [];
+  return [{ id: 'quick', html: c._quickHtml(q), size: 'f' }];
+} });
+registerCard({ id: 'batt', label: 'Batterien', icon: 'mdi:battery-alert-variant-outline', home: true, size: 'w', items: (c) => {
+  const l = c._batteries();
+  if (!l.length && !(c._edit && c._set.ignore.length)) return [];
+  return [{ id: 'batt', html: c._battHtml(l), size: 'w' }];
+} });
+registerCard({ id: 'offline', label: 'Geräte offline', icon: 'mdi:lan-disconnect', home: true, size: 'w', items: (c) => {
+  const l = c._offline();
+  return l.length ? [{ id: 'offline', html: c._offHtml(l), size: 'w' }] : [];
+} });
+registerCard({ id: 'espark', label: 'Energie-Verlauf', icon: 'mdi:chart-areaspline', size: 'f', items: (c) => {
+  const rows = [['PV-Erzeugung', c._xs('e_pv'), 'a'], ['Hausverbrauch', c._xs('e_consumption'), '']].filter((r) => r[1]);
+  if (!rows.length) return [];
+  const body = rows.map(([l, st, cl]) => `<div class="rw" data-act="info" data-id="${st.entity_id}"><div class="rl"><span>${l}</span><span>${c._w(parseFloat(st.state) || 0)}</span></div>${c._spark(c._hist(st.entity_id, 24), 56, cl)}</div>`).join('');
+  return [{ id: 'espark', html: `<div class="en nopt"><div class="hd"><div class="ib"><ha-icon icon="mdi:chart-areaspline"></ha-icon></div><div><b>Energie-Verlauf</b><span>letzte 24 Stunden</span></div></div>${body}</div>`, size: 'f' }];
+} });
+registerCard({ id: 'custom', label: 'Eigene Karten', icon: 'mdi:card-text-outline', home: true, size: 's', items: (c) => c._set.custom.map((cu) => {
+  const st = c._hass.states[cu.entity];
+  if (!st) return c._edit ? { id: cu.id, html: c._customMissing(cu), cfg: true } : null;
+  return { id: cu.id, html: c._customHtml(cu, st), size: cu.kind === 'spark' ? 'w' : 's', cfg: true };
+}).filter(Boolean) });
+
+window.LumoraCards = { register: registerCard, list: () => REG.map((x) => ({ id: x.id, label: x.label })) };
 
 if (!customElements.get('lumora-card')) customElements.define('lumora-card', LumoraCard);
 window.customCards = window.customCards || [];
