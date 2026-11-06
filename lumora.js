@@ -249,7 +249,8 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .tile .tools .mini{width:30px;height:30px}.tile .tools .mini ha-icon{--mdc-icon-size:17px}
 .mw{container-type:inline-size}.enw{height:100%}.enw>.en{height:100%;box-sizing:border-box}
 .en .hd>div:nth-child(2){min-width:0}.en .hd b,.en .rl span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.en .rl span:first-child{min-width:0}
-@container (max-width:270px){.en{padding:12px}.en .hd{gap:8px}.en .ib{width:34px;height:34px}.en .big{font-size:22px}.en .hd b{font-size:14px}.en .rl{font-size:12.5px}.en .rl ha-icon{margin-right:4px}.en .hd span{font-size:11.5px}}
+@container (max-width:270px){.en{padding:12px}.en .hd{flex-wrap:wrap;gap:8px}.en .ib{width:34px;height:34px}.en .hd>div:nth-child(2){flex:1;min-width:0}.en .hd b{font-size:14px}.en .hd span{font-size:11.5px}.en .big{margin-left:0;flex-basis:100%;font-size:26px}.en .rl{font-size:12.5px}.en .rl ha-icon{margin-right:4px}.en .rl span:first-child{white-space:normal}.en .rw{margin-top:10px}}
+.en .rl span:last-child{white-space:nowrap;flex:none}
 .mw.sz-w{grid-column:span 2}.mw.sz-f{grid-column:1/-1}
 .mw>.card,.mw>.en,.mw>.qs{height:100%;box-sizing:border-box}
 .card.sz-w,.vc.sz-w,.cl.sz-w,.ap.sz-w{grid-column:span 2}.card.sz-f,.vc.sz-f,.cl.sz-f,.ap.sz-f{grid-column:1/-1}
