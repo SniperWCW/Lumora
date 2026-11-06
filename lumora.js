@@ -680,7 +680,7 @@ class LumoraCard extends HTMLElement {
       <div class="meta">${esc(meta)}</div>${this._vent()}
       <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${persons.length ? `${home}/${persons.length} zu Hause` : ''}</div></div></div>
       ${note}<div class="pills">${pills}</div>${regCells ? `<div class="grid reg">${regCells}</div>` : ''}
-      ${en ? `<h3>Energie</h3>${en}` : ''}${this._homeCams()}
+      ${en && (this._edit || !this._set.hidden.includes('energyhome')) ? `<h3>Energie</h3><div class="grid"><div class="mw sz-${this._set.size.energyhome || 'f'} ${this._set.hidden.includes('energyhome') ? 'hid' : ''}">${this._tools('homeen', 'energyhome', 'hidden', { size: this._set.size.energyhome || 'f' })}${en}</div></div>` : ''}${this._homeCams()}
       <h3>Aktiv jetzt${this._locked ? '' : `<span class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</span>`}</h3>
       ${this._hint()}<div class="grid">${cards.join('')}</div>`;
   }
