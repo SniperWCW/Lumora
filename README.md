@@ -25,7 +25,7 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - Batterie-Karte (erscheint nur bei schwachen Batterien, Grenze einstellbar) und Karte "Geräte offline" (Geräte, deren Entitäten alle nicht erreichbar sind); einzelne Geräte lassen sich ausblenden
 - Verläufe: Sparklines für Raumtemperatur im Raumkopf, Energie-Verlauf (PV und Verbrauch, 24 h) und eigene Karten mit frei wählbarem Zeitraum
 - Eigene Karten: beliebige Entität als Wert, Verlauf oder Schalter (Karte hinzufügen, "Als eigene Karte"); Titel, Darstellung und Zeitraum über das Zahnrad
-- Kartengröße: im Bearbeiten-Modus pro Karte klein, breit oder volle Breite; jede Karte lässt sich zwischen Zuhause und Mehr verschieben
+- Kartengröße: im Bearbeiten-Modus pro Karte klein, breit oder volle Breite (auch Kacheln in den Räumen); jede Karte lässt sich zwischen Zuhause und Mehr verschieben
 - Karten-Register: jede Karte ist ein Objekt (`id`, `label`, `icon`, `home`, `size`, `items`). Fehler in einer Karte legen nicht das Dashboard lahm. Erweiterbar per `window.LumoraCards.register({...})`
 
 ## Installation

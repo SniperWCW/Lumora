@@ -216,7 +216,7 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .tools .mini{width:36px;height:36px;background:rgba(40,30,20,.72);color:#fff}.tools .mini ha-icon{--mdc-icon-size:20px}
 .pill .tools .mini{width:26px;height:26px}.pill .tools .mini ha-icon{--mdc-icon-size:16px}
 :host(.ed) .tile,:host(.ed) .card,:host(.ed) .pl,:host(.ed) .cam,:host(.ed) .pill,:host(.ed) .mw,:host(.ed) .vc,:host(.ed) .cl,:host(.ed) .ap{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:grab}
-:host(.ed) .tile{padding-right:54px}:host(.ed) .plt em{margin-right:42px}
+:host(.ed) .tile{padding-right:78px}:host(.ed) .plt em{margin-right:42px}
 .dgo{z-index:50!important;box-shadow:0 12px 30px rgba(0,0,0,.35)!important;opacity:.92;transition:none!important;pointer-events:none}
 .dgt{outline:3px solid var(--fg)!important;outline-offset:-3px}
 .tile .ic{width:42px;height:42px;border-radius:50%;background:var(--a);display:grid;place-items:center;flex:none}
@@ -245,6 +245,8 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .row button.sel{background:var(--selbg);color:var(--selfg)}
 .srch,.ccin{width:100%;padding:12px 14px;border-radius:12px;border:0;background:var(--a);color:var(--fg);font:inherit;font-size:15px;margin-bottom:10px;outline:none}
 .srch::placeholder,.ccin::placeholder{color:var(--fg2)}
+.tile.sz-w,.pl.sz-w{grid-column:span 2}.tile.sz-f,.pl.sz-f{grid-column:1/-1}
+.tile .tools .mini{width:30px;height:30px}.tile .tools .mini ha-icon{--mdc-icon-size:17px}
 .mw.sz-w{grid-column:span 2}.mw.sz-f{grid-column:1/-1}
 .mw>.card,.mw>.en,.mw>.qs{height:100%;box-sizing:border-box}
 .card.sz-w,.vc.sz-w,.cl.sz-w,.ap.sz-w{grid-column:span 2}.card.sz-f,.vc.sz-f,.cl.sz-f,.ap.sz-f{grid-column:1/-1}
@@ -1148,13 +1150,16 @@ _more() {
   }
   _tile(st, area, scope) {
     const d = dom(st.entity_id); const on = !INACTIVE.includes(st.state);
-    if (d === 'switch') { const pw = this._plugPower(st.entity_id); if (pw) return this._plugCard(st, pw, this._tools(scope, st.entity_id, 'hidden'), this._set.hidden.includes(st.entity_id) ? 'hid' : '', area); }
-    if (d === 'climate' || d === 'vacuum') return this._special(st, this._tools(scope, st.entity_id, 'hidden'), this._set.hidden.includes(st.entity_id) ? 'hid' : '');
+    const sz = this._set.size[st.entity_id] || 's'; const szc = sz === 's' ? '' : `sz-${sz}`;
+    const tl = this._tools(scope, st.entity_id, 'hidden', { size: sz });
+    const hc = `${this._set.hidden.includes(st.entity_id) ? 'hid' : ''} ${szc}`;
+    if (d === 'switch') { const pw = this._plugPower(st.entity_id); if (pw) return this._plugCard(st, pw, tl, hc, area); }
+    if (d === 'climate' || d === 'vacuum') return this._special(st, tl, hc);
     let n = st.attributes.friendly_name || st.entity_id;
     if (n.toLowerCase().startsWith(area.toLowerCase() + ' ') && n.length > area.length + 1) n = n.slice(area.length + 1);
     const sens = d === 'sensor' ? 'sens' : '';
     const bad = d === 'binary_sensor' && st.state === 'on' && ['door', 'window', 'opening', 'smoke', 'moisture', 'gas'].includes(st.attributes.device_class);
-    return `<div class="tile ${on || bad ? 'on' : ''} ${sens} ${this._set.hidden.includes(st.entity_id) ? 'hid' : ''}">${this._tools(scope, st.entity_id, 'hidden')}<div class="ic" data-act="toggle" data-id="${st.entity_id}"><ha-icon icon="${this._icon(st)}"></ha-icon></div>
+    return `<div class="tile ${on || bad ? 'on' : ''} ${sens} ${hc}">${tl}<div class="ic" data-act="toggle" data-id="${st.entity_id}"><ha-icon icon="${this._icon(st)}"></ha-icon></div>
       <div class="tx" data-act="info" data-id="${st.entity_id}"><b>${esc(n)}</b><span>${esc(this._state(st))}</span></div></div>`;
   }
   _camHtml(st, scope, extra) {
