@@ -20,7 +20,7 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - Automatische Erkennung von Sensoren (Energie, Zähler, Geräte, Pakete, Drucker, Pool, System, Warnungen, Fahrzeiten, Bahnverbindungen). Gefundenes ist vorausgefüllt, Fehlendes bleibt unsichtbar. Anpassen im Bearbeiten-Modus unter "Quellen" oder per YAML
 - Kamera-Vorschau auf der Startseite: Kameras im Bearbeiten-Modus unter "Kameras" wählen; Bilder aktualisieren sich alle 10 Sekunden ohne Flackern. Angepinnte Kameras erscheinen ebenfalls als Vorschau
 - Im Bearbeiten-Modus wird nichts neu gezeichnet, damit sich Elemente in Ruhe verschieben lassen
-- Gemeinsames Layout für alle: als Administrator im Bearbeiten-Modus "Layout für alle speichern" (schreibt `layout:` in die Karte des Dashboards). Andere Benutzer sehen es und können es nicht ändern. Mit `shared: false` bleibt alles pro Benutzer
+- Gemeinsames Layout für alle: als Administrator im Bearbeiten-Modus "Layout für alle speichern" (schreibt `layout:` in die Karte des Dashboards). Jeder Benutzer kann es für sich anpassen (wird pro Benutzer gespeichert) und über "Auf Gruppenlayout zurücksetzen" wieder übernehmen. Mit `shared: false` bleibt alles pro Benutzer
 - Startseite zeigt laufende Geräte, Pakete in Zustellung und den Drucker während des Drucks automatisch
 - Bearbeiten-Modus auf Start, Räumen und Kameras: ausblenden (Auge) und verschieben per Drag and Drop (gedrückt halten und ziehen) für Etagen, Räume, Kacheln, Kameras und angepinnte Karten; Räume von Meldungen ausnehmen
 - Schnellaktionen: Szenen, Skripte, Tasten und "Alles Licht aus" als Chips mit einem Tipp (Bearbeiten, dann Aktion hinzufügen)

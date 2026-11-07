@@ -852,17 +852,25 @@ class LumoraCard extends HTMLElement {
       try { const j = localStorage.getItem(KEY); if (j) mine = JSON.parse(j); } catch (_) { /* ignore */ }
     }
     const base = this._cfg && this._cfg.layout && this._cfg.shared !== false ? this._cfg.layout : null;
-    const admin = !!(this._hass.user && this._hass.user.is_admin);
-    this._locked = !!base && !admin;
-    const pick = admin ? (mine || base) : (base || mine);
+    /* Jeder Benutzer darf bearbeiten: eigene Einstellungen haben Vorrang, sonst gilt das veröffentlichte Gruppenlayout */
+    this._hasBase = !!base;
+    const pick = mine || base;
     if (pick) this._set = merge(pick);
     this._loaded = true; this._sig = this._signature(); this._fxUpdate(true); this._render();
   }
   async _save() {
     this._fxUpdate(true);
-    if (this._locked) return;
     try { localStorage.setItem(KEY, JSON.stringify(this._set)); } catch (_) { /* ignore */ }
     try { await this._hass.callWS({ type: 'frontend/set_user_data', key: KEY, value: this._set }); } catch (_) { /* ignore */ }
+  }
+
+  /* Eigene Einstellungen verwerfen, danach gilt wieder das veröffentlichte Gruppenlayout */
+  async _resetMine() {
+    const base = this._cfg && this._cfg.layout; if (!base) return;
+    this._set = merge(base);
+    try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+    try { await this._hass.callWS({ type: 'frontend/set_user_data', key: KEY, value: null }); } catch { /* ignore */ }
+    this._msg = 'Zurückgesetzt: Es gilt wieder das Gruppenlayout.'; this._sig = ''; this._render();
   }
 
   /* ---------- Daten ---------- */
@@ -1208,7 +1216,7 @@ class LumoraCard extends HTMLElement {
       <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${persons.length ? `${home}/${persons.length} zu Hause` : ''}</div></div></div>
       ${note}<div class="pills">${pills}</div>${regCells ? `<div class="grid reg">${regCells}</div>` : ''}
       ${this._homeCams()}
-      <h3>Aktiv jetzt${this._locked ? '' : `<span class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</span>`}</h3>
+      <h3>Aktiv jetzt<span class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</span></h3>
       ${this._hint()}<div class="grid">${cards.join('')}</div>`;
   }
   _card(st, sub, pinId, edit, cls, p) {
@@ -1714,7 +1722,7 @@ _more() {
       ${qa ? `<div class="tabs" style="margin-bottom:10px">${qa}</div>` : ''}
       <div class="grid">${rcells}${tiles || (rcells ? '' : `<div class="empty">${onlyAct ? 'Nichts aktiv in diesem Raum.' : 'Keine Geräte in diesem Raum.'}</div>`)}</div>`;
   }
-  _editBtn() { return this._locked ? '' : `<button class="pill" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button>`; }
+  _editBtn() { return `<button class="pill" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button>`; }
   _tools(scope, id, hideKey, o) {
     if (!this._edit) return '';
     const list = hideKey === 'hiddenAreas' ? this._set.hiddenAreas : this._set.hidden;
@@ -1734,7 +1742,7 @@ _more() {
   _hint() {
     if (!this._edit) return '';
     const admin = this._hass.user && this._hass.user.is_admin;
-    return `<div class="hint">${this._msg ? esc(this._msg) : 'Bearbeiten: Element gedrückt halten und ziehen zum Verschieben. Das Auge blendet aus oder ein, das Größen-Symbol ändert die Breite, das Haus-Symbol verschiebt eine Karte zwischen Zuhause und Mehr.'}${admin && this._cfg.shared !== false ? ' <button class="pill" data-act="publish" style="margin-top:8px"><ha-icon icon="mdi:account-group"></ha-icon>Layout für alle speichern</button>' : ''}</div>`;
+    return `<div class="hint">${this._msg ? esc(this._msg) : 'Bearbeiten: Element gedrückt halten und ziehen zum Verschieben. Das Auge blendet aus oder ein, das Größen-Symbol ändert die Breite, das Haus-Symbol verschiebt eine Karte zwischen Zuhause und Mehr.'}${admin && this._cfg.shared !== false ? ' <button class="pill" data-act="publish" style="margin-top:8px"><ha-icon icon="mdi:account-group"></ha-icon>Layout für alle speichern</button>' : ''}${this._hasBase ? ' <button class="pill" data-act="resetmine" style="margin-top:8px"><ha-icon icon="mdi:backup-restore"></ha-icon>Auf Gruppenlayout zurücksetzen</button>' : ''}</div>`;
   }
   async _publish() {
     const h = this._hass; const seg = (location.pathname.split('/')[1] || ''); const url = !seg || seg === 'lovelace' ? null : seg;
@@ -2707,6 +2715,7 @@ _more() {
       case 'ntf': { const k = t.dataset.k; const o = this._ntfOpts(k); const cur = k === 'min' ? s.notify.min : s.notify[k]; s.notify[k] = o[(Math.max(0, o.indexOf(cur)) + 1) % o.length]; this._ntAt = 0; this._save(); break; }
       case 'unhide': s.excludeEntities = s.excludeEntities.filter((x) => x !== id); this._save(); break;
       case 'add': this._sheet = 'add'; this._q = ''; this._flt = 'all'; this._cust = false; break;
+      case 'resetmine': this._resetMine(); break;
       case 'roomact': this._roomAct = !this._roomAct; break;
       case 'rmlight': { const l = this._areaEnts(id).filter((x) => dom(x.entity_id) === 'light'); h.callService('light', l.some((x) => x.state === 'on') ? 'turn_off' : 'turn_on', { entity_id: l.map((x) => x.entity_id) }); break; }
       case 'rmcover': { const c = this._areaEnts(id).filter((x) => dom(x.entity_id) === 'cover'); h.callService('cover', c.some((x) => x.state !== 'closed') ? 'close_cover' : 'open_cover', { entity_id: c.map((x) => x.entity_id) }); break; }
@@ -2747,7 +2756,7 @@ _more() {
       }
       case 'ponly': { const q = s.pinned.find((x) => x.entity === id); if (q) q.only = !q.only; this._save(); break; }
       case 'unpin': s.pinned = s.pinned.filter((p) => p.entity !== id); this._save(); break;
-      case 'edit': if (this._locked) return; this._edit = !this._edit; break;
+      case 'edit': this._edit = !this._edit; break;
       case 'publish': this._publish(); return;
       case 'mv': {
         const sc = t.dataset.s; const dd = Number(t.dataset.d);
