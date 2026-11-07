@@ -468,7 +468,7 @@ class LumoraCard extends HTMLElement {
       else if (this._auto().tracked.has(id)) parts.push(id + h.states[id].state);
       else if (cuSet.has(id) || this._set.pinned.some((p) => p.entity === id)) parts.push(id + h.states[id].state);
     }
-    if (this._view === 'home' || this._view === 'more') parts.push(this._plSig());
+    if (['home', 'more', 'rooms'].includes(this._view)) parts.push(this._plSig());
     if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
     parts.push(this._bd.s);
     return parts.join('|');
@@ -960,23 +960,23 @@ _more() {
   }
 
   /* ---------- Karten-Register ---------- */
-  _regItems(where) {
+  _allReg() {
     const s = this._set; const out = [];
     for (const def of REG) {
       let its = [];
       try { its = def.items(this) || []; } catch (e) { its = []; }
       for (const it of its) {
         if (!it || !it.html) continue;
-        const pl = def.fixed ? 'more' : (s.place[it.id] || (def.home ? 'home' : 'more'));
-        if (pl === where) out.push({ ...it, def, size: s.size[it.id] || it.size || def.size || 's' });
+        out.push({ ...it, def, pl: def.fixed ? 'more' : (s.place[it.id] || (def.home ? 'home' : 'more')), size: s.size[it.id] || it.size || def.size || 's' });
       }
     }
     return out;
   }
+  _regItems(where) { return this._allReg().filter((x) => x.pl === where); }
   _cell(x, scope) {
     const hd = this._set.hidden.includes(x.id);
     if (hd && !this._edit) return '';
-    const opts = { size: x.size, place: x.def.fixed ? null : (scope === 'more' ? 'home' : 'more'), cfg: x.cfg };
+    const opts = { size: x.size, place: x.def.fixed ? null : scope, cfg: x.cfg };
     return `<div class="mw sz-${x.size} ${hd ? 'hid' : ''}">${this._tools(scope, x.id, 'hidden', opts)}${x.html}</div>`;
   }
 
@@ -1225,10 +1225,11 @@ _more() {
     const tileEnts = this._ord('tiles:' + a.id, ents.filter((s) => dom(s.entity_id) !== 'camera' && !used.has(s.entity_id) && !['temperature', 'humidity'].includes(s.attributes.device_class))
       .sort((x, y) => ROOM_DOMAINS.indexOf(dom(x.entity_id)) - ROOM_DOMAINS.indexOf(dom(y.entity_id))), (s) => s.entity_id);
     const tiles = tileEnts.map((s) => this._tile(s, a.name, 'tiles:' + a.id)).join('');
+    const rsc = `areareg:${a.id}`; const rcells = this._ord(rsc, this._regItems(`area:${a.id}`), (x) => x.id).map((x) => this._cell(x, rsc)).filter(Boolean).join('');
     return `<div class="tabs">${ftabs}</div><div class="tabs">${atabs}</div>
-      <div class="rh"><h2>${esc(a.name)}</h2><div class="inf"><span>${info.join(' · ')}</span>${t ? `<span class="spi">${this._spark(this._hist(t.entity_id, 24), 24)}</span>` : ''}${this._edit ? `<button class="pill" data-act="rsens" data-id="${a.id}"><ha-icon icon="mdi:thermometer"></ha-icon>Sensoren</button>` : ''}${this._editBtn()}</div></div>${this._hint()}
+      <div class="rh"><h2>${esc(a.name)}</h2><div class="inf"><span>${info.join(' · ')}</span>${t ? `<span class="spi">${this._spark(this._hist(t.entity_id, 24), 24)}</span>` : ''}${this._edit ? `<button class="pill" data-act="regpick"><ha-icon icon="mdi:card-plus-outline"></ha-icon>Karte</button><button class="pill" data-act="rsens" data-id="${a.id}"><ha-icon icon="mdi:thermometer"></ha-icon>Sensoren</button>` : ''}${this._editBtn()}</div></div>${this._hint()}
       ${cams.length ? `<div class="cams" style="margin-bottom:10px">${cams.map((s) => this._camHtml(s, 'rcams:' + a.id)).join('')}</div>` : ''}
-      <div class="grid">${tiles || '<div class="empty">Keine Geräte in diesem Raum.</div>'}</div>`;
+      <div class="grid">${rcells}${tiles || (rcells ? '' : '<div class="empty">Keine Geräte in diesem Raum.</div>')}</div>`;
   }
   _editBtn() { return this._locked ? '' : `<button class="pill" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button>`; }
   _tools(scope, id, hideKey, o) {
@@ -1238,7 +1239,7 @@ _more() {
     const e = esc(id);
     const cf = o && o.cfg ? `<span class="mini" data-act="cc" data-id="${e}"><ha-icon icon="mdi:cog-outline"></ha-icon></span>` : '';
     const sz = o && o.size ? `<span class="mini" data-act="size" data-id="${e}" data-d="${o.size}"><ha-icon icon="${SIZE_ICON[o.size]}"></ha-icon></span>` : '';
-    const pl = o && o.place ? `<span class="mini" data-act="place" data-id="${e}" data-p="${o.place}"><ha-icon icon="${o.place === 'home' ? 'mdi:home-import-outline' : 'mdi:view-dashboard-outline'}"></ha-icon></span>` : '';
+    const pl = o && o.place ? `<span class="mini" data-act="placeopen" data-id="${e}"><ha-icon icon="mdi:folder-move-outline"></ha-icon></span>` : '';
     return `<span class="tools">${cf}${sz}${pl}${eye}</span><i class="dg" data-s="${esc(scope)}" data-id="${esc(id)}" style="display:none"></i>`;
   }
   _ord(scope, items, idf) {
@@ -1362,6 +1363,13 @@ _more() {
         <div class="row"><div class="t"><b>Nur anzeigen, wenn aktiv</b><span>Karte erscheint nur bei Zustand an, offen oder läuft</span></div><button class="${this._only ? 'sel' : ''}" data-act="onlyact">${this._only ? 'An' : 'Aus'}</button></div>
         <div class="row"><div class="t"><b>Als eigene Karte</b><span>Wert, Verlauf oder Schalter statt Kachel</span></div><button class="${this._cust ? 'sel' : ''}" data-act="ascust">${this._cust ? 'An' : 'Aus'}</button></div>
         <div class="list"></div>`;
+    } else if (this._sheet === 'place') {
+      const cur = this._allReg().find((x) => x.id === this._plId); const at = cur ? cur.pl : '';
+      const b = (p, l, ic) => `<div class="row"><ha-icon icon="${ic}"></ha-icon><div class="t"><b>${esc(l)}</b></div><button class="${at === p ? 'sel' : ''}" data-act="placeset" data-p="${esc(p)}">${at === p ? 'Hier' : 'Hierhin'}</button></div>`;
+      c = `<h2>Karte platzieren</h2>${b('home', 'Zuhause (Startseite)', 'mdi:home-outline')}${b('more', 'Mehr', 'mdi:view-dashboard-outline')}${this._roomData().map((f) => `<h4>${esc(f.name)}</h4>${f.areas.map((ar) => b(`area:${ar.id}`, ar.name, 'mdi:door')).join('')}`).join('')}`;
+    } else if (this._sheet === 'regpick') {
+      const here = `area:${this._area}`;
+      c = `<h2>Karte in diesen Raum holen</h2>${this._allReg().filter((x) => !x.def.fixed).map((x) => `<div class="row"><ha-icon icon="${x.def.icon}"></ha-icon><div class="t"><b>${esc(x.def.label)}</b></div><button class="${x.pl === here ? 'sel' : ''}" data-act="regset" data-id="${esc(x.id)}">${x.pl === here ? 'Hier' : 'Holen'}</button></div>`).join('') || '<div class="empty">Keine Karten verfügbar.</div>'}`;
     } else if (this._sheet === 'quick') {
       c = `<h2>Schnellaktionen</h2><div class="hint">Szenen, Skripte und Tasten mit einem Tipp auslösen. Mehrfachauswahl möglich.</div><input class="srch" placeholder="Suchen" value="${esc(this._q)}"><div class="list"></div>`;
     } else if (this._sheet === 'cc') {
@@ -1964,7 +1972,10 @@ _more() {
       case 'add': this._sheet = 'add'; this._q = ''; this._flt = 'all'; this._cust = false; break;
       case 'ascust': this._cust = !this._cust; break;
       case 'size': { const cur = t.dataset.d || 's'; s.size[id] = SIZES[(SIZES.indexOf(cur) + 1) % SIZES.length]; this._save(); break; }
-      case 'place': s.place[id] = t.dataset.p; this._save(); break;
+      case 'placeopen': this._sheet = 'place'; this._plId = id; break;
+      case 'placeset': s.place[this._plId] = t.dataset.p; this._save(); this._sheet = null; break;
+      case 'regpick': this._sheet = 'regpick'; break;
+      case 'regset': s.place[id] = `area:${this._area}`; this._save(); this._sheet = null; break;
       case 'quick': this._sheet = 'quick'; this._q = ''; break;
       case 'qtog': s.quick = s.quick.includes(id) ? s.quick.filter((x) => x !== id) : [...s.quick, id]; this._save(); this._fillList(); return;
       case 'qdel': s.quick = s.quick.filter((x) => x !== id); this._save(); break;
