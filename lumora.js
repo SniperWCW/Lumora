@@ -88,7 +88,6 @@ const APPL_TYPES = [
 const WXL = { 'clear-night': 'Klare Nacht', sunny: 'Sonnig', cloudy: 'Bewölkt', partlycloudy: 'Teils bewölkt', rainy: 'Regen', pouring: 'Starkregen', snowy: 'Schnee', fog: 'Nebel', windy: 'Windig', lightning: 'Gewitter', 'lightning-rainy': 'Gewitter mit Regen', hail: 'Hagel', exceptional: 'Außergewöhnlich' };
 const APL = { wash: 'Wäscht', washing: 'Wäscht', rinse: 'Spült', spin: 'Schleudert', drying: 'Trocknet', run: 'Läuft', running: 'Läuft', finished: 'Fertig', end: 'Fertig', pause: 'Pausiert', paused: 'Pausiert', ready: 'Bereit', idle: 'Bereit', off: 'Aus' };
 const PKG_DAYS = 5;
-const DHL = ['Angekündigt', 'Unterwegs', 'In der Region', 'Zustellbasis', 'In Zustellung', 'Zugestellt'];
 const WX = {
   'clear-night': 'mdi:weather-night', sunny: 'mdi:weather-sunny', cloudy: 'mdi:weather-cloudy', partlycloudy: 'mdi:weather-partly-cloudy',
   rainy: 'mdi:weather-rainy', pouring: 'mdi:weather-pouring', snowy: 'mdi:weather-snowy', fog: 'mdi:weather-fog', windy: 'mdi:weather-windy',
@@ -169,7 +168,6 @@ h1{margin:0;font-size:clamp(26px,7.4vw,38px);line-height:1.1;font-weight:600;let
 .av img{width:100%;height:100%;border-radius:50%;object-fit:cover}
 .av i{position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;background:#9a9a9a;border:2px solid var(--from)}
 .hello .av{width:64px;height:64px;font-size:24px}.pp.home .av i{background:#4caf50}
-.pps{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px}
 .pp{position:relative;display:flex;align-items:center;gap:10px;background:var(--a);border-radius:99px;padding:5px 16px 5px 5px;cursor:pointer}
 .pp b{display:block;font-size:14px;font-weight:600}.pp span{font-size:12px;color:var(--fg2)}
 .en{background:var(--a);border-radius:20px;padding:16px;cursor:pointer}
@@ -361,7 +359,6 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .pool-chips{display:flex;gap:8px;flex-wrap:wrap}.pool-chip{background:var(--a);border-radius:12px;padding:7px 10px;font-size:12.5px;display:flex;flex-direction:column}.pool-chip small{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg2)}
 .pool-modes{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .pool-ft{margin-top:12px;font-size:11.5px;color:var(--fg2);line-height:1.5}
-.pool-cmp{display:flex;flex-direction:column;gap:10px}.pool-cmp .pool-v{text-align:left;display:flex;justify-content:space-between;align-items:center;gap:10px}.pool-cmp .pool-v b{display:inline;font-size:17px;margin:0}
 .pool-lz{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;border-radius:99px;padding:3px 9px;background:var(--a);flex:none}
 .pool-lz i{width:8px;height:8px;border-radius:50%;background:var(--bd);display:block}.pool-lz.on i{background:var(--ok)}
 .prn-cam{margin-top:12px;border-radius:14px;overflow:hidden;background:var(--b);cursor:pointer}.prn-cam img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}
@@ -417,6 +414,9 @@ const BATX = /phone|ipad|watch|handy|tablet|pixel|galaxy|saug|vacuum|robo|laptop
 /* Karten-Register: jede Karte ist ein Objekt { id, label, icon, home, fixed, size, items(card) -> [{ id, html, size, cfg }] }.
    Auch von außen erweiterbar: window.LumoraCards.register({...}). */
 const REG = [];
+const hmMin = (m) => { const hh = Math.floor(m / 60); const mm = m % 60; return hh <= 0 ? `${mm} min` : mm <= 0 ? `${hh} h` : `${hh} h ${mm} min`; };
+const dvStat = (c, l, s2, d) => (s2 ? `<div data-act="info" data-id="${s2.entity_id}"><small>${l}</small><b>${c._dvVal(s2, d)}</b></div>` : '');
+const newItems = () => { const items = []; return { items, add: (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); } }; };
 const registerCard = (def) => { const i = REG.findIndex((x) => x.id === def.id); if (i >= 0) REG[i] = def; else REG.push(def); };
 
 /* ---------- Effekte (Overlay über dem ganzen Dashboard) ---------- */
@@ -809,7 +809,7 @@ class LumoraCard extends HTMLElement {
     try {
       const r = await this._hass.callWS({ type: 'frontend/get_user_data', key: KEY });
       if (r && r.value) mine = r.value;
-    } catch (e) {
+    } catch {
       try { const j = localStorage.getItem(KEY); if (j) mine = JSON.parse(j); } catch (_) { /* ignore */ }
     }
     const base = this._cfg && this._cfg.layout && this._cfg.shared !== false ? this._cfg.layout : null;
@@ -833,7 +833,7 @@ class LumoraCard extends HTMLElement {
     return r.area_id || (r.device_id && h.devices && h.devices[r.device_id] && h.devices[r.device_id].area_id) || null;
   }
   _aname(id) { const a = this._hass.areas && this._hass.areas[id]; return a ? a.name : ''; }
-  _state(st) { try { return this._hass.formatEntityState ? this._hass.formatEntityState(st) : st.state; } catch (e) { return st.state; } }
+  _state(st) { try { return this._hass.formatEntityState ? this._hass.formatEntityState(st) : st.state; } catch { return st.state; } }
   _icon(st) {
     const a = st.attributes; const d = dom(st.entity_id); const on = !INACTIVE.includes(st.state);
     if (a.icon) return a.icon;
@@ -1300,7 +1300,7 @@ _more() {
     const s = this._set; const out = [];
     for (const def of REG) {
       let its = [];
-      try { its = def.items(this) || []; } catch (e) { its = []; }
+      try { its = def.items(this) || []; } catch { its = []; }
       for (const it of its) {
         if (!it || !it.html) continue;
         out.push({ ...it, def, pl: def.fixed ? 'more' : (s.place[it.id] || (def.home ? 'home' : 'more')), size: s.size[it.id] || it.size || def.size || 's' });
@@ -1474,7 +1474,7 @@ _more() {
 
   /* ---------- Eigene Karten ---------- */
   _customHtml(cu, st) {
-    const a = st.attributes; const name = cu.title || a.friendly_name || cu.entity; const d = dom(cu.entity);
+    const a = st.attributes; const name = cu.title || a.friendly_name || cu.entity;
     const num = parseFloat(st.state); const isNum = !isNaN(num); const unit = a.unit_of_measurement || '';
     const val = isNum ? `${this._de(num, Math.abs(num) >= 100 ? 0 : 1)}${unit ? ` ${esc(unit)}` : ''}` : esc(this._state(st));
     const ic = `<ha-icon icon="${this._icon(st)}"></ha-icon>`;
@@ -2029,8 +2029,7 @@ _more() {
   _plHrs(v, d = 1) { return Number(v).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: d }); }
   _plDur(hv) {
     if (!Number.isFinite(hv) || hv < 0) return 'Nicht genügend Daten'; if (hv <= 0.2) return 'jetzt';
-    const m = Math.max(1, Math.round(hv * 60)); const hh = Math.floor(m / 60); const mm = m % 60;
-    return hh <= 0 ? `${mm} min` : mm <= 0 ? `${hh} h` : `${hh} h ${mm} min`;
+    return hmMin(Math.max(1, Math.round(hv * 60)));
   }
   _plStars(v) {
     if (!this._plKnown(v)) return 'Noch keine Bewertung';
@@ -2184,8 +2183,7 @@ _more() {
     return { on: c.enabled !== false, hours: cl(parseFloat(c.history_hours), 6, 168, 48), fb: cl(parseFloat(c.fallback_rate_c_per_hour), 0.1, 10, 3) };
   }
   _plLzDur(hv) {
-    if (!Number.isFinite(hv) || hv < 0) return '--'; const m = Math.max(1, Math.ceil(hv * 60)); const hh = Math.floor(m / 60); const mm = m % 60;
-    return hh <= 0 ? `${mm} min` : mm <= 0 ? `${hh} h` : `${hh} h ${mm} min`;
+    if (!Number.isFinite(hv) || hv < 0) return '--'; return hmMin(Math.max(1, Math.ceil(hv * 60)));
   }
   _plEta(L, cur, tgt, heatOn) {
     const c = this._plEtaCfg(); if (!c.on || !L.cur || !L.heat) return null;
@@ -2410,7 +2408,6 @@ _more() {
     const head = (sub) => `<div class="pool-hd"><div class="ib"><ha-icon icon="mdi:pool"></ha-icon></div><div class="tt"><b>Pool</b><span>${esc(sub)}</span></div>${big}</div>`;
     if (!rec) return `<div class="pool">${head(L.any ? 'LayzSpa' : 'Wassertemperatur')}${errHtml}${L.any ? this._plLzSec(L) : ''}</div>`;
     const stx = this._plStatus(rec); const bath = this._plBath(a); const rt = this._plRetest(a);
-    const comb = stx.cls === 'bd' || bath.cls === 'bd' ? 'bd' : stx.cls === 'bl' ? 'bl' : stx.cls === 'wn' || bath.cls === 'wn' ? 'wn' : 'ok';
     const hasChlor = this._plKnown(a.chlor_ist) && a.data_source !== 'Speicher';
     const cr = this._plRange(a, 'chlor_min', 'chlor_max', 'chlor_target'); const pr = this._plRange(a, 'ph_min', 'ph_max', 'ph_target'); const cya = this._plCya(a.cyanuric_acid, a.chlor_product_type);
     const val = (l, v, u, cls, sub, id) => `<div class="pool-v" data-act="pl-info" data-id="${id}"><small>${l}</small><b class="${cls ? `s-${cls}` : ''}">${v}${u}</b><em>${sub}</em></div>`;
@@ -2678,42 +2675,42 @@ _more() {
 }
 
 registerCard({ id: 'appliances', label: 'Haushaltsgeräte', icon: 'mdi:washing-machine', items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+  const { items, add } = newItems();
     c._appls().forEach((a) => add(`appl:${a.base}`, c._applCard(a)));
   return items;
 } });
 registerCard({ id: 'pkg', label: 'Pakete', icon: 'mdi:package-variant-closed', items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+  const { items, add } = newItems();
     const pk = c._pkgs(); if (pk) add('pkg', c._pkgPanel(pk), true);
   return items;
 } });
 registerCard({ id: 'energy', label: 'Energie', icon: 'mdi:lightning-bolt', fixed: true, items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+  const { items, add } = newItems();
     add('energy', c._energy(), true);
   return items;
 } });
 registerCard({ id: 'meter', label: 'Netzbezug', icon: 'mdi:meter-electric', items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+  const { items, add } = newItems();
     const m = c._xs('meter'); if (m) add('stat:meter', c._stat('mdi:meter-electric', 'Netzbezug aktuell', c._de(parseFloat(m.state)), 'W', m.entity_id));
   return items;
 } });
 registerCard({ id: 'gas', label: 'Gaszähler', icon: 'mdi:meter-gas', items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+  const { items, add } = newItems();
     const gas = c._xs('gas'); if (gas) add('stat:gas', c._stat('mdi:meter-gas', 'Gaszähler', c._de(parseFloat(gas.state), 1), 'm³', gas.entity_id));
   return items;
 } });
 registerCard({ id: 'water', label: 'Wasserzähler', icon: 'mdi:water', items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+  const { items, add } = newItems();
     const wat = c._xs('water'); if (wat) add('stat:water', c._stat('mdi:water', 'Wasserzähler', c._de(parseFloat(wat.state), 1), 'm³', wat.entity_id));
   return items;
 } });
 registerCard({ id: 'saving', label: 'PV-Ersparnis', icon: 'mdi:piggy-bank-outline', items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+  const { items, add } = newItems();
     const sv = c._xs('saving_total'); if (sv) add('stat:sav', c._stat('mdi:piggy-bank-outline', 'PV-Ersparnis gesamt', c._de(parseFloat(sv.state), 0), '€', sv.entity_id));
   return items;
 } });
 registerCard({ id: 'saving_year', label: 'Ersparnis pro Jahr', icon: 'mdi:cash-refund', items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+  const { items, add } = newItems();
     const sy = c._xs('saving_year'); if (sy) add('stat:savy', c._stat('mdi:cash-refund', 'Ersparnis pro Jahr', c._de(parseFloat(sy.state), 0), '€', sy.entity_id));
   return items;
 } });
@@ -2726,7 +2723,7 @@ registerCard({ id: 'pool', label: 'Pool', icon: 'mdi:pool', items: (c) => {
   return html ? [{ id: 'pool', html, size: 'f' }] : [];
 } });
 registerCard({ id: 'wx', label: 'Wetter', icon: 'mdi:weather-partly-cloudy', items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+  const { items, add } = newItems();
     const wx = (c._byDomain().weather || [])[0];
     if (wx) {
       const a = wx.attributes;
@@ -2735,12 +2732,12 @@ registerCard({ id: 'wx', label: 'Wetter', icon: 'mdi:weather-partly-cloudy', ite
   return items;
 } });
 registerCard({ id: 'tank', label: 'Tankzeit', icon: 'mdi:gas-station', items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+  const { items, add } = newItems();
     const tk = c._xs('tank'); if (tk) add('tank', c._stat('mdi:gas-station', `Tankzeit${tk.attributes.stunde ? ` · ${tk.attributes.stunde} Uhr` : ''}`, c._de(parseFloat(tk.state), 3), '', tk.entity_id));
   return items;
 } });
 registerCard({ id: 'health', label: 'HA-Health', icon: 'mdi:heart-pulse', items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+  const { items, add } = newItems();
     const hs = c._xs('health');
     if (hs) {
       const v = parseFloat(hs.state); const at = hs.attributes;
@@ -2749,7 +2746,7 @@ registerCard({ id: 'health', label: 'HA-Health', icon: 'mdi:heart-pulse', items:
   return items;
 } });
 registerCard({ id: 'pihole', label: 'Pi-hole', icon: 'mdi:shield-check-outline', items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+  const h = c._hass; const { items, add } = newItems();
     const ph = c._xs('pihole_ratio');
     if (ph) {
       const sw = h.states[c._xid('pihole_switch')]; const q = c._num(c._xid('pihole_queries')); const cl = c._num(c._xid('pihole_clients'));
@@ -2759,7 +2756,7 @@ registerCard({ id: 'pihole', label: 'Pi-hole', icon: 'mdi:shield-check-outline',
   return items;
 } });
 registerCard({ id: 'lage', label: 'Lage Deutschland', icon: 'mdi:alert-circle-outline', items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
+  const { items, add } = newItems();
     const lg = c._xs('lage');
     if (lg) {
       const an = lg.attributes.analysis_summary; const hl = an && typeof an === 'object' ? an.headline : '';
@@ -2821,7 +2818,7 @@ registerDevice({
     const err = bad || st.state === 'error' ? `<div class="dverr"><ha-icon icon="mdi:alert-circle"></ha-icon><div>${esc(bad ? c._state(es) : 'Fehler')}</div></div>` : '';
     const fans = Array.isArray(a.fan_speed_list) ? a.fan_speed_list : [];
     const fan = fans.length ? `<div class="dvf">${fans.map((f) => `<button class="pill ${a.fan_speed === f ? 'sel' : ''}" data-act="vfan" data-id="${id}" data-v="${esc(f)}">${esc(f)}</button>`).join('')}</div>` : '';
-    const stat = (l, s2, d) => (s2 ? `<div data-act="info" data-id="${s2.entity_id}"><small>${l}</small><b>${c._dvVal(s2, d)}</b></div>` : '');
+    const stat = (l, s2, d) => dvStat(c, l, s2, d);
     const ar = c._dvS(F.area); const tm = c._dvS(F.time); const mp = F.map && c._hass.states[F.map];
     const stats = [stat('Fläche', ar, 1), stat('Dauer', tm, 0), mp ? `<div data-act="info" data-id="${mp.entity_id}"><small>Karte</small><b>Öffnen</b></div>` : ''].join('');
     const mt = [['Filter', 'filter'], ['Hauptbürste', 'mainbrush'], ['Seitenbürste', 'sidebrush']].map(([l, k]) => {
@@ -2849,7 +2846,7 @@ registerDevice({
   render: (c, iv, F, st) => {
     const w = c._dvPow(st); const id = iv.main;
     const stt = c._dvS(F.status); const sub = stt ? c._state(stt) : (w !== null && w > 5 ? 'Erzeugt Strom' : 'Keine Erzeugung');
-    const stat = (l, s2, d) => (s2 ? `<div data-act="info" data-id="${s2.entity_id}"><small>${l}</small><b>${c._dvVal(s2, d)}</b></div>` : '');
+    const stat = (l, s2, d) => dvStat(c, l, s2, d);
     const stats = [stat('Heute', c._dvS(F.today), 1), stat('Gesamt', c._dvS(F.total), 0), stat('Prognose', c._dvS(F.forecast), 1), stat('Wechselrichter', c._dvS(F.temp), 0)].join('');
     const strs = ['string1', 'string2'].map((k) => { const s2 = c._dvS(F[k]); const p = s2 ? c._dvPow(s2) : null; return p === null ? '' : `<div data-act="info" data-id="${s2.entity_id}"><b>${esc(DEVTPL.pv.fields[k].l)}</b><span>${c._w(p)}</span></div>`; }).join('');
     return `<div class="dvc"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="mdi:solar-power-variant"></ha-icon></div><div class="tt"><b>${esc(iv.title || st.attributes.friendly_name || id)}</b><span>${esc(sub)}</span></div><div class="big">${w === null ? '–' : esc(c._w(w))}</div></div>
@@ -2902,7 +2899,7 @@ registerDevice({
       use('ram', 'rammax', 'ramp', F.ram || F.ramp, 'Arbeitsspeicher'),
       use('disk', 'diskmax', null, F.disk, 'Speicher'),
     ].join('') : '';
-    const stat = (l, s2, d) => (s2 ? `<div data-act="info" data-id="${s2.entity_id}"><small>${l}</small><b>${c._dvVal(s2, d)}</b></div>` : '');
+    const stat = (l, s2, d) => dvStat(c, l, s2, d);
     const lb = c._dvS(F.lastbackup); const bd = c._dvS(F.backupdur);
     const stats = [
       S.on ? stat('Netzwerk ein', c._dvS(F.netin), 1) : '', S.on ? stat('Netzwerk aus', c._dvS(F.netout), 1) : '',
