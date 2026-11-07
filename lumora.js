@@ -24,6 +24,8 @@ const DEF = {
   ignore: [],
   battLimit: 20,
   fx: {},
+  snooze: {},
+  notify: { push: '', tts: '', min: 0 },
 };
 const norm = (t) => String(t || '').toLowerCase().replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ß/g, 'ss');
 const PV = '(?:^|[^a-z])pv(?:[^a-z]|$)|solar|photovolt';
@@ -87,6 +89,18 @@ const APPL_TYPES = [
 ];
 const WXL = { 'clear-night': 'Klare Nacht', sunny: 'Sonnig', cloudy: 'Bewölkt', partlycloudy: 'Teils bewölkt', rainy: 'Regen', pouring: 'Starkregen', snowy: 'Schnee', fog: 'Nebel', windy: 'Windig', lightning: 'Gewitter', 'lightning-rainy': 'Gewitter mit Regen', hail: 'Hagel', exceptional: 'Außergewöhnlich' };
 const APL = { wash: 'Wäscht', washing: 'Wäscht', rinse: 'Spült', spin: 'Schleudert', drying: 'Trocknet', run: 'Läuft', running: 'Läuft', finished: 'Fertig', end: 'Fertig', pause: 'Pausiert', paused: 'Pausiert', ready: 'Bereit', idle: 'Bereit', off: 'Aus' };
+/* Rohwerte von Herstellern (snake_case) in lesbaren Klartext übersetzen; Unbekanntes wird zumindest sauber formatiert */
+const HUMAN = {
+  power_off: 'Aus', standby: 'Bereit', not_running: 'Bereit', in_use: 'In Betrieb', programmed: 'Programmiert', waiting_to_start: 'Wartet auf Start', delayed_start: 'Verzögerter Start', delay_start: 'Verzögerter Start',
+  door_open: 'Tür offen', error: 'Fehler', aborting: 'Bricht ab', pre_wash: 'Vorwäsche', main_wash: 'Hauptwäsche', cooling: 'Kühlt ab', anti_crease: 'Knitterschutz', program_ended: 'Programm beendet', cleaning_is_complete: 'Reinigung fertig',
+  eco: 'Eco', auto: 'Automatik', quick: 'Schnell', intensive: 'Intensiv', normal: 'Normal', cotton: 'Baumwolle', delicates: 'Feinwäsche', wool: 'Wolle', mixed: 'Mix', easy_care: 'Pflegeleicht', rinse_hold: 'Spülstopp', sportswear: 'Sportbekleidung', shirts: 'Hemden',
+};
+const human = (v) => {
+  const k = String(v ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_'); if (HUMAN[k]) return HUMAN[k];
+  if (!/^[a-z0-9]+(_[a-z0-9]+)+$/.test(k)) return v;
+  const t = k.replace(/_/g, ' '); return t.charAt(0).toUpperCase() + t.slice(1);
+};
+const SEV = ['Kritisch', 'Warnung', 'Info'];
 const PKG_DAYS = 5;
 const WX = {
   'clear-night': 'mdi:weather-night', sunny: 'mdi:weather-sunny', cloudy: 'mdi:weather-cloudy', partlycloudy: 'mdi:weather-partly-cloudy',
@@ -125,7 +139,7 @@ const dom = (id) => id.split('.')[0];
 const merge = (v) => {
   v = v || {};
   const arr = (k) => [...(v[k] || DEF[k])];
-  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx) };
+  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify } };
 };
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -209,7 +223,7 @@ h1{margin:0;font-size:clamp(26px,7.4vw,38px);line-height:1.1;font-weight:600;let
 .en .pills{margin:12px 0 0}
 .sq{width:46px;height:46px;border-radius:14px;border:0;background:var(--b);color:inherit;display:grid;place-items:center;cursor:pointer;padding:0}
 .note{display:flex;gap:10px;align-items:center;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg2);margin-bottom:14px;cursor:pointer}
-.note ha-icon{--mdc-icon-size:20px;flex:none}
+.note ha-icon{--mdc-icon-size:20px;flex:none}.note.sv0{color:#e5484d}.note.sv1{color:#e8a13a}.sev{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--fg2)}.sev.s0{background:#e5484d}.sev.s1{background:#e8a13a}
 .pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);display:flex;justify-content:space-between;align-items:center}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -503,6 +517,28 @@ const Fx = (() => {
     });
     ctx.stroke();
   };
+  /* Tropfen an der Scheibe: wachsen langsam, laufen ab einer Größe als Schlieren nach unten */
+  const mkPane = (init) => ({ x: R(0, W), y: R(0, H), r: init ? R(1, 4.5) : R(0.8, 1.6), sl: 0, vy: 0, y0: 0 });
+  const pane = (st, dt, a, heavy) => {
+    const arr = st.pd || (st.pd = []); const cnt = n(heavy ? 46 : 28);
+    while (arr.length < cnt) arr.push(mkPane(true));
+    if (arr.length > cnt + 8) arr.length = cnt;
+    ctx.fillStyle = `rgba(205,225,255,${0.2 * a})`; ctx.strokeStyle = `rgba(255,255,255,${0.32 * a})`; ctx.lineWidth = 0.8;
+    ctx.beginPath(); const trail = [];
+    arr.forEach((d, i) => {
+      if (!d.sl) {
+        d.r += dt * (heavy ? 0.45 : 0.25);
+        if (d.r > 5 + (i % 3)) { d.sl = 1; d.vy = R(30, 70); d.y0 = d.y; }
+      } else {
+        d.y += d.vy * dt; d.r -= dt * 0.7;
+        trail.push(d);
+        if (d.y > H || d.r < 1) { arr[i] = mkPane(false); return; }
+      }
+      ctx.moveTo(d.x + d.r, d.y); ctx.arc(d.x, d.y, d.r, 0, 6.283);
+    });
+    ctx.fill(); ctx.stroke();
+    if (trail.length) { ctx.strokeStyle = `rgba(205,225,255,${0.12 * a})`; ctx.lineWidth = 1.6; ctx.beginPath(); trail.forEach((d) => { ctx.moveTo(d.x, d.y0); ctx.lineTo(d.x, d.y); }); ctx.stroke(); }
+  };
   const snow = (st, dt, a, big, cnt, t) => {
     fill(st.p, n(cnt), () => mkFlake(true, big));
     ctx.fillStyle = `rgba(255,255,255,${0.85 * a})`;
@@ -535,7 +571,7 @@ const Fx = (() => {
   const bolt = (st, dt, a) => {
     st.tm -= dt;
     if (st.tm <= 0) {
-      st.tm = R(5, 13); st.fl = 1;
+      st.tm = R(5, 13); st.fl = 1; st.dbl = Math.random() < 0.45 ? 1 : 0;
       let x = R(W * 0.1, W * 0.9); let y = 0; const pts = [[x, y]];
       while (y < H * R(0.45, 0.8)) { y += R(20, 50); x += R(-35, 35); pts.push([x, y]); }
       st.bolt = pts;
@@ -547,6 +583,7 @@ const Fx = (() => {
         ctx.beginPath(); st.bolt.forEach((q, i) => (i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]))); ctx.stroke(); ctx.shadowBlur = 0;
       }
       st.fl -= dt * 2.2;
+      if (st.fl <= 0 && st.dbl) { st.dbl = 0; st.fl = 0.75; }
     }
   };
   const sun = (a, t) => {
@@ -641,7 +678,7 @@ const Fx = (() => {
       const st = get(k); const c = conf.act[k]; let want = 0;
       if (c) { if (!st.on) { st.on = true; st.t0 = now; } want = (!c.dur || (now - st.t0) / 1000 < c.dur) ? 1 : 0; } else st.on = false;
       st.a += Math.max(-1, Math.min(1, (want - st.a))) * Math.min(1, dt * 1.2);
-      if (st.a < 0.01 && !want) { st.a = 0; st.p = []; st.g = null; st.sh = null; st.sp = null; st.sl = null; st.bolt = null; st.fl = 0; return; }
+      if (st.a < 0.01 && !want) { st.a = 0; st.p = []; st.pd = null; st.dbl = 0; st.g = null; st.sh = null; st.sp = null; st.sl = null; st.bolt = null; st.fl = 0; return; }
       busy = true; const a = st.a; const v = c ? c.v : st.v; st.v = v || st.v;
       if (k === 'weather') {
         const rainy = ['rain', 'pouring', 'storm', 'lightning-rainy', 'snowy-rainy'].includes(v);
@@ -650,7 +687,7 @@ const Fx = (() => {
         else if (v === 'sun') sun(a, t);
         else {
           if (v === 'storm' || v === 'lightning-rainy' || v === 'lightning') { ctx.fillStyle = `rgba(20,28,50,${0.18 * a})`; ctx.fillRect(0, 0, W, H); bolt(st, dt, a); }
-          if (rainy) rain(st, dt, a, v === 'pouring' || v === 'storm', v === 'storm' ? 0.28 : 0.08);
+          if (rainy) { rain(st, dt, a, v === 'pouring' || v === 'storm', v === 'storm' ? 0.28 : 0.08); pane(st, dt, a, v === 'pouring' || v === 'storm'); }
           if (v === 'snow' || v === 'snowy-rainy') snow(st, dt, a, false, 110, t);
           if (v === 'hail') { fill(st.p, n(80), () => mkDrop(true, true)); ctx.fillStyle = `rgba(235,245,255,${0.85 * a})`; st.p.forEach((d, i) => { d.y += d.s * 1.1 * dt; if (d.y > H) st.p[i] = mkDrop(false, true); ctx.beginPath(); ctx.arc(d.x, d.y, 2, 0, 6.283); ctx.fill(); }); }
         }
@@ -740,7 +777,7 @@ class LumoraCard extends HTMLElement {
       if (this._edit || this._dg) return;
       const el = this.shadowRoot.querySelector('.note-t');
       const al = this._hass ? this._alerts() : [];
-      if (el && al.length > 1) { this._ai = (this._ai + 1) % al.length; el.textContent = al[this._ai].text; }
+      if (el && al.length > 1) { this._ai = (this._ai + 1) % al.length; el.textContent = al[this._ai].text; if (el.parentElement) el.parentElement.className = `note sv${al[this._ai].sev}`; }
     }, 5000);
   }
   disconnectedCallback() { clearInterval(this._tick); Fx.detach(this); }
@@ -749,6 +786,7 @@ class LumoraCard extends HTMLElement {
     const first = !this._hass;
     this._hass = h;
     if (first) this._load();
+    if (this._loaded) this._notifyAlerts();
     if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'dv', 'dvadd', 'dvmain', 'dvpick'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
     if (this._down && this._edit) { this._pend = true; return; }
     if (this._plFocus()) return;
@@ -779,6 +817,7 @@ class LumoraCard extends HTMLElement {
     if (['home', 'more', 'rooms'].includes(this._view)) { parts.push(this._plSig()); parts.push(this._prSig()); }
     if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
     parts.push(this._bd.s);
+    parts.push('sn' + this._snoozed().length);
     return parts.join('|');
   }
 
@@ -833,7 +872,10 @@ class LumoraCard extends HTMLElement {
     return r.area_id || (r.device_id && h.devices && h.devices[r.device_id] && h.devices[r.device_id].area_id) || null;
   }
   _aname(id) { const a = this._hass.areas && this._hass.areas[id]; return a ? a.name : ''; }
-  _state(st) { try { return this._hass.formatEntityState ? this._hass.formatEntityState(st) : st.state; } catch { return st.state; } }
+  _state(st) {
+    let r; try { r = this._hass.formatEntityState ? this._hass.formatEntityState(st) : st.state; } catch { r = st.state; }
+    return r === st.state ? human(r) : r;
+  }
   _icon(st) {
     const a = st.attributes; const d = dom(st.entity_id); const on = !INACTIVE.includes(st.state);
     if (a.icon) return a.icon;
@@ -875,7 +917,39 @@ class LumoraCard extends HTMLElement {
     }
     if (s.alerts.weather) out.push(...this._warnAlerts());
     if (s.alerts.climate) out.push(...this._climAlerts());
-    return out.sort((x, y) => x.sev - y.sev);
+    const now = Date.now(); const sn = s.snooze || {};
+    return out.filter((a) => !(sn[a.id] > now)).sort((x, y) => x.sev - y.sev);
+  }
+  _ntfOpts(k) {
+    const h = this._hass;
+    if (k === 'push') return [''].concat(Object.keys((h.services && h.services.notify) || {}).filter((x) => !['send_message', 'persistent_notification'].includes(x)).sort());
+    if (k === 'tts') return [''].concat(Object.keys(h.states).filter((id) => dom(id) === 'media_player').sort());
+    return [0, 1, 2];
+  }
+  _ntfRows() {
+    const n = this._set.notify; const nm = (id) => (id && this._hass.states[id] && this._hass.states[id].attributes.friendly_name) || id;
+    const row = (k, l, v) => `<div class="row"><div class="t"><b>${l}</b></div><button class="${v === 'Aus' ? '' : 'sel'}" data-act="ntf" data-k="${k}">${esc(v)}</button></div>`;
+    return row('push', 'Push-Nachricht', n.push ? `notify.${n.push}` : 'Aus') + row('tts', 'Ansage auf Lautsprecher', n.tts ? nm(n.tts) : 'Aus') + row('min', 'Ab Schweregrad', ['Kritisch', 'Warnung', 'Alle'][n.min] || 'Kritisch') + '<div class="empty" style="padding:6px 0;font-size:12px">Wirkt nur, solange Lumora geöffnet ist (z. B. am Wandtablet).</div>';
+  }
+  _snoozed() {
+    const now = Date.now(); const sn = this._set.snooze || {};
+    return Object.keys(sn).filter((id) => sn[id] > now).map((id) => ({ id, until: sn[id], name: (this._hass.states[id] && this._hass.states[id].attributes.friendly_name) || id }));
+  }
+  /* Neue Meldungen per Push (notify.*) und/oder Ansage (tts.speak) melden; beim ersten Durchlauf nur merken */
+  _notifyAlerts() {
+    const n = this._set.notify; if (!n || (!n.push && !n.tts)) return;
+    const now = Date.now(); if (now - (this._ntAt || 0) < 10000) return; this._ntAt = now;
+    const h = this._hass; let seen = {};
+    try { seen = JSON.parse(localStorage.getItem('lumora_notified') || '{}'); } catch { seen = {}; }
+    const first = !this._ntInit; this._ntInit = true;
+    const cur = {}; const fresh = [];
+    this._alerts().filter((a) => a.id && a.sev <= n.min).forEach((a) => { const k = `${a.id}|${a.text}`; cur[k] = seen[k] || now; if (!seen[k] && !first) fresh.push(a); });
+    try { localStorage.setItem('lumora_notified', JSON.stringify(cur)); } catch { /* ignore */ }
+    if (!fresh.length) return;
+    const msg = fresh.map((a) => a.text).join('. ');
+    if (n.push) Promise.resolve(h.callService('notify', n.push, { title: 'Lumora', message: msg })).catch(() => {});
+    const tts = Object.keys(h.states).find((id) => dom(id) === 'tts');
+    if (n.tts && tts) Promise.resolve(h.callService('tts', 'speak', { entity_id: tts, media_player_entity_id: n.tts, message: msg })).catch(() => {});
   }
   _climAlerts() {
     const h = this._hass; const s = this._set; const out = []; const T = {
@@ -1097,7 +1171,7 @@ class LumoraCard extends HTMLElement {
     const meta = [date, temp && `${temp}° innen`, hum !== null && `${hum}% Luftfeuchtigkeit`].filter(Boolean).join(' • ');
     const ai = al.length ? this._ai % al.length : 0;
     const note = al.length
-      ? `<div class="note" data-act="alerts"><ha-icon icon="${al[ai].icon}"></ha-icon><span class="note-t">${esc(al[ai].text)}</span></div>`
+      ? `<div class="note sv${al[ai].sev}" data-act="alerts"><ha-icon icon="${al[ai].icon}"></ha-icon><span class="note-t">${esc(al[ai].text)}</span></div>`
       : `<div class="note" data-act="alerts"><ha-icon icon="mdi:check-circle-outline"></ha-icon><span class="note-t">Alles in Ordnung</span></div>`;
     const apill = alarm ? `<button class="pill ${alarm.state === 'triggered' ? 'bad' : ''}" data-act="info" data-id="${alarm.entity_id}"><ha-icon icon="mdi:shield-home"></ha-icon>${esc(AL[alarm.state] || alarm.state)}</button>` : '';
     const wpill = wx && typeof wx.attributes.temperature === 'number' ? `<button class="pill" data-act="info" data-id="${wx.entity_id}"><ha-icon icon="${WX[wx.state] || 'mdi:weather-cloudy'}"></ha-icon>${wx.attributes.temperature.toFixed(1)}° draußen</button>` : '';
@@ -1228,7 +1302,7 @@ class LumoraCard extends HTMLElement {
     const left = this._dur(this._hass.states[`${a.base}_verbleibende_zeit`]);
     const pr = this._hass.states[`${a.base}_programm`];
     const prg = pr && !['unavailable', 'unknown', 'none', 'off', ''].includes(pr.state) ? pr.state : null;
-    return { off, done, active, prog, left, program: prg, label: done ? a.hint : (APL[stt] || stt) };
+    return { off, done, active, prog, left, program: prg ? human(prg) : null, label: done ? a.hint : (APL[stt] || human(stt)) };
   }
   _applCard(a) {
     const i = this._applInfo(a); if (!i) return '';
@@ -1595,6 +1669,10 @@ _more() {
     list.forEach((f) => { f.areas.sort((a, b) => a.name.localeCompare(b.name, 'de')); f.areas = this._ord('areas:' + f.id, f.areas, (x) => x.id); });
     return this._ord('floors', list, (f) => f.id);
   }
+  _areaEnts(aid) {
+    for (const f of this._roomData()) { const a = f.areas.find((x) => x.id === aid); if (a) return a.ents; }
+    return [];
+  }
   _rooms() {
     const floors = this._roomData();
     if (!floors.length) return `<div class="empty">Keine Räume gefunden. Weise Entitäten in Home Assistant Bereichen zu.</div>`;
@@ -1620,12 +1698,21 @@ _more() {
     const used = new Set(ents.filter((s) => dom(s.entity_id) === 'switch').map((s) => this._plugPower(s.entity_id)).filter(Boolean));
     const tileEnts = this._ord('tiles:' + a.id, ents.filter((s) => dom(s.entity_id) !== 'camera' && !used.has(s.entity_id) && !['temperature', 'humidity'].includes(s.attributes.device_class))
       .sort((x, y) => ROOM_DOMAINS.indexOf(dom(x.entity_id)) - ROOM_DOMAINS.indexOf(dom(y.entity_id))), (s) => s.entity_id);
-    const tiles = tileEnts.map((s) => this._tile(s, a.name, 'tiles:' + a.id)).join('');
+    const isAct = (x) => { const d = dom(x.entity_id); return d !== 'sensor' && (d === 'binary_sensor' ? x.state === 'on' : !INACTIVE.includes(x.state)); };
+    const nAct = tileEnts.filter(isAct).length; const onlyAct = this._roomAct && !this._edit;
+    const tiles = (onlyAct ? tileEnts.filter(isAct) : tileEnts).map((s) => this._tile(s, a.name, 'tiles:' + a.id)).join('');
+    const lg = ents.filter((x) => dom(x.entity_id) === 'light'); const cv = ents.filter((x) => dom(x.entity_id) === 'cover');
+    const qa = [
+      (nAct || this._roomAct) && `<button class="pill ${this._roomAct ? 'sel' : ''}" data-act="roomact"><ha-icon icon="mdi:flash-outline"></ha-icon>Aktiv (${nAct})</button>`,
+      lg.length && `<button class="pill" data-act="rmlight" data-id="${esc(a.id)}"><ha-icon icon="${lg.some((x) => x.state === 'on') ? 'mdi:lightbulb-off-outline' : 'mdi:lightbulb-on-outline'}"></ha-icon>${lg.some((x) => x.state === 'on') ? 'Licht aus' : 'Licht an'}</button>`,
+      cv.length && `<button class="pill" data-act="rmcover" data-id="${esc(a.id)}"><ha-icon icon="mdi:blinds"></ha-icon>${cv.some((x) => x.state !== 'closed') ? 'Rollläden zu' : 'Rollläden auf'}</button>`,
+    ].filter(Boolean).join('');
     const rsc = `areareg:${a.id}`; const rcells = this._ord(rsc, this._regItems(`area:${a.id}`), (x) => x.id).map((x) => this._cell(x, rsc)).filter(Boolean).join('');
     return `<div class="tabs">${ftabs}</div><div class="tabs">${atabs}</div>
       <div class="rh"><h2>${esc(a.name)}</h2><div class="inf"><span>${info.join(' · ')}</span>${t ? `<span class="spi">${this._spark(this._hist(t.entity_id, 24), 24)}</span>` : ''}${this._edit ? `<button class="pill" data-act="regpick"><ha-icon icon="mdi:card-plus-outline"></ha-icon>Karte</button><button class="pill" data-act="rsens" data-id="${a.id}"><ha-icon icon="mdi:thermometer"></ha-icon>Sensoren</button>` : ''}${this._editBtn()}</div></div>${this._hint()}
       ${cams.length ? `<div class="cams" style="margin-bottom:10px">${cams.map((s) => this._camHtml(s, 'rcams:' + a.id)).join('')}</div>` : ''}
-      <div class="grid">${rcells}${tiles || (rcells ? '' : '<div class="empty">Keine Geräte in diesem Raum.</div>')}</div>`;
+      ${qa ? `<div class="tabs" style="margin-bottom:10px">${qa}</div>` : ''}
+      <div class="grid">${rcells}${tiles || (rcells ? '' : `<div class="empty">${onlyAct ? 'Nichts aktiv in diesem Raum.' : 'Keine Geräte in diesem Raum.'}</div>`)}</div>`;
   }
   _editBtn() { return this._locked ? '' : `<button class="pill" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button>`; }
   _tools(scope, id, hideKey, o) {
@@ -1707,7 +1794,9 @@ _more() {
     if (this._sheet === 'alerts') {
       const al = this._alerts(); const s = this._set;
       const CAT = [['door', 'Türen'], ['window', 'Fenster'], ['motion', 'Bewegung'], ['smoke', 'Rauch / Wasser / Gas'], ['alarm', 'Alarmanlage'], ['lock', 'Schloss entsperrt'], ['weather', 'DWD, NINA & Eiswarnung'], ['climate', 'Schimmel, Lüften & Raumklima']];
-      c = `<h2>Meldungen</h2>${al.map((a) => `<div class="row"><ha-icon icon="${a.icon}"></ha-icon><div class="t"><b>${esc(a.text)}</b><span>${ago(a.since)}</span></div><button data-act="hide" data-id="${a.id}">Ausblenden</button></div>`).join('') || '<div class="empty">Keine aktiven Meldungen.</div>'}
+      c = `<h2>Meldungen</h2>${al.map((a) => `<div class="row"><ha-icon icon="${a.icon}"></ha-icon><div class="t"><b><i class="sev s${a.sev}"></i>${esc(a.text)}</b><span>${SEV[a.sev] || ''} · ${ago(a.since)}</span></div><button data-act="snooze" data-id="${a.id}">1 h Ruhe</button><button data-act="hide" data-id="${a.id}">Ausblenden</button></div>`).join('') || '<div class="empty">Keine aktiven Meldungen.</div>'}
+        ${this._snoozed().length ? `<h4>Schlummernd</h4>${this._snoozed().map((x) => `<div class="row"><div class="t"><b>${esc(x.name)}</b><span>bis ${new Date(x.until).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span></div><button data-act="unsnooze" data-id="${x.id}">Aufheben</button></div>`).join('')}` : ''}
+        <h4>Benachrichtigen bei neuen Meldungen</h4>${this._ntfRows()}
         <h4>Was gemeldet wird</h4>${CAT.map(([k, l]) => `<div class="row"><div class="t"><b>${l}</b></div><button class="${s.alerts[k] ? 'sel' : ''}" data-act="cat" data-k="${k}">${s.alerts[k] ? 'An' : 'Aus'}</button></div>`).join('')}
         <h4>Räume von Meldungen ausnehmen</h4>${Object.keys(this._hass.areas || {}).sort((x, y) => this._aname(x).localeCompare(this._aname(y), 'de')).map((id) => `<div class="row"><div class="t"><b>${esc(this._aname(id))}</b></div><button class="${s.excludeAreas.includes(id) ? '' : 'sel'}" data-act="exarea" data-id="${id}">${s.excludeAreas.includes(id) ? 'Aus' : 'Gemeldet'}</button></div>`).join('')}
         ${s.excludeEntities.length ? `<h4>Ausgeblendet</h4>${s.excludeEntities.map((id) => `<div class="row"><div class="t"><b>${esc((this._hass.states[id] && this._hass.states[id].attributes.friendly_name) || id)}</b></div><button data-act="unhide" data-id="${id}">Einblenden</button></div>`).join('')}` : ''}`;
@@ -2613,8 +2702,14 @@ _more() {
       case 'close': this._sheet = null; break;
       case 'cat': s.alerts[t.dataset.k] = !s.alerts[t.dataset.k]; this._save(); break;
       case 'hide': if (!s.excludeEntities.includes(id)) s.excludeEntities.push(id); this._save(); break;
+      case 'snooze': s.snooze[id] = Date.now() + 3600000; this._save(); break;
+      case 'unsnooze': delete s.snooze[id]; this._save(); break;
+      case 'ntf': { const k = t.dataset.k; const o = this._ntfOpts(k); const cur = k === 'min' ? s.notify.min : s.notify[k]; s.notify[k] = o[(Math.max(0, o.indexOf(cur)) + 1) % o.length]; this._ntAt = 0; this._save(); break; }
       case 'unhide': s.excludeEntities = s.excludeEntities.filter((x) => x !== id); this._save(); break;
       case 'add': this._sheet = 'add'; this._q = ''; this._flt = 'all'; this._cust = false; break;
+      case 'roomact': this._roomAct = !this._roomAct; break;
+      case 'rmlight': { const l = this._areaEnts(id).filter((x) => dom(x.entity_id) === 'light'); h.callService('light', l.some((x) => x.state === 'on') ? 'turn_off' : 'turn_on', { entity_id: l.map((x) => x.entity_id) }); break; }
+      case 'rmcover': { const c = this._areaEnts(id).filter((x) => dom(x.entity_id) === 'cover'); h.callService('cover', c.some((x) => x.state !== 'closed') ? 'close_cover' : 'open_cover', { entity_id: c.map((x) => x.entity_id) }); break; }
       case 'ascust': this._cust = !this._cust; break;
       case 'size': { const cur = t.dataset.d || 's'; s.size[id] = SIZES[(SIZES.indexOf(cur) + 1) % SIZES.length]; this._save(); break; }
       case 'placeopen': this._sheet = 'place'; this._plId = id; break;
