@@ -23,6 +23,7 @@ const DEF = {
   place: {},
   ignore: [],
   battLimit: 20,
+  fx: {},
 };
 const norm = (t) => String(t || '').toLowerCase().replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ß/g, 'ss');
 const PV = '(?:^|[^a-z])pv(?:[^a-z]|$)|solar|photovolt';
@@ -125,7 +126,7 @@ const dom = (id) => id.split('.')[0];
 const merge = (v) => {
   v = v || {};
   const arr = (k) => [...(v[k] || DEF[k])];
-  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit };
+  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx) };
 };
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -418,6 +419,266 @@ const BATX = /phone|ipad|watch|handy|tablet|pixel|galaxy|saug|vacuum|robo|laptop
 const REG = [];
 const registerCard = (def) => { const i = REG.findIndex((x) => x.id === def.id); if (i >= 0) REG[i] = def; else REG.push(def); };
 
+/* ---------- Effekte (Overlay über dem ganzen Dashboard) ---------- */
+const FX_KEYS = ['weather', 'night', 'autumn', 'halloween', 'christmas'];
+const FX_LABEL = {
+  weather: ['Wetter', 'Regen, Schnee, Hagel, Gewitter, Nebel und Wolken passend zur Wetter-Entität'],
+  night: ['Nachthimmel', 'Sterne, Mond mit Phase und Sternschnuppen nach Sonnenstand'],
+  autumn: ['Herbst', 'Fallende Blätter, automatisch 22.9. bis 30.11.'],
+  halloween: ['Halloween', 'Fledermäuse, Spinne, Geister, automatisch 24.10. bis 1.11.'],
+  christmas: ['Weihnachten', 'Schnee, Lichterkette und Schlitten, automatisch ab 1. Advent bis 6.1.'],
+};
+const FX_MODES = ['auto', 'on', 'off'];
+const FX_MODE_L = { auto: 'Auto', on: 'Immer an', off: 'Aus' };
+const FX_WMODES = ['auto', 'rain', 'snow', 'storm', 'fog', 'off'];
+const FX_WMODE_L = { auto: 'Auto', rain: 'Test: Regen', snow: 'Test: Schnee', storm: 'Test: Gewitter', fog: 'Test: Nebel', off: 'Aus' };
+const FX_DURS = [0, 30, 60, 300, 900, 3600];
+const durL = (d) => (!d ? 'Dauerhaft' : d < 60 ? `${d} s` : d < 3600 ? `${d / 60} Min.` : `${d / 3600} Std.`);
+const FX_LEVELS = [['Wenig', 0.5], ['Mittel', 1], ['Viel', 1.6]];
+const fxDate = (now) => {
+  const y = now.getFullYear(); const m = now.getMonth(); const d = now.getDate();
+  const day = (mm, dd) => mm * 100 + dd; const cur = day(m, d);
+  const f4 = new Date(y, 11, 24); f4.setDate(24 - f4.getDay());
+  const f1 = new Date(f4); f1.setDate(f4.getDate() - 21);
+  return {
+    autumn: cur >= day(8, 22) && cur <= day(10, 30),
+    halloween: cur >= day(9, 24) && cur <= day(10, 1),
+    christmas: now >= f1 || cur <= day(0, 6),
+  };
+};
+const moonPhase = () => { const jd = Date.now() / 86400000 + 2440587.5; const p = ((jd - 2451550.1) / 29.530588853) % 1; return p < 0 ? p + 1 : p; };
+const Fx = (() => {
+  let cv = null; let ctx = null; let W = 0; let H = 0; let raf = 0; let last = 0; let dpr = 1;
+  const owners = new Set(); let hiddenAt = 0;
+  let conf = { level: 1, act: {} };
+  const S = {}; // Zustand je Effekt
+  const R = (a, b) => a + Math.random() * (b - a);
+  const scale = () => Math.max(0.5, Math.min(1.6, (W * H) / (1280 * 720)));
+  const get = (k) => S[k] || (S[k] = { a: 0, t0: 0, on: false, p: [], v: '', tm: 0 });
+  const resize = () => {
+    if (!cv) return;
+    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  const vis = () => {
+    if (document.hidden) { hiddenAt = Date.now(); return; }
+    if (hiddenAt && Date.now() - hiddenAt > 30000) FX_KEYS.forEach((k) => { if (S[k]) S[k].t0 = Date.now(); });
+    hiddenAt = 0; kick();
+  };
+  const mount = () => {
+    if (cv) return;
+    cv = document.createElement('canvas'); cv.id = 'lumora-fx';
+    cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:5';
+    cv.setAttribute('aria-hidden', 'true');
+    ctx = cv.getContext('2d'); document.body.appendChild(cv); resize();
+    window.addEventListener('resize', resize); document.addEventListener('visibilitychange', vis);
+  };
+  const unmount = () => {
+    cancelAnimationFrame(raf); raf = 0;
+    window.removeEventListener('resize', resize); document.removeEventListener('visibilitychange', vis);
+    if (cv) cv.remove(); cv = null; ctx = null; FX_KEYS.forEach((k) => delete S[k]);
+  };
+  const kick = () => { if (!raf && cv && !document.hidden) { last = 0; raf = requestAnimationFrame(frame); } };
+
+  /* --- Partikel-Fabriken --- */
+  const n = (base) => Math.round(base * conf.level * scale());
+  const fill = (arr, count, mk) => { while (arr.length < count) arr.push(mk(true)); if (arr.length > count + 8) arr.length = count; };
+  const mkDrop = (init, heavy) => ({ x: R(-100, W + 100), y: init ? R(-H, H) : R(-60, -5), l: R(heavy ? 14 : 10, heavy ? 26 : 20), s: R(heavy ? 900 : 650, heavy ? 1300 : 900) });
+  const mkFlake = (init, big) => ({ x: R(0, W), y: init ? R(0, H) : R(-10, -2), r: R(1, big ? 4 : 3), s: R(30, 75), ph: R(0, 6.28), w: R(0.5, 1.4) });
+  const mkLeaf = (init) => ({ x: R(0, W), y: init ? R(0, H) : R(-30, -10), sz: R(9, 17), s: R(35, 80), ph: R(0, 6.28), w: R(0.6, 1.5), rot: R(0, 6.28), rs: R(-2, 2), c: ['#c0562a', '#d98a1f', '#a63a1e', '#8a5a2b', '#e0b030', '#b8481c'][Math.floor(R(0, 6))] });
+  const mkStar = () => ({ x: R(0, W), y: R(0, H * 0.7), r: R(0.4, 1.5), ph: R(0, 6.28), sp: R(0.8, 2.4) });
+  const mkBat = (init) => { const dir = Math.random() < 0.5 ? 1 : -1; return { x: init ? R(0, W) : (dir > 0 ? -50 : W + 50), y: R(40, H * 0.5), dir, s: R(70, 140), sz: R(26, 40), ph: R(0, 6.28), amp: R(20, 60), f: R(0.8, 1.6) }; };
+  const mkGhost = () => ({ x: R(0, W), y: R(H * 0.2, H * 0.8), s: R(10, 25), ph: R(0, 6.28), sz: R(34, 52) });
+
+  /* --- Zeichnen --- */
+  const rain = (st, dt, a, heavy, slant) => {
+    fill(st.p, n(heavy ? 170 : 90), () => mkDrop(true, heavy));
+    ctx.strokeStyle = `rgba(175,205,255,${0.5 * a})`; ctx.lineWidth = 1.2; ctx.beginPath();
+    st.p.forEach((d, i) => {
+      d.y += d.s * dt; d.x += d.s * dt * slant;
+      if (d.y > H) st.p[i] = mkDrop(false, heavy);
+      ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - d.l * slant, d.y - d.l);
+    });
+    ctx.stroke();
+  };
+  const snow = (st, dt, a, big, cnt, t) => {
+    fill(st.p, n(cnt), () => mkFlake(true, big));
+    ctx.fillStyle = `rgba(255,255,255,${0.85 * a})`;
+    st.p.forEach((f, i) => {
+      f.y += f.s * dt; f.x += Math.sin(t * f.w + f.ph) * 22 * dt;
+      if (f.y > H + 6) st.p[i] = mkFlake(false, big);
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 6.283); ctx.fill();
+    });
+  };
+  const fogs = (st, dt, a) => {
+    fill(st.p, 6, () => ({ x: R(0, W), y: R(H * 0.1, H * 0.95), r: R(220, 420), s: R(6, 18) * (Math.random() < 0.5 ? 1 : -1) }));
+    st.p.forEach((f) => {
+      f.x += f.s * dt; if (f.x > W + f.r) f.x = -f.r; if (f.x < -f.r) f.x = W + f.r;
+      const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
+      g.addColorStop(0, `rgba(200,208,215,${0.2 * a})`); g.addColorStop(1, 'rgba(200,208,215,0)');
+      ctx.fillStyle = g; ctx.fillRect(f.x - f.r, f.y - f.r, f.r * 2, f.r * 2);
+    });
+  };
+  const clouds = (st, dt, a) => {
+    fill(st.p, 5, () => ({ x: R(0, W), y: R(20, H * 0.35), r: R(120, 220), s: R(4, 10) }));
+    st.p.forEach((c) => {
+      c.x += c.s * dt; if (c.x > W + c.r * 2) c.x = -c.r * 2;
+      [[0, 0, 1], [0.7, 0.15, 0.75], [-0.7, 0.2, 0.7], [0.3, -0.25, 0.7]].forEach(([dx, dy, k]) => {
+        const g = ctx.createRadialGradient(c.x + dx * c.r, c.y + dy * c.r, 0, c.x + dx * c.r, c.y + dy * c.r, c.r * k);
+        g.addColorStop(0, `rgba(205,212,222,${0.2 * a})`); g.addColorStop(1, 'rgba(205,212,222,0)');
+        ctx.fillStyle = g; ctx.fillRect(c.x + dx * c.r - c.r, c.y + dy * c.r - c.r, c.r * 2, c.r * 2);
+      });
+    });
+  };
+  const bolt = (st, dt, a) => {
+    st.tm -= dt;
+    if (st.tm <= 0) {
+      st.tm = R(5, 13); st.fl = 1;
+      let x = R(W * 0.1, W * 0.9); let y = 0; const pts = [[x, y]];
+      while (y < H * R(0.45, 0.8)) { y += R(20, 50); x += R(-35, 35); pts.push([x, y]); }
+      st.bolt = pts;
+    }
+    if (st.fl > 0) {
+      ctx.fillStyle = `rgba(235,240,255,${0.3 * st.fl * a})`; ctx.fillRect(0, 0, W, H);
+      if (st.bolt && st.fl > 0.45) {
+        ctx.strokeStyle = `rgba(255,255,255,${st.fl * a})`; ctx.lineWidth = 2.4; ctx.shadowColor = '#bcd'; ctx.shadowBlur = 14;
+        ctx.beginPath(); st.bolt.forEach((q, i) => (i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]))); ctx.stroke(); ctx.shadowBlur = 0;
+      }
+      st.fl -= dt * 2.2;
+    }
+  };
+  const sun = (a, t) => {
+    const g = ctx.createRadialGradient(W * 0.88, 0, 0, W * 0.88, 0, Math.max(W, H) * 0.6);
+    g.addColorStop(0, `rgba(255,214,120,${(0.2 + 0.03 * Math.sin(t * 0.6)) * a})`); g.addColorStop(1, 'rgba(255,214,120,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  };
+  const drawMoon = (a) => {
+    const r = Math.max(22, Math.min(34, W * 0.03)); const mx = W - r * 2.6; const my = r * 2.4; const p = moonPhase();
+    ctx.save(); ctx.translate(mx, my);
+    const g = ctx.createRadialGradient(0, 0, r * 0.8, 0, 0, r * 3.2);
+    g.addColorStop(0, `rgba(230,236,255,${0.28 * a})`); g.addColorStop(1, 'rgba(230,236,255,0)');
+    ctx.fillStyle = g; ctx.fillRect(-r * 3.2, -r * 3.2, r * 6.4, r * 6.4);
+    ctx.fillStyle = `rgba(40,52,84,${0.55 * a})`; ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.283); ctx.fill();
+    const k = Math.cos(p * 6.283); const waxing = p < 0.5;
+    ctx.fillStyle = `rgba(245,243,225,${0.95 * a})`; ctx.beginPath();
+    ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2, !waxing);
+    ctx.ellipse(0, 0, Math.max(0.01, r * Math.abs(k)), r, 0, Math.PI / 2, -Math.PI / 2, (k > 0) === waxing);
+    ctx.fill(); ctx.restore();
+  };
+  const night = (st, dt, a, t) => {
+    ctx.fillStyle = `rgba(8,14,40,${0.16 * a})`; ctx.fillRect(0, 0, W, H);
+    fill(st.p, n(110), mkStar);
+    st.p.forEach((s) => { const tw = 0.45 + 0.55 * Math.abs(Math.sin(t * s.sp + s.ph)); ctx.fillStyle = `rgba(255,255,235,${tw * a * 0.9})`; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.283); ctx.fill(); });
+    drawMoon(a);
+    st.tm -= dt;
+    if (st.tm <= 0) { st.tm = R(5, 12); st.sh = st.sh || []; st.sh.push({ x: R(W * 0.1, W * 0.9), y: R(0, H * 0.35), vx: R(-520, -340), vy: R(200, 320), life: 1, len: R(90, 160) }); }
+    (st.sh || []).forEach((s) => {
+      s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt * 1.1;
+      const m = Math.hypot(s.vx, s.vy); const tx = s.x - (s.vx / m) * s.len; const ty = s.y - (s.vy / m) * s.len;
+      const g = ctx.createLinearGradient(s.x, s.y, tx, ty); g.addColorStop(0, `rgba(255,255,255,${Math.max(0, s.life) * a})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.strokeStyle = g; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(tx, ty); ctx.stroke();
+    });
+    if (st.sh) st.sh = st.sh.filter((s) => s.life > 0);
+  };
+  const leaf = (l, a) => {
+    ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(l.rot); ctx.scale(1, Math.cos(l.rot * 1.3) * 0.6 + 0.5);
+    ctx.globalAlpha = 0.85 * a; ctx.fillStyle = l.c; ctx.beginPath();
+    ctx.moveTo(0, -l.sz); ctx.quadraticCurveTo(l.sz * 0.9, -l.sz * 0.2, 0, l.sz); ctx.quadraticCurveTo(-l.sz * 0.9, -l.sz * 0.2, 0, -l.sz); ctx.fill();
+    ctx.strokeStyle = 'rgba(90,40,10,.5)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(0, -l.sz); ctx.lineTo(0, l.sz); ctx.stroke(); ctx.restore();
+  };
+  const autumn = (st, dt, a, t) => {
+    fill(st.p, n(20), mkLeaf);
+    st.p.forEach((l, i) => { l.y += l.s * dt; l.x += Math.sin(t * l.w + l.ph) * 40 * dt + 14 * dt; l.rot += l.rs * dt; if (l.y > H + 20 || l.x > W + 30) st.p[i] = mkLeaf(false); leaf(l, a); });
+  };
+  const emoji = (ch, x, y, sz, a, sx) => { ctx.save(); ctx.globalAlpha = a; ctx.translate(x, y); if (sx !== undefined) ctx.scale(sx, 1); ctx.font = `${sz}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, 0, 0); ctx.restore(); };
+  const halloween = (st, dt, a, t) => {
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+    g.addColorStop(0, 'rgba(255,120,0,0)'); g.addColorStop(1, `rgba(255,110,0,${0.16 * a})`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    fill(st.p, n(4), mkBat);
+    st.p.forEach((b, i) => {
+      b.x += b.dir * b.s * dt; const yy = b.y + Math.sin(t * b.f + b.ph) * b.amp;
+      if ((b.dir > 0 && b.x > W + 60) || (b.dir < 0 && b.x < -60)) st.p[i] = mkBat(false);
+      emoji('\u{1F987}', b.x, yy, b.sz, 0.9 * a, (b.dir > 0 ? -1 : 1) * (0.55 + 0.45 * Math.abs(Math.sin(t * 9 + b.ph))));
+    });
+    st.g = st.g || []; fill(st.g, n(2), mkGhost);
+    st.g.forEach((q) => { q.y -= q.s * dt; q.x += Math.sin(t * 0.7 + q.ph) * 24 * dt; if (q.y < -50) { q.y = H + 40; q.x = R(0, W); } emoji('\u{1F47B}', q.x, q.y, q.sz, 0.55 * a); });
+    st.tm -= dt;
+    if (!st.sp && st.tm <= 0) { st.sp = { x: R(W * 0.1, W * 0.9), y: 0, ph: 0, wait: 0 }; st.tm = R(18, 35); }
+    if (st.sp) {
+      const q = st.sp;
+      if (q.ph === 0) { q.y += 90 * dt; if (q.y > H * 0.28) { q.ph = 1; q.wait = 2.2; } }
+      else if (q.ph === 1) { q.wait -= dt; q.y += Math.sin(t * 3) * 10 * dt; if (q.wait <= 0) q.ph = 2; }
+      else { q.y -= 110 * dt; if (q.y < -30) st.sp = null; }
+      if (st.sp) { ctx.strokeStyle = `rgba(200,200,200,${0.7 * a})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(q.x, 0); ctx.lineTo(q.x, q.y); ctx.stroke(); emoji('\u{1F577}\u{FE0F}', q.x, q.y + 10, 34, a); }
+    }
+  };
+  const christmas = (st, dt, a, t) => {
+    snow(st, dt, a * 0.8, true, 45, t);
+    const step = 44; const nB = Math.ceil(W / step) + 1; const cols = ['#ff4040', '#ffd24a', '#4cd964', '#4aa8ff', '#ff7ad9'];
+    ctx.strokeStyle = `rgba(30,70,30,${0.7 * a})`; ctx.lineWidth = 1.4; ctx.beginPath();
+    const yAt = (x) => 10 + 12 * Math.sin((x / step) * Math.PI);
+    for (let x = 0; x <= W + step; x += 6) (x ? ctx.lineTo(x, yAt(x)) : ctx.moveTo(x, yAt(x)));
+    ctx.stroke();
+    for (let i = 0; i < nB; i++) {
+      const x = i * step; const y = yAt(x) + 5; const on = 0.55 + 0.45 * Math.sin(t * 2.2 + i * 1.7); const c = cols[i % cols.length];
+      ctx.globalAlpha = a * on; ctx.shadowColor = c; ctx.shadowBlur = 12; ctx.fillStyle = c;
+      ctx.beginPath(); ctx.ellipse(x, y + 4, 3.6, 5.2, 0, 0, 6.283); ctx.fill();
+    }
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    st.tm -= dt;
+    if (!st.sl && st.tm <= 0) { st.sl = { x: W + 120, y: R(H * 0.12, H * 0.3), ph: R(0, 6) }; st.tm = R(45, 90); }
+    if (st.sl) { const q = st.sl; q.x -= 160 * dt; if (q.x < -160) st.sl = null; else emoji('\u{1F98C}\u{1F98C}\u{1F6F7}', q.x, q.y + Math.sin(t * 2 + q.ph) * 8, 34, a); }
+  };
+
+  const frame = (ts) => {
+    raf = 0; if (!cv) return;
+    const dt = Math.min(0.05, last ? (ts - last) / 1000 : 0.016); last = ts; const t = ts / 1000; const now = Date.now();
+    ctx.clearRect(0, 0, W, H);
+    let busy = false;
+    FX_KEYS.forEach((k) => {
+      const st = get(k); const c = conf.act[k]; let want = 0;
+      if (c) { if (!st.on) { st.on = true; st.t0 = now; } want = (!c.dur || (now - st.t0) / 1000 < c.dur) ? 1 : 0; } else st.on = false;
+      st.a += Math.max(-1, Math.min(1, (want - st.a))) * Math.min(1, dt * 1.2);
+      if (st.a < 0.01 && !want) { st.a = 0; st.p = []; st.g = null; st.sh = null; st.sp = null; st.sl = null; st.bolt = null; st.fl = 0; return; }
+      busy = true; const a = st.a; const v = c ? c.v : st.v; st.v = v || st.v;
+      if (k === 'weather') {
+        const rainy = ['rain', 'pouring', 'storm', 'lightning-rainy', 'snowy-rainy'].includes(v);
+        if (v === 'fog') fogs(st, dt, a);
+        else if (v === 'cloud') clouds(st, dt, a);
+        else if (v === 'sun') sun(a, t);
+        else {
+          if (v === 'storm' || v === 'lightning-rainy' || v === 'lightning') { ctx.fillStyle = `rgba(20,28,50,${0.18 * a})`; ctx.fillRect(0, 0, W, H); bolt(st, dt, a); }
+          if (rainy) rain(st, dt, a, v === 'pouring' || v === 'storm', v === 'storm' ? 0.28 : 0.08);
+          if (v === 'snow' || v === 'snowy-rainy') snow(st, dt, a, false, 110, t);
+          if (v === 'hail') { fill(st.p, n(80), () => mkDrop(true, true)); ctx.fillStyle = `rgba(235,245,255,${0.85 * a})`; st.p.forEach((d, i) => { d.y += d.s * 1.1 * dt; if (d.y > H) st.p[i] = mkDrop(false, true); ctx.beginPath(); ctx.arc(d.x, d.y, 2, 0, 6.283); ctx.fill(); }); }
+        }
+      } else if (k === 'night') night(st, dt, a, t);
+      else if (k === 'autumn') autumn(st, dt, a, t);
+      else if (k === 'halloween') halloween(st, dt, a, t);
+      else if (k === 'christmas') christmas(st, dt, a, t);
+    });
+    if (busy) raf = requestAnimationFrame(frame);
+    else if (!Object.keys(conf.act).length) unmount();
+  };
+  return {
+    attach(o) { owners.add(o); },
+    detach(o) { owners.delete(o); if (!owners.size) unmount(); },
+    set(act, level) {
+      conf = { level: level || 1, act: act || {} };
+      if (Object.keys(conf.act).length) { mount(); kick(); }
+      else if (cv && !FX_KEYS.some((k) => S[k] && S[k].a > 0)) unmount();
+      else kick();
+    },
+  };
+})();
+
+const mergeFx = (f) => {
+  f = f || {}; const e = {};
+  FX_KEYS.forEach((k) => { const x = (f.e && f.e[k]) || {}; e[k] = { m: x.m || 'auto', d: FX_DURS.includes(x.d) ? x.d : 0 }; });
+  return { on: f.on !== false, level: FX_LEVELS.some((l) => l[1] === f.level) ? f.level : 1, respect: f.respect !== false, e };
+};
 class LumoraCard extends HTMLElement {
   constructor() {
     super();
@@ -473,6 +734,7 @@ class LumoraCard extends HTMLElement {
   }
   getCardSize() { return 12; }
   connectedCallback() {
+    Fx.attach(this);
     this._tick = setInterval(() => {
       this._tk = (this._tk || 0) + 1; if (this._tk % 2 === 0) this._refreshCams();
       if (this._edit || this._dg) return;
@@ -481,7 +743,7 @@ class LumoraCard extends HTMLElement {
       if (el && al.length > 1) { this._ai = (this._ai + 1) % al.length; el.textContent = al[this._ai].text; }
     }, 5000);
   }
-  disconnectedCallback() { clearInterval(this._tick); }
+  disconnectedCallback() { clearInterval(this._tick); Fx.detach(this); }
 
   set hass(h) {
     const first = !this._hass;
@@ -490,6 +752,7 @@ class LumoraCard extends HTMLElement {
     if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'dv', 'dvadd', 'dvmain', 'dvpick'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
     if (this._down && this._edit) { this._pend = true; return; }
     if (this._plFocus()) return;
+    this._fxUpdate();
     const sig = this._signature();
     if (sig !== this._sig) {
       this._sig = sig;
@@ -519,6 +782,28 @@ class LumoraCard extends HTMLElement {
     return parts.join('|');
   }
 
+  _fxUpdate(force) {
+    const now = Date.now(); if (!force && now - (this._fxAt || 0) < 4000) return;
+    this._fxAt = now; const h = this._hass; if (!h || !this._loaded) return;
+    const s = this._set.fx; const act = {};
+    const still = s.respect && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (s.on && !still) {
+      const dt = fxDate(new Date(now)); const sunE = h.states['sun.sun'];
+      const dark = sunE ? sunE.state === 'below_horizon' : (new Date(now).getHours() < 7 || new Date(now).getHours() >= 18);
+      const put = (k, ok, v) => { const c = s.e[k]; if (c.m !== 'off' && ok) act[k] = { dur: c.d, v }; };
+      const wx = (this._byDomain().weather || [])[0]; const m = s.e.weather.m;
+      const MAP = { rainy: 'rain', pouring: 'pouring', snowy: 'snow', 'snowy-rainy': 'snowy-rainy', hail: 'hail', lightning: 'lightning', 'lightning-rainy': 'lightning-rainy', fog: 'fog', cloudy: 'cloud', partlycloudy: 'cloud', exceptional: 'storm', sunny: dark ? '' : 'sun' };
+      const TEST = { rain: 'rain', snow: 'snow', storm: 'storm', fog: 'fog' };
+      const wv = TEST[m] || (m === 'auto' && wx ? MAP[wx.state] || '' : '');
+      put('weather', !!wv, wv);
+      put('night', s.e.night.m === 'on' || dark, '');
+      put('autumn', s.e.autumn.m === 'on' || dt.autumn, '');
+      put('halloween', s.e.halloween.m === 'on' || dt.halloween, '');
+      put('christmas', s.e.christmas.m === 'on' || dt.christmas, '');
+    }
+    Fx.set(act, s.level);
+  }
+
   async _load() {
     let mine = null;
     try {
@@ -532,9 +817,10 @@ class LumoraCard extends HTMLElement {
     this._locked = !!base && !admin;
     const pick = admin ? (mine || base) : (base || mine);
     if (pick) this._set = merge(pick);
-    this._loaded = true; this._sig = this._signature(); this._render();
+    this._loaded = true; this._sig = this._signature(); this._fxUpdate(true); this._render();
   }
   async _save() {
+    this._fxUpdate(true);
     if (this._locked) return;
     try { localStorage.setItem(KEY, JSON.stringify(this._set)); } catch (_) { /* ignore */ }
     try { await this._hass.callWS({ type: 'frontend/set_user_data', key: KEY, value: this._set }); } catch (_) { /* ignore */ }
@@ -820,7 +1106,7 @@ class LumoraCard extends HTMLElement {
       this._chipOn('outdoor') ? wpill : '',
       this._infoPills(al),
       al.length && this._chipOn('count') ? `<button class="pill ${al.some((a) => a.sev === 0) ? 'bad' : 'warn'}" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>${al.length} Meldung${al.length > 1 ? 'en' : ''}</button>` : '',
-      this._edit ? '<button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips</button><button class="pill" data-act="src"><ha-icon icon="mdi:link-variant"></ha-icon>Quellen</button><button class="pill" data-act="hc"><ha-icon icon="mdi:cctv"></ha-icon>Kameras</button>' : '',
+      this._edit ? '<button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips</button><button class="pill" data-act="src"><ha-icon icon="mdi:link-variant"></ha-icon>Quellen</button><button class="pill" data-act="hc"><ha-icon icon="mdi:cctv"></ha-icon>Kameras</button><button class="pill" data-act="fx"><ha-icon icon="mdi:weather-night"></ha-icon>Effekte</button>' : '',
     ].join('');
     const cards = [];
     if (lights.length) {
@@ -1501,6 +1787,15 @@ _more() {
     } else if (this._sheet === 'dvpick') {
       const iv = this._set.devices.find((x) => x.id === this._dvId); const tp = iv && DEVTPL[iv.type]; const k = this._dvK;
       if (tp && tp.fields[k]) c = `<h2>${esc(tp.fields[k].l)}</h2><input class="srch" placeholder="Entität suchen" value="${esc(this._q)}"><div class="row" data-act="dvset" data-k="${k}" data-id=""><div class="t"><b>Automatisch erkennen</b></div></div><div class="row" data-act="dvset" data-k="${k}" data-id="-"><div class="t"><b>Nicht verwenden</b></div></div><div class="list"></div>`;
+    } else if (this._sheet === 'fx') {
+      const f = this._set.fx; const lv = FX_LEVELS.find((l) => l[1] === f.level) || FX_LEVELS[1];
+      const tg = (k, v) => `<button class="${v ? 'sel' : ''}" data-act="fxg" data-k="${k}">${v ? 'An' : 'Aus'}</button>`;
+      c = `<h2>Effekte</h2><div class="hint">Stimmungs-Effekte über dem ganzen Dashboard. Pro Effekt: Auto (nach Wetter, Sonnenstand oder Datum), Immer an oder Aus, dazu die Dauer. Nach Ablauf der Dauer wird der Effekt ausgeblendet; sie startet neu, wenn du das Dashboard wieder öffnest.</div>
+        <div class="row"><div class="t"><b>Effekte anzeigen</b></div>${tg('on', f.on)}</div>
+        <div class="row"><div class="t"><b>Intensität</b><span>Anzahl der Partikel</span></div><button data-act="fxg" data-k="level">${lv[0]}</button></div>
+        <div class="row"><div class="t"><b>Bewegung reduzieren beachten</b><span>Gerät meldet „weniger Animationen“: keine Effekte</span></div>${tg('respect', f.respect)}</div>
+        <h4>Effekte</h4>${FX_KEYS.map((k) => { const e = f.e[k]; const ml = k === 'weather' ? FX_WMODE_L[e.m] : FX_MODE_L[e.m]; return `<div class="row"><div class="t"><b>${FX_LABEL[k][0]}</b><span>${FX_LABEL[k][1]}</span></div><button class="${e.m === 'off' ? '' : 'sel'}" data-act="fxm" data-k="${k}">${ml}</button><button data-act="fxd" data-k="${k}">${durL(e.d)}</button></div>`; }).join('')}
+        <div class="hint">Beim Wetter lassen sich Regen, Schnee, Gewitter und Nebel zum Ausprobieren fest einstellen.</div>`;
     } else if (this._sheet === 'quick') {
       c = `<h2>Schnellaktionen</h2><div class="hint">Szenen, Skripte und Tasten mit einem Tipp auslösen. Mehrfachauswahl möglich.</div><input class="srch" placeholder="Suchen" value="${esc(this._q)}"><div class="list"></div>`;
     } else if (this._sheet === 'cc') {
@@ -2305,6 +2600,10 @@ _more() {
       case 'alerts': this._sheet = 'alerts'; break;
       case 'warns': this._sheet = 'warns'; break;
       case 'chips': this._sheet = 'chips'; break;
+      case 'fx': this._sheet = 'fx'; break;
+      case 'fxg': { const f = s.fx; const k = t.dataset.k; if (k === 'level') f.level = FX_LEVELS[(FX_LEVELS.findIndex((l) => l[1] === f.level) + 1) % FX_LEVELS.length][1]; else f[k] = !f[k]; this._save(); break; }
+      case 'fxm': { const e = s.fx.e[t.dataset.k]; const L = t.dataset.k === 'weather' ? FX_WMODES : FX_MODES; e.m = L[(L.indexOf(e.m) + 1) % L.length]; this._save(); break; }
+      case 'fxd': { const e = s.fx.e[t.dataset.k]; e.d = FX_DURS[(FX_DURS.indexOf(e.d) + 1) % FX_DURS.length]; this._save(); break; }
       case 'hc': this._sheet = 'hc'; break;
       case 'hcam': s.homeCams = s.homeCams.includes(id) ? s.homeCams.filter((x) => x !== id) : [...s.homeCams, id]; this._save(); break;
       case 'src': this._sheet = 'src'; this._ac = null; break;
