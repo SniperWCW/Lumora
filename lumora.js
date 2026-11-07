@@ -47,6 +47,11 @@ const SLOTS = {
   packages: { g: 'Haushalt', l: 'Pakete', d: P, re: /paket|package|parcel/, no: /status|tracking|batter/ },
   tank: { g: 'Haushalt', l: 'Tankzeit', d: P, re: /tankzeit|tank.?zeit|best.?time.?fuel/ },
   printer_status: { g: '3D-Drucker', l: 'Druckstatus', d: P, re: /print.*status|druck.*status|printer.*state|print_state/, no: /camera/ },
+  printer_plug: { g: '3D-Drucker', l: 'Drucker-Steckdose', d: ['switch'], re: /3d.?(?:drucker|printer)|(?:drucker|printer).*(?:steckdose|plug|socket)|steckdose.*(?:drucker|printer)/ },
+  printer_plugw: { g: '3D-Drucker', l: 'Drucker-Verbrauch', d: P, u: /^k?w$/i, re: /3d.?(?:drucker|printer)|(?:drucker|printer).*(?:steckdose|plug|socket)|steckdose.*(?:drucker|printer)/ },
+  printer_boxt: { g: '3D-Drucker', l: 'Gehäuse-Temperatur', d: P, u: /°/, re: /3d.?(?:drucker|printer)/, no: /nozzle|bed|dusen|bett/ },
+  printer_boxh: { g: '3D-Drucker', l: 'Gehäuse-Luftfeuchte', d: P, u: /%/, re: /3d.?(?:drucker|printer).*(?:humid|feucht)/ },
+  printer_time: { g: '3D-Drucker', l: 'Druckzeit gesamt', d: P, re: /druckzeit|print.?time/, no: /left|rest|verbleib|remain/ },
   pool_temp: { g: 'Pool', l: 'Pooltemperatur', d: P, u: /°/, re: /pool|spa(?:[^a-z]|$)|spa_|layz/, no: /garten|aussen|outdoor|luft|air|weather|max|ziel|target|soll/ },
   pool_power: { g: 'Pool', l: 'Pool-Leistung', d: P, u: /^k?w$/i, re: /pool|spa(?:[^a-z]|$)|spa_|layz/ },
   pool_pump: { g: 'Pool', l: 'Pool-Pumpe', d: ['switch'], re: /(?:pool|spa|layz).*pump|pump.*(?:pool|spa|layz)/ },
@@ -358,6 +363,21 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .pool-cmp{display:flex;flex-direction:column;gap:10px}.pool-cmp .pool-v{text-align:left;display:flex;justify-content:space-between;align-items:center;gap:10px}.pool-cmp .pool-v b{display:inline;font-size:17px;margin:0}
 .pool-lz{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;border-radius:99px;padding:3px 9px;background:var(--a);flex:none}
 .pool-lz i{width:8px;height:8px;border-radius:50%;background:var(--bd);display:block}.pool-lz.on i{background:var(--ok)}
+.prn-cam{margin-top:12px;border-radius:14px;overflow:hidden;background:var(--b);cursor:pointer}.prn-cam img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}
+.prn-bar{margin-top:12px}.prn-t{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:12.5px;color:var(--fg2)}
+.prn-ch{margin-top:12px}.prn-ch .pool-chip{cursor:pointer;flex:1 1 90px}.prn-ch .pool-chip b{display:flex;align-items:center;gap:4px;font-size:15px}.prn-ch .pool-chip b i{font-style:normal;font-size:12px;color:var(--fg2)}.prn-ch ha-icon{--mdc-icon-size:16px;width:16px;height:16px}
+.prn-act{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}.prn-act .pool-btn{flex:1 1 90px;display:flex;align-items:center;justify-content:center;gap:6px}.prn-act ha-icon{--mdc-icon-size:18px;width:18px;height:18px}
+.pool-btn.prn-pa{background:#ffad45;color:#2b1a00}.pool-btn.prn-re{background:#3f9d56;color:#fff}.pool-btn.prn-st{background:#e5484d;color:#fff}.pool-btn.cf{outline:2px solid var(--fg);outline-offset:1px}
+.prn-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.prn-box{display:flex;align-items:center;gap:10px;background:var(--b);border-radius:14px;padding:9px 10px;min-width:0;cursor:pointer}
+.prn-box .i{width:34px;height:34px;border-radius:10px;background:var(--a);display:grid;place-items:center;flex:none}
+.prn-box small,.prn-c small{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2)}
+.prn-box b{font-size:17px;white-space:nowrap}.prn-box b i,.prn-c b i{font-style:normal;font-size:11px;color:var(--fg2);margin-left:2px}
+.prn-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:8px}
+.prn-c{background:var(--b);border-radius:14px;padding:9px 4px;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0}
+.prn-c ha-icon{--mdc-icon-size:18px;width:18px;height:18px}.prn-c b{font-size:16px;white-space:nowrap;cursor:pointer}
+.prn-c .sp{display:flex;align-items:center;gap:6px;margin-top:4px}.prn-c .sp button{width:30px;height:30px;border-radius:99px;border:0;background:var(--a);color:var(--fg);font:inherit;font-size:17px;line-height:1;cursor:pointer}
+.prn-pv{margin-top:12px;border-radius:14px;overflow:hidden;cursor:pointer}.prn-pv img{display:block;width:100%;max-height:280px;object-fit:contain;background:var(--b)}
 @container (max-width:520px){
   .pool{padding:12px}
   .pool-strip{grid-template-columns:1fr}
@@ -366,6 +386,7 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
   .pool-tr{grid-template-columns:1fr 1fr;row-gap:2px}.pool-tr.th{display:none}.pool-tr .r{text-align:left}
   .pool-tr.hs{grid-template-columns:1fr 1fr}
   .pool-hd .big{font-size:26px}
+  .prn-4{grid-template-columns:repeat(2,minmax(0,1fr))}
   .pool-ss{display:none}
 }
 .dvc{background:var(--a);border-radius:20px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0;position:relative}
@@ -485,7 +506,7 @@ class LumoraCard extends HTMLElement {
       else if (cuSet.has(id) || this._set.pinned.some((p) => p.entity === id)) parts.push(id + h.states[id].state);
     }
     for (const iv of this._dvAll()) { try { const m = this._dvMap(iv); parts.push(iv.main + (h.states[iv.main] ? h.states[iv.main].state + (h.states[iv.main].attributes.fan_speed || '') : '')); Object.values(m).forEach((x) => { if (x && h.states[x]) parts.push(x + h.states[x].state); }); } catch (_) { /* ignore */ } }
-    if (['home', 'more', 'rooms'].includes(this._view)) parts.push(this._plSig());
+    if (['home', 'more', 'rooms'].includes(this._view)) { parts.push(this._plSig()); parts.push(this._prSig()); }
     if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
     parts.push(this._bd.s);
     return parts.join('|');
@@ -630,7 +651,7 @@ class LumoraCard extends HTMLElement {
       travel.sort((x, y) => x[0].localeCompare(y[0], 'de')); trains.sort((x, y) => x[0].localeCompare(y[0], 'de'));
       this._ac = { t: now, v, travel, trains, appls, tracked };
       const ps = v.printer_status && /^sensor\.(.+)_print_status$/.exec(v.printer_status);
-      if (ps) ['print_progress', 'print_time_left', 'nozzle_temperature', 'bed_temperature'].forEach((x) => tracked.add(`sensor.${ps[1]}_${x}`));
+      if (ps) ['print_progress', 'print_time_left', 'nozzle_temperature', 'bed_temperature', 'working_layer', 'total_layers', 'used_material_length'].forEach((x) => tracked.add(`sensor.${ps[1]}_${x}`));
       return this._ac;
     }
     return { t: 0, v, travel: [], trains: [], appls: [], tracked };
@@ -640,11 +661,16 @@ class LumoraCard extends HTMLElement {
     const ov = k.startsWith('e_') ? (c.energy && c.energy[k.slice(2)]) : ((c.extras && c.extras[k]) || (c.info && c.info[k]));
     if (ov) return ov;
     const ch = this._set.sources[k]; if (ch === '-') return null; if (ch) return ch;
-    if (k.startsWith('printer_') && k !== 'printer_status') {
+    if (k.startsWith('printer_') && !['printer_status', 'printer_plug', 'printer_plugw', 'printer_boxt', 'printer_boxh', 'printer_time'].includes(k)) {
       const st = this._slot('printer_status'); const m = st && /^sensor\.(.+)_print_status$/.exec(st); if (!m) return null;
-      const map = { printer_progress: `sensor.${m[1]}_print_progress`, printer_left: `sensor.${m[1]}_print_time_left`, printer_nozzle: `sensor.${m[1]}_nozzle_temperature`, printer_bed: `sensor.${m[1]}_bed_temperature` };
-      if (map[k]) return this._hass.states[map[k]] ? map[k] : null;
-      return Object.keys(this._hass.states).find((i) => i.startsWith(`camera.${m[1]}`)) || null;
+      const p = m[1]; const st0 = this._hass.states;
+      const map = { printer_progress: `sensor.${p}_print_progress`, printer_left: `sensor.${p}_print_time_left`, printer_nozzle: `sensor.${p}_nozzle_temperature`, printer_bed: `sensor.${p}_bed_temperature`,
+        printer_pause: `button.${p}_pause_print`, printer_resume: `button.${p}_resume_print`, printer_stop: `button.${p}_stop_print`,
+        printer_bedt: `number.${p}_bed_target`, printer_nozt: `number.${p}_nozzle_target`, printer_tune: `number.${p}_print_tuning`,
+        printer_layer: `sensor.${p}_working_layer`, printer_layers: `sensor.${p}_total_layers`, printer_mat: `sensor.${p}_used_material_length`, printer_prev: `image.${p}_current_print_preview` };
+      if (map[k]) return st0[map[k]] ? map[k] : null;
+      if (k === 'printer_cam') return Object.keys(st0).find((i) => i.startsWith(`camera.${p}`)) || null;
+      return null;
     }
     return this._auto().v[k] || null;
   }
@@ -2045,6 +2071,120 @@ _more() {
       <div class="pool-ft">Berechnet: ${esc(a.last_calculation || '--')} | Messung: ${esc(a.last_measurement || '--')}${a.last_measurement_source ? ` (${esc(a.last_measurement_source)})` : ''}<br>Daten-Aktualität: ${lastCalc ? ago(lastCalc) : '--'}</div></div>`;
   }
 
+  /* ---------- 3D-Drucker ---------- */
+  _R() { return this._prs || (this._prs = { cf: '', cfAt: 0, opt: {}, optAt: 0 }); }
+  _prSig() {
+    const h = this._hass;
+    return ['printer_status', 'printer_progress', 'printer_left', 'printer_nozzle', 'printer_bed', 'printer_plug', 'printer_plugw', 'printer_boxt', 'printer_boxh', 'printer_time', 'printer_bedt', 'printer_nozt', 'printer_tune', 'printer_layer', 'printer_layers', 'printer_mat', 'printer_prev', 'printer_cam']
+      .map((k) => { const id = this._xid(k); const x = id && h.states[id]; return x ? `${id}${x.state}` : ''; }).join(',') + this._R().cf;
+  }
+  _prX() {
+    const h = this._hass; const g = (k) => { const id = this._xid(k); return id && h.states[id] ? id : null; };
+    const o = {}; ['status', 'cam', 'pause', 'resume', 'stop', 'bedt', 'nozt', 'tune', 'layer', 'layers', 'mat', 'prev', 'plug', 'plugw', 'boxt', 'boxh', 'time'].forEach((n) => { o[n] = g(`printer_${n}`); });
+    o.st = this._xs('printer_status'); o.progId = this._xid('printer_progress');
+    o.prog = this._num(o.progId); o.left = this._dur(h.states[this._xid('printer_left')]);
+    o.nozzle = this._num(this._xid('printer_nozzle')); o.bed = this._num(this._xid('printer_bed'));
+    return o;
+  }
+  _prPhase(s) {
+    if (!s) return 'idle'; const x = norm(s.state);
+    if (/pause/.test(x)) return 'paused';
+    if (/error|fail|fehler|stop|cancel|abort/.test(x)) return 'error';
+    if (/complete|finish|done|fertig/.test(x)) return 'done';
+    if (/print|run|druck|heat/.test(x) && !/idle/.test(x)) return 'printing';
+    return 'idle';
+  }
+  _prVal(id) { const R = this._R(); const x = this._hass.states[id]; const v = x ? parseFloat(x.state) : NaN; return R.opt[id] !== undefined && Date.now() - R.optAt < 8000 ? R.opt[id] : v; }
+  _prStep(id, dir) {
+    const h = this._hass; const x = h.states[id]; if (!x) return; const at = x.attributes || {}; const R = this._R();
+    const base = this._prVal(id); if (!Number.isFinite(base)) return;
+    const stp = Math.max(5, parseFloat(at.step) || 1); let v = base + dir * stp;
+    const mn = parseFloat(at.min); const mx = parseFloat(at.max); if (Number.isFinite(mn)) v = Math.max(mn, v); if (Number.isFinite(mx)) v = Math.min(mx, v);
+    if (v === base) return;
+    if (Date.now() - R.optAt >= 8000) R.opt = {};
+    R.opt[id] = v; R.optAt = Date.now();
+    h.callService('number', 'set_value', { entity_id: id, value: v });
+  }
+  _printClick(t, act) {
+    const R = this._R(); const h = this._hass; const k = t.dataset.k;
+    switch (act) {
+      case 'pr-btn': {
+        const X = this._prX(); const ph = this._prPhase(X.st); const run = ph === 'printing' || ph === 'paused';
+        const sure = (key) => {
+          if (R.cf === key && Date.now() - R.cfAt < 4000) { R.cf = ''; return true; }
+          R.cf = key; R.cfAt = Date.now();
+          setTimeout(() => { if (R.cf === key && Date.now() - R.cfAt >= 3900) { R.cf = ''; this._sig = ''; this._render(); } }, 4000);
+          return false;
+        };
+        if (k === 'power') {
+          if (!X.plug) return false; const on = h.states[X.plug].state === 'on';
+          if (on && run && !sure('power')) return true;
+          R.cf = ''; h.callService('switch', on ? 'turn_off' : 'turn_on', { entity_id: X.plug }); return true;
+        }
+        if (k === 'stop' && !sure('stop')) return true;
+        const id = X[k]; R.cf = ''; if (id) h.callService('button', 'press', { entity_id: id }); return true;
+      }
+      case 'pr-adj': this._prStep(t.dataset.id, Number(t.dataset.d)); return true;
+      case 'pr-full': this._set.size.printer = 'f'; this._save(); return true;
+      case 'pr-info': this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId: t.dataset.id }, bubbles: true, composed: true })); return false;
+      default: return false;
+    }
+  }
+  _printerHtml() {
+    const h = this._hass; const X = this._prX(); const R = this._R();
+    if (!X.st && !X.plug) return '';
+    const size = this._set.size.printer || 'f'; const full = size === 'f';
+    const plugOn = X.plug ? h.states[X.plug].state === 'on' : true;
+    const ph = !plugOn ? 'off' : this._prPhase(X.st);
+    const M = { printing: ['Druckt', 'mdi:printer-3d-nozzle', 's-bl'], paused: ['Pausiert', 'mdi:pause-circle', 's-wn'], error: ['Fehler oder abgebrochen', 'mdi:alert-circle', 's-bd'], done: ['Druck fertig', 'mdi:check-circle', 's-ok'], idle: ['Bereit', 'mdi:printer-3d', 's-ok'], off: ['Ausgeschaltet', 'mdi:power-plug-off', ''] }[ph];
+    const run = ph === 'printing' || ph === 'paused';
+    const prog = X.prog !== null ? Math.max(0, Math.min(100, X.prog)) : null;
+    const big = run && prog !== null ? `<div class="big" data-act="pr-info" data-id="${X.progId}">${Math.round(prog)} %</div>` : '';
+    const sub = [];
+    if (run) {
+      const ly = X.layer && X.layers ? `${Math.round(this._num(X.layer) ?? 0)} / ${Math.round(this._num(X.layers) ?? 0)}` : '';
+      if (ly) sub.push(`Layer ${ly}`);
+      if (X.left !== null) { sub.push(`noch ${this._fmtMin(X.left)}`); sub.push(`fertig ca. ${new Date(Date.now() + X.left * 60000).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`); }
+    }
+    const head = `<div class="pool-hd"><div class="ib"><ha-icon icon="${M[1]}"></ha-icon></div><div class="tt"><b>3D-Drucker</b><span class="${M[2]}">${M[0]}</span></div>${big}</div>`;
+    const bar = run && prog !== null ? `<div class="bar prn-bar"><i style="width:${Math.round(prog)}%"></i></div>` : '';
+    const info = sub.length ? `<div class="prn-t">${sub.map((x) => `<span>${esc(x)}</span>`).join('')}</div>` : '';
+    const temp = (ic, l, cur, tgt, id, col) => cur === null && tgt === null ? '' : `<div class="pool-chip" data-act="pr-info" data-id="${id}"><small>${l}</small><b><ha-icon icon="${ic}" style="color:${col}"></ha-icon> ${cur !== null ? `${this._de(cur, 0)}°` : '--'}${tgt !== null && tgt > 0 ? ` <i>/ ${this._de(tgt, 0)}°</i>` : ''}</b></div>`;
+    const tn = this._prVal(X.nozt), tb = this._prVal(X.bedt);
+    const temps = plugOn ? `<div class="pool-chips prn-ch">${temp('mdi:printer-3d-nozzle-heat', 'Düse', X.nozzle, Number.isFinite(tn) ? tn : null, this._xid('printer_nozzle') || X.nozt, '#ef6569')}${temp('mdi:radiator', 'Bett', X.bed, Number.isFinite(tb) ? tb : null, this._xid('printer_bed') || X.bedt, '#ffad45')}</div>` : '';
+    const btn = (key, ic, txt, cls) => { const cf = R.cf === key; return `<button class="pool-btn ${cls}${cf ? ' cf' : ''}" data-act="pr-btn" data-k="${key}"><ha-icon icon="${cf ? 'mdi:help-circle' : ic}"></ha-icon>${cf ? (key === 'stop' ? 'Wirklich stoppen?' : 'Wirklich ausschalten?') : txt}</button>`; };
+    const acts = [];
+    if (plugOn && ph === 'printing' && X.pause) acts.push(btn('pause', 'mdi:pause', 'Pause', 'prn-pa'));
+    if (plugOn && ph === 'paused' && X.resume) acts.push(btn('resume', 'mdi:play', 'Fortsetzen', 'prn-re'));
+    if (plugOn && run && X.stop) acts.push(btn('stop', 'mdi:stop', 'Stopp', 'prn-st'));
+    if (X.plug) acts.push(btn('power', 'mdi:power', plugOn ? 'Ausschalten' : 'Einschalten', plugOn ? 'alt' : 'sel'));
+    const actHtml = acts.length ? `<div class="prn-act">${acts.join('')}</div>` : '';
+    const camSt = X.cam && h.states[X.cam]; const camPic = camSt && camSt.state !== 'unavailable' && camSt.attributes.entity_picture;
+    const cam = camPic && plugOn && (full || run) ? `<div class="prn-cam" data-act="pr-info" data-id="${X.cam}"><img data-b="${esc(camPic)}" src="${esc(camPic)}" alt=""></div>` : '';
+    if (!full) return `<div class="pool prn">${head}${bar}${info}${temps}${cam}${actHtml}<div class="pool-in"><button class="pool-btn" data-act="pr-full">Alle Funktionen</button></div></div>`;
+    const wv = X.plugw ? parseFloat(h.states[X.plugw].state) : NaN;
+    const wTxt = !Number.isFinite(wv) ? '--' : Math.abs(wv) >= 1000 ? `${this._de(wv / 1000, 2)}<i>kW</i>` : `${this._de(wv, 0)}<i>W</i>`;
+    const box = (ic, col, l, v, id) => `<div class="prn-box"${id ? ` data-act="pr-info" data-id="${id}"` : ''}><div class="i"><ha-icon icon="${ic}" style="color:${col}"></ha-icon></div><div><small>${l}</small><b>${v}</b></div></div>`;
+    const stat = (X.plug || X.plugw) ? `<div class="prn-2">${X.plug ? box(plugOn ? 'mdi:power-plug' : 'mdi:power-plug-off', plugOn ? '#63d17a' : '#9a9a9a', 'Strom', plugOn ? 'EIN' : 'AUS', X.plug) : ''}${X.plugw ? box('mdi:lightning-bolt', '#f6cc59', 'Verbrauch', wTxt, X.plugw) : ''}</div>` : '';
+    const ctl = (ic, col, l, id, fmt, adj) => {
+      if (!id) return ''; const v = adj ? this._prVal(id) : parseFloat(h.states[id].state); const okv = Number.isFinite(v);
+      const sp = adj && plugOn ? `<div class="sp"><button data-act="pr-adj" data-id="${id}" data-d="-1" aria-label="weniger">−</button><button data-act="pr-adj" data-id="${id}" data-d="1" aria-label="mehr">+</button></div>` : '';
+      return `<div class="prn-c"><ha-icon icon="${ic}" style="color:${col}"></ha-icon><b data-act="pr-info" data-id="${id}">${okv ? fmt(v) : '--'}</b><small>${l}</small>${sp}</div>`;
+    };
+    const mat = (v) => (v >= 1000 ? `${this._de(v / 1000, 2)}<i>m</i>` : `${this._de(v, 0)}<i>${esc((X.mat && h.states[X.mat].attributes.unit_of_measurement) || 'mm')}</i>`);
+    const ctls = [ctl('mdi:radiator', '#ffad45', 'Bett soll', X.bedt, (v) => `${Math.round(v)}<i>°C</i>`, true), ctl('mdi:printer-3d-nozzle-heat', '#ef6569', 'Düse soll', X.nozt, (v) => `${Math.round(v)}<i>°C</i>`, true), ctl('mdi:speedometer', '#31bfca', 'Speed', X.tune, (v) => `${Math.round(v)}<i>%</i>`, true), ctl('mdi:spool', '#ba8ce0', 'Material', X.mat, mat, false)].join('');
+    const ctlHtml = ctls ? `<div class="prn-4">${ctls}</div>` : '';
+    const chip = (l, v, id) => `<div class="pool-chip" data-act="pr-info" data-id="${id}"><small>${l}</small><b>${v}</b></div>`;
+    const stx = (id) => h.states[id];
+    const chips = [];
+    if (X.boxt && this._ok(stx(X.boxt))) chips.push(chip('Gehäuse', `${this._de(parseFloat(stx(X.boxt).state), 1)} °C`, X.boxt));
+    if (X.boxh && this._ok(stx(X.boxh))) chips.push(chip('Luftfeuchte', `${this._de(parseFloat(stx(X.boxh).state), 0)} %`, X.boxh));
+    if (X.time && this._ok(stx(X.time))) { const d = this._dur(stx(X.time)); chips.push(chip('Druckzeit', d !== null ? this._fmtMin(d) : esc(`${stx(X.time).state} ${stx(X.time).attributes.unit_of_measurement || ''}`.trim()), X.time)); }
+    const pv = X.prev && this._ok(stx(X.prev)) && stx(X.prev).attributes.entity_picture;
+    const prev = pv ? `<div class="prn-pv" data-act="pr-info" data-id="${X.prev}"><img src="${esc(pv)}" alt=""></div>` : '';
+    return `<div class="pool prn">${head}${bar}${info}${cam}${temps}${actHtml}${stat}${ctlHtml}${chips.length ? `<div class="pool-chips prn-ch">${chips.join('')}</div>` : ''}${prev}</div>`;
+  }
+
   /* ---------- Aktionen ---------- */
   _click(e) {
     const t = e.target.closest('[data-act]'); if (!t) return;
@@ -2053,6 +2193,7 @@ _more() {
     e.stopPropagation();
     if (Date.now() - (this._dgAt || 0) < 450) return;
     if (this._edit && ['info', 'toggle', 'vstart', 'vdock', 'vlocate', 'vfan', 'qrun'].includes(act)) return;
+    if (act.startsWith('pr-')) { if (this._edit) return; if (this._printClick(t, act)) { this._sig = ''; this._render(); } return; }
     if (act.startsWith('pl-')) { if (this._edit) return; if (this._poolClick(t, act)) { this._sig = ''; this._render(); } return; }
     switch (act) {
       case 'nav': this._view = t.dataset.v; this._sheet = null; this._edit = false; break;
@@ -2207,14 +2348,8 @@ registerCard({ id: 'saving_year', label: 'Ersparnis pro Jahr', icon: 'mdi:cash-r
   return items;
 } });
 registerCard({ id: 'printer', label: '3D-Drucker', icon: 'mdi:printer-3d-nozzle', items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
-    const pr = c._printerInfo();
-    if (pr) {
-      const cam = h.states[c._xid('printer_cam')]; const pic = cam && cam.state !== 'unavailable' && cam.attributes.entity_picture;
-      add('printer', c._panel('mdi:printer-3d-nozzle', '3D-Drucker', pr.active ? 'Druckt' : 'Bereit', pr.prog !== null ? `${Math.round(pr.prog)} %` : '',
-        `${pr.prog !== null ? `<div class="bar"><i style="width:${Math.round(pr.prog)}%"></i></div>` : ''}<div class="pkr"><span>${[pr.left !== null ? `noch ${c._fmtMin(pr.left)}` : '', pr.nozzle !== null ? `Düse ${Math.round(pr.nozzle)}°` : '', pr.bed !== null ? `Bett ${Math.round(pr.bed)}°` : ''].filter(Boolean).join(' · ')}</span></div>${pic ? `<img src="${esc(pic)}" alt="">` : ''}`, pr.st.entity_id), true);
-    }
-  return items;
+  const html = c._printerHtml();
+  return html ? [{ id: 'printer', html, size: 'f' }] : [];
 } });
 registerCard({ id: 'pool', label: 'Pool', icon: 'mdi:pool', items: (c) => {
   const html = c._poolHtml();

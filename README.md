@@ -11,6 +11,7 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - Steckdosen-Karten: Ein/Aus, aktuelle Leistung in Watt und Tagesspitze mit Uhrzeit (Leistungssensor am selben Gerät wird automatisch zugeordnet)
 - Räume je Etage und Area, Kameraübersicht; Temperatur und Luftfeuchte im Raumkopf automatisch aus der Area (abgeleitete Werte wie Taupunkt werden ignoriert), pro Raum wählbar unter Bearbeiten, Sensoren
 - Pool-Karte (Smart Pool Assistant + LayzSpa): Status, Badeampel, PoolLab-Abruf, Chlor-/pH-/CYA-Empfehlung mit Eintragen von Zugaben und Wasserwechsel, Berechnungsdetails, Wetter, Stabilität, Messwerte, LayzSpa (Pumpe, Heizung, Blubber, Zieltemperatur, Heizzeit-Prognose, Fehlercodes), Aktivitäten, Filterwartung, Abdeckung, Nutzung und Badeplan. Winterschlaf blendet sie aus. Ohne Integration bleibt die LayzSpa-Steuerung
+- 3D-Drucker-Karte: Status, Fortschritt mit Layer und Fertig-Uhrzeit, Kamera, Düsen- und Betttemperatur, Pause/Fortsetzen/Stopp (Stopp und Ausschalten während des Drucks mit Rückfrage), Steckdose mit Verbrauch, Soll-Temperaturen und Geschwindigkeit per +/-, Material, Gehäuse-Klima, Druckzeit und Vorschaubild. Wird frei platziert wie alle Karten
 - Tab "Mehr": Haushaltsgeräte (Waschmaschine, Trockner, Spülmaschine mit Programm, Fortschritt, Restzeit), Pakete, Energie, Zähler (Strom, Gas, Wasser, Ersparnis), 3D-Drucker, Pool, Wetter, Tankzeit, HA-Health, Pi-hole, Lage Deutschland. Karten ohne verfügbare Daten bleiben ausgeblendet
 - Warn-Chips neben "x Lampen an" und in der Meldungszeile: DWD-Wetterwarnungen (automatisch erkannt), NINA-Warnungen, Eiswarnung, Fahrrad-Hinweis, Pollen (nur bei Belastung) und Fahrzeiten (Waze, Bahn); Details per Tipp. Ein- und ausschaltbar unter Meldungen
 - Lüftungszeile unter Temperatur und Luftfeuchte (Room Climate): Empfehlung, Dauer, erste Räume, nächstes Lüftungsfenster
@@ -69,6 +70,20 @@ info:              # optional
   trains: [["Bahnhof A → B", sensor.abfahrten_a_nach_b]]
 color_from: "#f2eadb"
 color_to: "#d6c5a8"
+```
+
+## 3D-Drucker-Karte
+
+Ohne Konfiguration: Aus dem Sensor `sensor.<name>_print_status` werden Fortschritt, Restzeit, Temperaturen, Pause/Fortsetzen/Stopp, Soll-Werte, Layer, Material, Kamera und Vorschau abgeleitet. Steckdose, Verbrauch und Gehäuse-Klima werden über ihre Namen gefunden. Abweichendes lässt sich überschreiben:
+
+```yaml
+extras:
+  printer_status: sensor.mein_drucker_print_status
+  printer_plug: switch.steckdose_drucker
+  printer_plugw: sensor.steckdose_drucker_power
+  printer_boxt: sensor.drucker_box_temperature
+  printer_boxh: sensor.drucker_box_humidity
+  printer_stop: button.mein_drucker_stop_print
 ```
 
 ## Pool-Karte
