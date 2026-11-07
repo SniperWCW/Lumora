@@ -28,6 +28,7 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - Eigene Karten: beliebige Entität als Wert, Verlauf oder Schalter (Karte hinzufügen, "Als eigene Karte"); Titel, Darstellung und Zeitraum über das Zahnrad
 - Kartengröße: im Bearbeiten-Modus pro Karte klein, breit oder volle Breite (auch Kacheln in den Räumen); jede Karte lässt sich zwischen Zuhause und Mehr verschieben
 - Freie Platzierung: im Bearbeiten-Modus am Ordner-Symbol einer Karte (Zuhause, Mehr oder ein beliebiger Raum wählen); in Räumen über "Karte" Karten in den Raum holen
+- Gerätekarten: vordefinierte Karten pro Gerät (Karte hinzufügen, Gerätekarte), derzeit Staubsauger (Start/Pause, Station, Finden, Saugstufe, Fläche, Dauer, Filter und Bürsten, Fehler) und PV-Anlage (Leistung, Verlauf, Ertrag heute und gesamt, Strings, Prognose). Passende Entitäten werden automatisch gefunden, zuerst am selben Gerät, dann an gleichem Namensanfang. Jedes Feld lässt sich über das Zahnrad der Karte selbst wählen oder abschalten. Mehrere Karten desselben Typs sind möglich. Eigene Vorlagen: `window.LumoraDevices.register({ type, label, icon, main, fields, render })`
 - Karten-Register: jede Karte ist ein Objekt (`id`, `label`, `icon`, `home`, `size`, `items`). Fehler in einer Karte legen nicht das Dashboard lahm. Erweiterbar per `window.LumoraCards.register({...})`
 
 ## Installation

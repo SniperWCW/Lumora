@@ -18,6 +18,7 @@ const DEF = {
   sources: {},
   quick: [],
   custom: [],
+  devices: [],
   size: {},
   place: {},
   ignore: [],
@@ -119,7 +120,7 @@ const dom = (id) => id.split('.')[0];
 const merge = (v) => {
   v = v || {};
   const arr = (k) => [...(v[k] || DEF[k])];
-  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit };
+  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit };
 };
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -367,6 +368,18 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
   .pool-hd .big{font-size:26px}
   .pool-ss{display:none}
 }
+.dvc{background:var(--a);border-radius:20px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0;position:relative}
+.dvc.run{background:rgba(120,170,110,.25)}
+.dvh{display:flex;align-items:center;gap:12px;cursor:pointer;min-width:0}.dvh .ib{width:42px;height:42px;border-radius:14px;background:var(--line);display:grid;place-items:center;flex:none}
+.dvh .tt{min-width:0;flex:1;display:flex;flex-direction:column}.dvh .tt b{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dvh .tt span{font-size:12.5px;color:var(--fg2)}
+.dvh .big{font-size:30px;font-weight:600;letter-spacing:-.02em;flex:none}
+.dvb{display:flex;gap:8px;flex-wrap:wrap}.dvb .sq{width:44px;height:44px}
+.dvf{display:flex;gap:6px;flex-wrap:wrap}
+.dvs{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px}
+.dvs>div{background:var(--line);border-radius:14px;padding:8px 10px;min-width:0;cursor:pointer}.dvs small{display:block;font-size:11px;color:var(--fg2)}.dvs b{font-size:15px;font-weight:600}
+.dvm{display:flex;flex-direction:column;gap:8px}.dvm>div{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:13px;cursor:pointer}.dvm span{color:var(--fg2)}
+.dvm i{grid-column:1/-1;height:5px;border-radius:3px;background:var(--line);overflow:hidden}.dvm i u{display:block;height:100%;background:var(--b)}.dvm i.lo u{background:#c9694f}
+.dverr{display:flex;gap:8px;align-items:center;background:rgba(200,80,60,.16);border-radius:12px;padding:8px 10px;font-size:13px}.dverr ha-icon{--mdc-icon-size:20px;flex:none}
 `;
 
 const SIZES = ['s', 'w', 'f'];
@@ -418,6 +431,9 @@ class LumoraCard extends HTMLElement {
       else if (e.target.classList.contains('ccin')) {
         const cu = this._set.custom.find((x) => x.id === this._ccId); if (!cu) return;
         cu.title = e.target.value; clearTimeout(this._ct); this._ct = setTimeout(() => this._save(), 600);
+      } else if (e.target.classList.contains('dvin')) {
+        const iv = this._set.devices.find((x) => x.id === this._dvId); if (!iv) return;
+        iv.title = e.target.value; clearTimeout(this._ct); this._ct = setTimeout(() => { this._save(); this._sig = ''; }, 600);
       }
     });
   }
@@ -443,7 +459,7 @@ class LumoraCard extends HTMLElement {
     const first = !this._hass;
     this._hass = h;
     if (first) this._load();
-    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
+    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'dv', 'dvadd', 'dvmain', 'dvpick'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
     if (this._down && this._edit) { this._pend = true; return; }
     if (this._plFocus()) return;
     const sig = this._signature();
@@ -468,6 +484,7 @@ class LumoraCard extends HTMLElement {
       else if (this._auto().tracked.has(id)) parts.push(id + h.states[id].state);
       else if (cuSet.has(id) || this._set.pinned.some((p) => p.entity === id)) parts.push(id + h.states[id].state);
     }
+    for (const iv of this._dvAll()) { try { const m = this._dvMap(iv); parts.push(iv.main + (h.states[iv.main] ? h.states[iv.main].state + (h.states[iv.main].attributes.fan_speed || '') : '')); Object.values(m).forEach((x) => { if (x && h.states[x]) parts.push(x + h.states[x].state); }); } catch (_) { /* ignore */ } }
     if (['home', 'more', 'rooms'].includes(this._view)) parts.push(this._plSig());
     if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
     parts.push(this._bd.s);
@@ -718,7 +735,7 @@ class LumoraCard extends HTMLElement {
       Object.keys(pk).forEach((k) => { const i = this.shadowRoot.querySelector(`[data-pk="${k}"]`); if (i && !i.disabled) i.value = pk[k]; });
       if (fk) { const i = this.shadowRoot.querySelector(`[data-pk="${fk.k}"]`); if (i) { i.focus(); try { if (fk.s != null) i.setSelectionRange(fk.s, fk.e); } catch (_) { /* number-Felder */ } } }
     }
-    if (['add', 'srcpick', 'quick'].includes(this._sheet)) this._fillList();
+    if (['add', 'srcpick', 'quick', 'dvmain', 'dvpick'].includes(this._sheet)) this._fillList();
   }
   _num(id) { const st = this._hass.states[id]; const v = st ? parseFloat(st.state) : NaN; return isNaN(v) ? null : v; }
   _w(v) { return Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')} kW` : `${Math.round(v)} W`; }
@@ -1361,6 +1378,7 @@ _more() {
       c = `<h2>Karte hinzufügen</h2><input class="srch" placeholder="Entität suchen" value="${esc(this._q)}">
         <div class="tabs">${Object.keys(FLT).map((k) => `<button class="pill ${this._flt === k ? 'sel' : ''}" data-act="flt" data-k="${k}">${FLT_LABEL[k]}</button>`).join('')}</div>
         <div class="row"><div class="t"><b>Nur anzeigen, wenn aktiv</b><span>Karte erscheint nur bei Zustand an, offen oder läuft</span></div><button class="${this._only ? 'sel' : ''}" data-act="onlyact">${this._only ? 'An' : 'Aus'}</button></div>
+        <div class="row"><div class="t"><b>Gerätekarte</b><span>Staubsauger, PV-Übersicht und mehr: Entitäten werden automatisch gefunden</span></div><button data-act="adddv">Wählen</button></div>
         <div class="row"><div class="t"><b>Als eigene Karte</b><span>Wert, Verlauf oder Schalter statt Kachel</span></div><button class="${this._cust ? 'sel' : ''}" data-act="ascust">${this._cust ? 'An' : 'Aus'}</button></div>
         <div class="list"></div>`;
     } else if (this._sheet === 'place') {
@@ -1370,6 +1388,26 @@ _more() {
     } else if (this._sheet === 'regpick') {
       const here = `area:${this._area}`;
       c = `<h2>Karte in diesen Raum holen</h2>${this._allReg().filter((x) => !x.def.fixed).map((x) => `<div class="row"><ha-icon icon="${x.def.icon}"></ha-icon><div class="t"><b>${esc(x.def.label)}</b></div><button class="${x.pl === here ? 'sel' : ''}" data-act="regset" data-id="${esc(x.id)}">${x.pl === here ? 'Hier' : 'Holen'}</button></div>`).join('') || '<div class="empty">Keine Karten verfügbar.</div>'}`;
+    } else if (this._sheet === 'dvadd') {
+      c = `<h2>Gerätekarte hinzufügen</h2><div class="hint">Wähle den Gerätetyp. Passende Entitäten werden automatisch gefunden und lassen sich danach einzeln ändern.</div>${Object.values(DEVTPL).map((tp) => `<div class="row" data-act="dvtype" data-k="${tp.type}"><ha-icon icon="${tp.icon}"></ha-icon><div class="t"><b>${esc(tp.label)}</b><span>${esc(tp.desc || '')}</span></div></div>`).join('')}`;
+    } else if (this._sheet === 'dvmain') {
+      const tp = DEVTPL[this._dvT];
+      c = `<h2>${esc(tp ? tp.label : '')}: Gerät wählen</h2><input class="srch" placeholder="Entität suchen" value="${esc(this._q)}"><div class="list"></div>`;
+    } else if (this._sheet === 'dv') {
+      const iv = this._set.devices.find((x) => x.id === this._dvId); const tp = iv && DEVTPL[iv.type];
+      if (iv && tp) {
+        const F = this._dvMap(iv); const ms = this._hass.states[iv.main];
+        c = `<h2>${esc(tp.label)}</h2><div class="hint">${esc(iv.main)}</div><h4>Titel</h4><input class="dvin" placeholder="${esc((ms && ms.attributes.friendly_name) || iv.main)}" value="${esc(iv.title)}">
+          <h4>Entitäten</h4><div class="hint">Gefundenes ist schon eingetragen. Passt etwas nicht, wähle es selbst aus.</div>${Object.keys(tp.fields).map((k) => {
+          const ch = iv.map[k]; const st = F[k] && this._hass.states[F[k]];
+          const sub = ch === '-' ? 'Nicht verwendet' : st ? `${st.attributes.friendly_name || F[k]}${ch ? ' · manuell' : ' · automatisch'}` : F[k] ? `${F[k]} (nicht verfügbar)` : 'Nicht gefunden';
+          return `<div class="row"><div class="t"><b>${esc(tp.fields[k].l)}</b><span>${esc(sub)}</span></div><button data-act="dvpick" data-k="${k}">Ändern</button></div>`;
+        }).join('')}
+          <div class="row" style="border:0"><button data-act="dvdel">Karte löschen</button><button class="sel" data-act="close">Fertig</button></div>`;
+      }
+    } else if (this._sheet === 'dvpick') {
+      const iv = this._set.devices.find((x) => x.id === this._dvId); const tp = iv && DEVTPL[iv.type]; const k = this._dvK;
+      if (tp && tp.fields[k]) c = `<h2>${esc(tp.fields[k].l)}</h2><input class="srch" placeholder="Entität suchen" value="${esc(this._q)}"><div class="row" data-act="dvset" data-k="${k}" data-id=""><div class="t"><b>Automatisch erkennen</b></div></div><div class="row" data-act="dvset" data-k="${k}" data-id="-"><div class="t"><b>Nicht verwenden</b></div></div><div class="list"></div>`;
     } else if (this._sheet === 'quick') {
       c = `<h2>Schnellaktionen</h2><div class="hint">Szenen, Skripte und Tasten mit einem Tipp auslösen. Mehrfachauswahl möglich.</div><input class="srch" placeholder="Suchen" value="${esc(this._q)}"><div class="list"></div>`;
     } else if (this._sheet === 'cc') {
@@ -1392,6 +1430,19 @@ _more() {
       el.innerHTML = this._cands(k, true).filter((x) => !q || norm(`${x.id} ${x.name}`).includes(q)).slice(0, 60).map((x) => `<div class="row" data-act="srcset" data-k="${k}" data-id="${x.id}"><ha-icon icon="mdi:link-variant"></ha-icon><div class="t"><b>${esc(x.name)}</b><span>${esc(x.id)}${x.ok ? ' · passt' : ''}</span></div></div>`).join('') || '<div class="empty">Nichts gefunden.</div>';
       return;
     }
+    if (this._sheet === 'dvmain') {
+      const tp = DEVTPL[this._dvT]; const q = norm(this._q); if (!tp) return;
+      el.innerHTML = this._dvMains(tp).filter((x) => !q || norm(`${x.id} ${x.name}`).includes(q)).slice(0, 60).map((x) => `<div class="row" data-act="dvnew" data-id="${esc(x.id)}"><ha-icon icon="${tp.icon}"></ha-icon><div class="t"><b>${esc(x.name)}</b><span>${esc(x.id)}</span></div></div>`).join('') || '<div class="empty">Keine passende Entität gefunden.</div>';
+      return;
+    }
+    if (this._sheet === 'dvpick') {
+      const iv = this._set.devices.find((x) => x.id === this._dvId); const tp = iv && DEVTPL[iv.type]; const k = this._dvK; if (!tp || !tp.fields[k]) return;
+      const q = norm(this._q); const sp = tp.fields[k]; const P = this._dvPool(iv); const near = new Set(P.A.concat(P.B));
+      const l = Object.values(this._hass.states).filter((x) => [].concat(sp.dom).includes(dom(x.entity_id)) && (!q || norm(`${x.entity_id} ${x.attributes.friendly_name || ''}`).includes(q)));
+      l.sort((a, b) => (near.has(b.entity_id) ? 1 : 0) - (near.has(a.entity_id) ? 1 : 0));
+      el.innerHTML = l.slice(0, 60).map((x) => `<div class="row" data-act="dvset" data-k="${k}" data-id="${esc(x.entity_id)}"><ha-icon icon="mdi:link-variant"></ha-icon><div class="t"><b>${esc(x.attributes.friendly_name || x.entity_id)}</b><span>${esc(x.entity_id)}${near.has(x.entity_id) ? ' · am selben Gerät' : ''}</span></div></div>`).join('') || '<div class="empty">Nichts gefunden.</div>';
+      return;
+    }
     if (this._sheet === 'quick') {
       const q = norm(this._q); const sel = this._set.quick;
       const all = [{ id: '__alloff', name: 'Alle Lichter ausschalten', ic: 'mdi:lightbulb-group-off', sub: 'Eingebaute Aktion' }]
@@ -1409,6 +1460,73 @@ _more() {
     }).slice(0, 40);
     el.innerHTML = res.map((s) => `<div class="row" data-act="pick" data-id="${s.entity_id}"><ha-icon icon="${this._icon(s)}"></ha-icon><div class="t"><b>${esc(s.attributes.friendly_name || s.entity_id)}</b><span>${esc(s.entity_id)}${pinned.includes(s.entity_id) ? ' · angepinnt' : ''}</span></div></div>`).join('') || '<div class="empty">Nichts gefunden.</div>';
   }
+
+  /* ---------- Gerätekarten: Vorlagen mit automatischer Zuordnung ---------- */
+  _dvAll() { return this._set.devices.filter((x) => DEVTPL[x.type]); }
+  _dvMains(tp) {
+    const sp = tp.main; const out = Object.values(this._hass.states).filter((x) => {
+      const id = x.entity_id; const a = x.attributes;
+      if (![].concat(sp.dom).includes(dom(id))) return false;
+      if (sp.dc && a.device_class !== sp.dc) return false;
+      if (sp.unit && !sp.unit.includes(a.unit_of_measurement)) return false;
+      const r = this._hass.entities && this._hass.entities[id]; return !(r && r.hidden);
+    }).map((x) => ({ id: x.entity_id, name: x.attributes.friendly_name || x.entity_id, hit: sp.prefer ? sp.prefer.test(norm(`${x.entity_id} ${x.attributes.friendly_name || ''}`)) : false }));
+    return out.sort((a, b) => (b.hit ? 1 : 0) - (a.hit ? 1 : 0));
+  }
+  _dvPool(iv) {
+    const h = this._hass; const reg = h.entities || {}; const ids = Object.keys(h.states);
+    const k = `${iv.main}|${ids.length}`; const cache = this._dvP || (this._dvP = {});
+    if (cache[iv.id] && cache[iv.id].k === k) return cache[iv.id];
+    const r = reg[iv.main]; const dv = r && r.device_id; const stem = iv.main.split('.')[1];
+    const P = { k, A: [], B: [], C: [] };
+    for (const id of ids) {
+      if (id === iv.main) continue;
+      const e = reg[id]; if (e && e.hidden) continue;
+      if (dv && e && e.device_id === dv) P.A.push(id);
+      else if (id.split('.')[1].startsWith(`${stem}_`)) P.B.push(id);
+      else P.C.push(id);
+    }
+    return (cache[iv.id] = P);
+  }
+  _dvMatch(id, sp) {
+    const st = this._hass.states[id]; if (!st) return false;
+    if (sp.dom && ![].concat(sp.dom).includes(dom(id))) return false;
+    const a = st.attributes;
+    if (sp.dc && a.device_class !== sp.dc) return false;
+    if (sp.unit && !sp.unit.includes(a.unit_of_measurement)) return false;
+    const t = norm(`${id} ${a.friendly_name || ''}`);
+    if (sp.re && !sp.re.test(t)) return false;
+    if (sp.not && sp.not.test(t)) return false;
+    return true;
+  }
+  _dvFind(iv, sp) {
+    const P = this._dvPool(iv); let first = null;
+    for (const g of ['A', 'B', 'C']) {
+      for (const id of P[g]) {
+        if (g === 'C' && !(sp.wide && sp.wide.test(norm(id)))) continue;
+        if (!this._dvMatch(id, sp)) continue;
+        if (!['unavailable', 'unknown'].includes(this._hass.states[id].state)) return id;
+        if (!first) first = id;
+      }
+      if (first) return first;
+    }
+    return null;
+  }
+  _dvMap(iv) {
+    const tp = DEVTPL[iv.type]; const P = this._dvPool(iv); const ck = `${P.k}|${JSON.stringify(iv.map)}`;
+    const cache = this._dvR || (this._dvR = {});
+    if (cache[iv.id] && cache[iv.id].k === ck) return cache[iv.id].v;
+    const v = {};
+    for (const k in tp.fields) { const m = iv.map[k]; v[k] = m === '-' ? null : m || this._dvFind(iv, tp.fields[k]); }
+    cache[iv.id] = { k: ck, v };
+    return v;
+  }
+  _dvS(id) { const st = id && this._hass.states[id]; return st && !['unavailable', 'unknown', ''].includes(st.state) ? st : null; }
+  _dvVal(st, d) {
+    const v = parseFloat(st.state); const u = st.attributes.unit_of_measurement || '';
+    return isNaN(v) ? esc(this._state(st)) : `${this._de(v, d === undefined ? (Math.abs(v) < 10 ? 1 : 0) : d)}${u ? ` ${esc(u)}` : ''}`;
+  }
+  _dvPow(st) { const v = parseFloat(st && st.state); if (isNaN(v)) return null; return st.attributes.unit_of_measurement === 'kW' ? v * 1000 : v; }
 
   /* ---------- Pool: Smart Pool Assistant + LayzSpa ---------- */
   _P() { return this._pl || (this._pl = { open: {}, wx: {}, wxBusy: {}, eta: {}, etaBusy: {}, fetching: false, fetchErr: null, opt: {}, optAt: 0 }); }
@@ -1934,7 +2052,7 @@ _more() {
     if (act === 'noop') return;
     e.stopPropagation();
     if (Date.now() - (this._dgAt || 0) < 450) return;
-    if (this._edit && ['info', 'toggle', 'vstart', 'vdock', 'qrun'].includes(act)) return;
+    if (this._edit && ['info', 'toggle', 'vstart', 'vdock', 'vlocate', 'vfan', 'qrun'].includes(act)) return;
     if (act.startsWith('pl-')) { if (this._edit) return; if (this._poolClick(t, act)) { this._sig = ''; this._render(); } return; }
     switch (act) {
       case 'nav': this._view = t.dataset.v; this._sheet = null; this._edit = false; break;
@@ -1948,6 +2066,26 @@ _more() {
         else if (d === 'scene' || d === 'script') h.callService(d, 'turn_on', { entity_id: id });
         else this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId: id }, bubbles: true, composed: true }));
         return;
+      }
+      case 'vlocate': h.callService('vacuum', 'locate', { entity_id: id }); return;
+      case 'vfan': h.callService('vacuum', 'set_fan_speed', { entity_id: id, fan_speed: t.dataset.v }); return;
+      case 'adddv': this._sheet = 'dvadd'; break;
+      case 'dvtype': this._dvT = t.dataset.k; this._sheet = 'dvmain'; this._q = ''; break;
+      case 'dvnew': {
+        const iv = { id: `dv${Date.now().toString(36)}`, type: this._dvT, main: id, map: {}, title: '' };
+        s.devices.push(iv); if (this._view === 'more') s.place[iv.id] = 'more';
+        this._dvId = iv.id; this._sheet = 'dv'; this._save(); break;
+      }
+      case 'dvpick': this._sheet = 'dvpick'; this._dvK = t.dataset.k; this._q = ''; break;
+      case 'dvset': {
+        const iv = s.devices.find((x) => x.id === this._dvId);
+        if (iv) { if (id) iv.map[t.dataset.k] = id; else delete iv.map[t.dataset.k]; this._save(); }
+        this._sheet = 'dv'; break;
+      }
+      case 'dvdel': {
+        const did = this._dvId; s.devices = s.devices.filter((x) => x.id !== did);
+        delete s.size[did]; delete s.place[did]; s.hidden = s.hidden.filter((x) => x !== did);
+        this._save(); this._sheet = null; break;
       }
       case 'vstart': h.callService('vacuum', h.states[id] && h.states[id].state === 'cleaning' ? 'pause' : 'start', { entity_id: id }); return;
       case 'vdock': h.callService('vacuum', 'return_to_base', { entity_id: id }); return;
@@ -1987,7 +2125,7 @@ _more() {
       case 'ign': if (!s.ignore.includes(id)) s.ignore.push(id); this._bd = null; this._save(); break;
       case 'ignclear': s.ignore = []; this._bd = null; this._save(); break;
       case 'bl': { const Lm = [10, 15, 20, 30]; s.battLimit = Lm[(Lm.indexOf(s.battLimit) + 1) % Lm.length]; this._bd = null; this._save(); break; }
-      case 'cc': this._sheet = 'cc'; this._ccId = id; break;
+      case 'cc': if (s.devices.some((x) => x.id === id)) { this._sheet = 'dv'; this._dvId = id; } else { this._sheet = 'cc'; this._ccId = id; } break;
       case 'cckind': { const cu = s.custom.find((x) => x.id === this._ccId); if (cu) { cu.kind = t.dataset.k; this._save(); } break; }
       case 'cchrs': { const cu = s.custom.find((x) => x.id === this._ccId); if (cu) { cu.hours = Number(t.dataset.k); this._save(); } break; }
       case 'ccdel': { const cid = this._ccId; s.custom = s.custom.filter((x) => x.id !== cid); delete s.size[cid]; delete s.place[cid]; s.hidden = s.hidden.filter((x) => x !== cid); this._save(); this._sheet = null; break; }
@@ -2150,7 +2288,77 @@ registerCard({ id: 'custom', label: 'Eigene Karten', icon: 'mdi:card-text-outlin
   return { id: cu.id, html: c._customHtml(cu, st), size: cu.kind === 'spark' ? 'w' : 's', cfg: true };
 }).filter(Boolean) });
 
+/* ---------- Gerätekarten-Vorlagen ----------
+   Eine Vorlage beschreibt Felder (dom, dc, unit, re, not) und wie die Karte gezeichnet wird. Gesucht wird erst am selben
+   Gerät der Haupt-Entität, dann bei Entitäten mit gleichem Namensanfang, nur mit `wide` auch im ganzen System.
+   Manuelle Wahl (Zahnrad) überschreibt jedes Feld. Auch von außen erweiterbar: window.LumoraDevices.register({...}). */
+const DEVTPL = {};
+const registerDevice = (t) => { DEVTPL[t.type] = t; };
+const NOENERGY = /grid|netz|export|import|feed|einsp|bezug|load|verbrauch|consum|batter/;
+registerDevice({
+  type: 'vacuum', label: 'Staubsauger', icon: 'mdi:robot-vacuum', desc: 'Start, Station, Saugstufe, Wartung und Fehler', size: 'w',
+  main: { dom: 'vacuum' },
+  fields: {
+    battery: { l: 'Akku', dom: 'sensor', dc: 'battery' },
+    error: { l: 'Fehler', dom: 'sensor', re: /error|fehler|stoerung/ },
+    area: { l: 'Gereinigte Fläche', dom: 'sensor', unit: ['m²', 'm2'], re: /clean|reinig|area|flache/ },
+    time: { l: 'Reinigungsdauer', dom: 'sensor', dc: 'duration', re: /clean|reinig|dauer|duration/, not: /filter|brush|burste|left|remaining|verbleib|rest/ },
+    filter: { l: 'Filter', dom: 'sensor', re: /filter/, not: /reset|dirty|schmutz/ },
+    mainbrush: { l: 'Hauptbürste', dom: 'sensor', re: /main.?brush|haupt.?burste/, not: /reset/ },
+    sidebrush: { l: 'Seitenbürste', dom: 'sensor', re: /side.?brush|seiten.?burste/, not: /reset/ },
+    map: { l: 'Karte', dom: ['image', 'camera'], re: /map|karte/ },
+  },
+  render: (c, iv, F, st) => {
+    const a = st.attributes; const run = st.state === 'cleaning'; const id = iv.main;
+    const bs = c._dvS(F.battery); const bat = bs ? parseFloat(bs.state) : typeof a.battery_level === 'number' ? a.battery_level : null;
+    const txt = (VAC[st.state] || st.state) + (bat !== null && !isNaN(bat) ? ` · ${Math.round(bat)} %` : '');
+    const es = c._dvS(F.error); const bad = es && !/^(none|no_?error|ok|0|-|kein.*|no .*)$/.test(norm(es.state).trim());
+    const err = bad || st.state === 'error' ? `<div class="dverr"><ha-icon icon="mdi:alert-circle"></ha-icon><div>${esc(bad ? c._state(es) : 'Fehler')}</div></div>` : '';
+    const fans = Array.isArray(a.fan_speed_list) ? a.fan_speed_list : [];
+    const fan = fans.length ? `<div class="dvf">${fans.map((f) => `<button class="pill ${a.fan_speed === f ? 'sel' : ''}" data-act="vfan" data-id="${id}" data-v="${esc(f)}">${esc(f)}</button>`).join('')}</div>` : '';
+    const stat = (l, s2, d) => (s2 ? `<div data-act="info" data-id="${s2.entity_id}"><small>${l}</small><b>${c._dvVal(s2, d)}</b></div>` : '');
+    const ar = c._dvS(F.area); const tm = c._dvS(F.time); const mp = F.map && c._hass.states[F.map];
+    const stats = [stat('Fläche', ar, 1), stat('Dauer', tm, 0), mp ? `<div data-act="info" data-id="${mp.entity_id}"><small>Karte</small><b>Öffnen</b></div>` : ''].join('');
+    const mt = [['Filter', 'filter'], ['Hauptbürste', 'mainbrush'], ['Seitenbürste', 'sidebrush']].map(([l, k]) => {
+      const s2 = c._dvS(F[k]); if (!s2) return '';
+      const v = parseFloat(s2.state); const pc = s2.attributes.unit_of_measurement === '%' && !isNaN(v);
+      return `<div data-act="info" data-id="${s2.entity_id}"><b>${l}</b><span>${c._dvVal(s2, 0)}</span>${pc ? `<i class="${v < 15 ? 'lo' : ''}"><u style="width:${Math.max(0, Math.min(100, v))}%"></u></i>` : ''}</div>`;
+    }).join('');
+    return `<div class="dvc ${run ? 'run' : ''}"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="mdi:robot-vacuum"></ha-icon></div><div class="tt"><b>${esc(iv.title || a.friendly_name || id)}</b><span>${esc(txt)}</span></div></div>${err}
+      <div class="dvb"><button class="sq" data-act="vstart" data-id="${id}" aria-label="${run ? 'Pausieren' : 'Starten'}"><ha-icon icon="${run ? 'mdi:pause' : 'mdi:play'}"></ha-icon></button><button class="sq" data-act="vdock" data-id="${id}" aria-label="Zur Station"><ha-icon icon="mdi:home-import-outline"></ha-icon></button><button class="sq" data-act="vlocate" data-id="${id}" aria-label="Finden"><ha-icon icon="mdi:map-marker-radius-outline"></ha-icon></button></div>
+      ${fan}${stats ? `<div class="dvs">${stats}</div>` : ''}${mt ? `<div class="dvm">${mt}</div>` : ''}</div>`;
+  },
+});
+registerDevice({
+  type: 'pv', label: 'PV-Anlage', icon: 'mdi:solar-power-variant', desc: 'Leistung, Ertrag heute und gesamt, Strings, Prognose', size: 'w',
+  main: { dom: 'sensor', dc: 'power', unit: ['W', 'kW'], prefer: new RegExp(`${PV}|inverter|wechselrichter|pv`) },
+  fields: {
+    today: { l: 'Ertrag heute', dom: 'sensor', dc: 'energy', re: /today|heute|daily|tages|day/, not: NOENERGY, wide: new RegExp(PV) },
+    total: { l: 'Ertrag gesamt', dom: 'sensor', dc: 'energy', re: /total|gesamt|lifetime|cumul|insgesamt/, not: NOENERGY, wide: new RegExp(PV) },
+    string1: { l: 'String 1', dom: 'sensor', dc: 'power', re: /(string|mppt|pv)_?1(?![0-9])/ },
+    string2: { l: 'String 2', dom: 'sensor', dc: 'power', re: /(string|mppt|pv)_?2(?![0-9])/ },
+    temp: { l: 'Temperatur Wechselrichter', dom: 'sensor', dc: 'temperature', re: /inverter|wechselrichter|temp|internal/ },
+    status: { l: 'Status', dom: 'sensor', re: /status|state|betriebs|operating|work_?mode|zustand/, not: /battery|batter|charge|laden/ },
+    forecast: { l: 'Prognose heute', dom: 'sensor', dc: 'energy', re: /(forecast|prognose|production|erzeugung).*(today|heute)|(today|heute).*(forecast|prognose)/, wide: /forecast|prognose|solar|energy_production_(today|heute)/ },
+  },
+  render: (c, iv, F, st) => {
+    const w = c._dvPow(st); const id = iv.main;
+    const stt = c._dvS(F.status); const sub = stt ? c._state(stt) : (w !== null && w > 5 ? 'Erzeugt Strom' : 'Keine Erzeugung');
+    const stat = (l, s2, d) => (s2 ? `<div data-act="info" data-id="${s2.entity_id}"><small>${l}</small><b>${c._dvVal(s2, d)}</b></div>` : '');
+    const stats = [stat('Heute', c._dvS(F.today), 1), stat('Gesamt', c._dvS(F.total), 0), stat('Prognose', c._dvS(F.forecast), 1), stat('Wechselrichter', c._dvS(F.temp), 0)].join('');
+    const strs = ['string1', 'string2'].map((k) => { const s2 = c._dvS(F[k]); const p = s2 ? c._dvPow(s2) : null; return p === null ? '' : `<div data-act="info" data-id="${s2.entity_id}"><b>${esc(DEVTPL.pv.fields[k].l)}</b><span>${c._w(p)}</span></div>`; }).join('');
+    return `<div class="dvc"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="mdi:solar-power-variant"></ha-icon></div><div class="tt"><b>${esc(iv.title || st.attributes.friendly_name || id)}</b><span>${esc(sub)}</span></div><div class="big">${w === null ? '–' : esc(c._w(w))}</div></div>
+      ${c._spark(c._hist(id, 24), 56, 'a')}${stats ? `<div class="dvs">${stats}</div>` : ''}${strs ? `<div class="dvm">${strs}</div>` : ''}</div>`;
+  },
+});
+registerCard({ id: 'dev', label: 'Gerätekarten', icon: 'mdi:view-grid-plus-outline', home: true, size: 'w', items: (c) => c._dvAll().map((iv) => {
+  const tp = DEVTPL[iv.type]; const st = c._hass.states[iv.main];
+  if (!st) return c._edit ? { id: iv.id, html: `<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="${tp.icon}"></ha-icon></div><div class="tt"><b>${esc(iv.title || tp.label)}</b><span>${esc(iv.main)} nicht gefunden</span></div></div></div>`, size: tp.size, cfg: true } : null;
+  return { id: iv.id, html: tp.render(c, iv, c._dvMap(iv), st), size: tp.size, cfg: true };
+}).filter(Boolean) });
+
 window.LumoraCards = { register: registerCard, list: () => REG.map((x) => ({ id: x.id, label: x.label })) };
+window.LumoraDevices = { register: registerDevice, list: () => Object.values(DEVTPL).map((x) => ({ type: x.type, label: x.label })) };
 
 if (!customElements.get('lumora-card')) customElements.define('lumora-card', LumoraCard);
 window.customCards = window.customCards || [];
