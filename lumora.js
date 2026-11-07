@@ -50,6 +50,17 @@ const SLOTS = {
   pool_power: { g: 'Pool', l: 'Pool-Leistung', d: P, u: /^k?w$/i, re: /pool|spa(?:[^a-z]|$)|spa_|layz/ },
   pool_pump: { g: 'Pool', l: 'Pool-Pumpe', d: ['switch'], re: /(?:pool|spa|layz).*pump|pump.*(?:pool|spa|layz)/ },
   pool_heat: { g: 'Pool', l: 'Pool-Heizung', d: ['switch'], re: /(?:pool|spa|layz).*(?:heat|heiz)|(?:heat|heiz).*(?:pool|spa|layz)/ },
+  pool_rec: { g: 'Pool', l: 'Pool-Empfehlung (Smart Pool Assistant)', d: P, at: 'last_calculation', re: /pool.?empfehl|pool.?recommend/ },
+  pool_fetch: { g: 'Pool', l: 'PoolLab-Abruf (Button)', any: true, d: ['button'], re: /poollab.*(?:abruf|fetch)|messwerte.?abrufen/ },
+  pool_winter: { g: 'Pool', l: 'Pool-Winterschlaf (blendet Karte aus)', d: ['input_boolean', 'switch'], re: /winter/ },
+  lz_conn: { g: 'Pool', l: 'LayzSpa Verbindung', d: ['binary_sensor'], re: /layz.*(?:connect|verbind)|(?:connect|verbind).*layz/ },
+  lz_ip: { g: 'Pool', l: 'LayzSpa IP-Adresse', d: P, re: /layz.*(?:^|[^a-z])ip(?:[^a-z]|$)/ },
+  lz_rssi: { g: 'Pool', l: 'LayzSpa WLAN-Signal', d: P, re: /layz.*(?:rssi|wlan|wifi|signal)/ },
+  lz_bubbles: { g: 'Pool', l: 'LayzSpa Blubber', d: ['switch'], re: /layz.*(?:bubble|blubb|air)/ },
+  lz_temp: { g: 'Pool', l: 'LayzSpa Ist-Temperatur', d: P, u: /°/, re: /layz|(?:^|[^a-z])spa(?:[^a-z]|$)/, no: /target|ziel|soll|setpoint/, pri: /temp_c|current|aktuell/ },
+  lz_target: { g: 'Pool', l: 'LayzSpa Ziel-Temperatur (Anzeige)', d: P, u: /°/, re: /layz.*(?:target|ziel|soll)|(?:target|ziel|soll).*layz/ },
+  lz_ctl: { g: 'Pool', l: 'LayzSpa Zieltemperatur steuern (climate/number)', d: ['climate', 'number'], re: /layz/ },
+  lz_error: { g: 'Pool', l: 'LayzSpa Fehlercode', d: P, re: /layz.*(?:error|fehler)/ },
   health: { g: 'System', l: 'HA-Health-Score', d: P, re: /health.?score|ha.?health|haghs/, no: /hardware|application|zombie/ },
   pihole_ratio: { g: 'System', l: 'Pi-hole blockiert', d: P, re: /(?=.*pi.?hole)(?=.*(?:blockiert|blocked|ratio|percent|prozent|anteil))/ },
   pihole_queries: { g: 'System', l: 'Pi-hole Abfragen', d: P, re: /(?=.*pi.?hole)(?=.*(?:abfragen|queries))/, no: /blockiert|blocked|unique|einzigartig|anteil/ },
@@ -274,6 +285,88 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .card.cu.sp{gap:6px;width:100%;box-sizing:border-box}.card.cu .spt{display:flex;gap:12px;align-items:center;width:100%}
 .card.cu .spl{font-size:12px;color:var(--fg2)}
 .en .rw .spk{margin-top:6px}
+.pool{--ok:#3d8b40;--wn:#b4731a;--bd:#c0392b;--bl:#23729e;background:var(--a);border-radius:20px;padding:16px;min-width:0}
+:host([theme=forest]) .pool{--ok:#8fd18f;--wn:#ffcf66;--bd:#ff9a90;--bl:#8ccdf2}
+.pool b{font-weight:600}
+.pool .s-ok{color:var(--ok)}.pool .s-wn{color:var(--wn)}.pool .s-bd{color:var(--bd)}.pool .s-bl{color:var(--bl)}
+.pool-hd{display:flex;align-items:center;gap:12px}
+.pool-hd .ib{width:44px;height:44px;border-radius:14px;background:var(--b);display:grid;place-items:center;flex:none}
+.pool-hd .tt{flex:1;min-width:0}.pool-hd .tt b{display:block;font-size:16px}.pool-hd .tt span{display:block;font-size:12.5px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pool-hd .big{font-size:30px;font-weight:600;white-space:nowrap;cursor:pointer}
+.pool-err{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:10px 12px;border-radius:14px;background:var(--bad);color:var(--badfg);font-size:13px;line-height:1.4}
+.pool-err ha-icon{--mdc-icon-size:22px;flex:none}
+.pool-strip{display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:8px;margin-top:12px}
+.pool-seg{border-radius:14px;padding:10px 12px;background:var(--b);min-width:0;display:flex;flex-direction:column;gap:3px}
+.pool-seg.ok{background:var(--okbg)}.pool-seg.wn{background:var(--warn)}.pool-seg.bd{background:var(--bad)}.pool-seg.bl{background:rgba(60,150,210,.2)}
+.pool-seg small{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg2)}
+.pool-seg b{font-size:14.5px;line-height:1.25}.pool-seg i{font-style:normal;font-size:12px;color:var(--fg2);line-height:1.3}
+.pool-seg.ok b{color:var(--ok)}.pool-seg.wn b{color:var(--wn)}.pool-seg.bd b{color:var(--badfg)}.pool-seg.bl b{color:var(--bl)}
+.pool-seg .pool-ab{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;flex-wrap:wrap}
+.pool-tag{font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-radius:99px;padding:3px 8px;background:var(--a)}
+.pool-btn{border:0;border-radius:99px;padding:8px 14px;background:var(--selbg);color:var(--selfg);font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.pool-btn:disabled{opacity:.55;cursor:default}
+.pool-btn.alt{background:var(--b);color:var(--fg)}.pool-btn.sel{background:var(--accent);color:var(--accentfg)}
+.pool-vals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+.pool-v{background:var(--b);border-radius:14px;padding:10px 8px;text-align:center;min-width:0;cursor:pointer}
+.pool-v small{display:block;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg2)}
+.pool-v b{display:block;font-size:19px;margin-top:2px;white-space:nowrap}.pool-v em{display:block;font-style:normal;font-size:11px;color:var(--fg2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pool-rr{display:flex;gap:12px;margin-top:14px}.pool-rr>ha-icon{--mdc-icon-size:26px;flex:none;margin-top:1px}
+.pool-rc{flex:1;min-width:0;font-size:14px;line-height:1.45}
+.pool-hist{font-size:12px;color:var(--fg2);font-style:italic;margin-top:2px}
+.pool-note{margin-top:6px;padding:8px 10px;border-radius:12px;background:var(--b);font-size:13px;line-height:1.4}
+.pool-sp{font-size:12px;color:var(--fg2)}
+.pool-in{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:8px}
+.pool-in label{display:flex;flex-direction:column;gap:3px;flex:1 1 90px;min-width:80px;font-size:11px;font-weight:600;color:var(--fg2)}
+.pool-in>input{flex:1 1 90px;width:auto!important}
+.pool input[type=number]{width:100%;min-width:0;height:38px;border-radius:12px;border:0;background:var(--b);color:var(--fg);font:inherit;font-size:15px;padding:0 10px;outline:none}
+.pool input::placeholder{color:var(--fg2)}.pool input:disabled{opacity:.5}
+.pool-ok{height:38px;border:0;border-radius:12px;padding:0 16px;background:var(--selbg);color:var(--selfg);font:inherit;font-size:14px;font-weight:600;cursor:pointer;flex:none}
+.pool-ok:disabled{opacity:.45;cursor:default}
+.pool-lnk{display:inline-block;margin-top:6px;font-size:12.5px;color:var(--fg2);cursor:pointer;text-decoration:underline}
+.pool-bk{margin-top:6px;padding:8px 10px;border-radius:12px;background:var(--b);font-size:12.5px}
+.pool-bk div{display:flex;justify-content:space-between;gap:10px;padding:2px 0}.pool-bk div.sum{border-top:1px solid var(--line);margin-top:4px;padding-top:6px;font-weight:600}
+.pool-sec{background:var(--b);border-radius:16px;margin-top:10px;overflow:hidden}
+.pool-sh{display:flex;align-items:center;gap:8px;padding:12px 12px;cursor:pointer;min-width:0}
+.pool-sh>ha-icon{--mdc-icon-size:22px;flex:none}.pool-sh b{font-size:14px;white-space:nowrap}
+.pool-ss{flex:1;min-width:0;text-align:right;font-size:12px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pool-sh .pool-ch{color:var(--fg2)}
+.pool-sb{padding:2px 12px 14px;font-size:13.5px}
+.pool-tb{display:flex;flex-direction:column}
+.pool-tr{display:grid;grid-template-columns:minmax(80px,1fr) minmax(70px,.9fr) minmax(70px,.9fr) minmax(100px,1.2fr);gap:10px;padding:8px 0;border-bottom:1px solid var(--line);align-items:center}
+.pool-tr:last-child{border-bottom:0}.pool-tr.th{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg2);padding-top:4px}
+.pool-tr .r{text-align:right;color:var(--fg2);font-size:12.5px}.pool-tr small{display:block;font-size:11px;color:var(--fg2);font-weight:400}
+.pool-tr.hs{grid-template-columns:minmax(60px,.8fr) minmax(90px,1.4fr) minmax(70px,.8fr) minmax(80px,.9fr)}
+.pool-wx{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.pool-wc{background:var(--a);border-radius:14px;padding:10px}.pool-wc .d{font-size:12px;color:var(--fg2)}
+.pool-wc .t{display:flex;justify-content:space-between;align-items:center;margin-top:2px}.pool-wc .t ha-icon{--mdc-icon-size:26px}
+.pool-wc .m{display:flex;justify-content:space-between;font-size:12.5px;margin-top:4px;gap:8px}.pool-wc .m span{color:var(--fg2)}
+.pool-kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+.pool-kv:last-child{border-bottom:0}.pool-kv span{color:var(--fg2)}.pool-kv b{text-align:right;min-width:0}
+.pool-2c{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.pool-card2{background:var(--a);border-radius:14px;padding:10px 12px}.pool-card2 h5{margin:0 0 6px;font-size:14px;display:flex;justify-content:space-between;gap:8px}
+.pool-ctrl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.pool-cb{border:0;border-radius:14px;padding:12px 6px;background:var(--a);color:inherit;font:inherit;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+.pool-cb ha-icon{--mdc-icon-size:24px}.pool-cb.on{background:var(--accent);color:var(--accentfg)}.pool-cb:disabled{opacity:.45;cursor:default}
+.pool-tmp{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:12px}.pool-tmp div{text-align:center}.pool-tmp small{display:block;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg2)}.pool-tmp b{font-size:24px}
+.pool-adj{display:flex;align-items:center;gap:12px;margin-top:12px}.pool-adj span{flex:1;text-align:center;font-size:12.5px;color:var(--fg2)}
+.pool-adj button{width:44px;height:40px;border:0;border-radius:12px;background:var(--selbg);color:var(--selfg);font:inherit;font-size:22px;line-height:1;cursor:pointer}.pool-adj button:disabled{opacity:.45;cursor:default}
+.pool-eta{margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--a);text-align:center}.pool-eta small{display:block;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg2)}.pool-eta b{display:block;font-size:17px;margin-top:2px}.pool-eta i{display:block;font-style:normal;font-size:12px;color:var(--fg2);margin-top:1px}
+.pool-chips{display:flex;gap:8px;flex-wrap:wrap}.pool-chip{background:var(--a);border-radius:12px;padding:7px 10px;font-size:12.5px;display:flex;flex-direction:column}.pool-chip small{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg2)}
+.pool-modes{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pool-ft{margin-top:12px;font-size:11.5px;color:var(--fg2);line-height:1.5}
+.pool-cmp{display:flex;flex-direction:column;gap:10px}.pool-cmp .pool-v{text-align:left;display:flex;justify-content:space-between;align-items:center;gap:10px}.pool-cmp .pool-v b{display:inline;font-size:17px;margin:0}
+.pool-lz{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;border-radius:99px;padding:3px 9px;background:var(--a);flex:none}
+.pool-lz i{width:8px;height:8px;border-radius:50%;background:var(--bd);display:block}.pool-lz.on i{background:var(--ok)}
+@container (max-width:520px){
+  .pool{padding:12px}
+  .pool-strip{grid-template-columns:1fr}
+  .pool-vals{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pool-2c{grid-template-columns:1fr}
+  .pool-tr{grid-template-columns:1fr 1fr;row-gap:2px}.pool-tr.th{display:none}.pool-tr .r{text-align:left}
+  .pool-tr.hs{grid-template-columns:1fr 1fr}
+  .pool-hd .big{font-size:26px}
+  .pool-ss{display:none}
+}
 `;
 
 const SIZES = ['s', 'w', 'f'];
@@ -303,6 +396,13 @@ class LumoraCard extends HTMLElement {
     this.shadowRoot.addEventListener('pointermove', (e) => { if (this._dg) this._dgMove(e); else if (this._drag) this._dragTo(e); });
     this.shadowRoot.addEventListener('touchmove', (e) => { if (this._dg && this._dg.on && e.cancelable) e.preventDefault(); }, { passive: false });
     this.shadowRoot.addEventListener('contextmenu', (e) => { if (this._edit) e.preventDefault(); });
+    this.shadowRoot.addEventListener('focusout', (e) => {
+      if (e.target.dataset && e.target.dataset.pk) setTimeout(() => { if (!this._plFocus() && this._hass) { this._sig = ''; this.hass = this._hass; } }, 200);
+    });
+    this.shadowRoot.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || !e.target.dataset || !e.target.dataset.go) return;
+      e.preventDefault(); if (this._poolClick({ dataset: { k: e.target.dataset.go } }, 'pl-go')) { this._sig = ''; this._render(); }
+    });
     const end = (e) => {
       this._down = false;
       if (this._dg) { this._dgEnd(e); return; }
@@ -345,6 +445,7 @@ class LumoraCard extends HTMLElement {
     if (first) this._load();
     if (!this._loaded || ['add', 'srcpick', 'quick', 'cc'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
     if (this._down && this._edit) { this._pend = true; return; }
+    if (this._plFocus()) return;
     const sig = this._signature();
     if (sig !== this._sig) {
       this._sig = sig;
@@ -367,6 +468,7 @@ class LumoraCard extends HTMLElement {
       else if (this._auto().tracked.has(id)) parts.push(id + h.states[id].state);
       else if (cuSet.has(id) || this._set.pinned.some((p) => p.entity === id)) parts.push(id + h.states[id].state);
     }
+    if (this._view === 'home' || this._view === 'more') parts.push(this._plSig());
     if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
     parts.push(this._bd.s);
     return parts.join('|');
@@ -489,7 +591,7 @@ class LumoraCard extends HTMLElement {
       const txt = norm(`${id} ${a.friendly_name || ''}`);
       const unit = String(a.unit_of_measurement || '');
       let ok = !(d.at && a[d.at] === undefined) && !(d.u && !d.u.test(unit)) && (!d.re || d.re.test(txt)) && !(d.no && d.no.test(txt));
-      if (ok && !loose && ['unavailable', 'unknown', ''].includes(st.state)) ok = false;
+      if (ok && !loose && !d.any && ['unavailable', 'unknown', ''].includes(st.state)) ok = false;
       if (!ok && !loose) continue;
       out.push({ id, ok, pri: d.pri && d.pri.test(txt) ? 1 : 0, name: a.friendly_name || id });
     }
@@ -603,10 +705,19 @@ class LumoraCard extends HTMLElement {
       .map(([v, i, l]) => `<button class="${this._view === v ? 'sel' : ''}" data-act="nav" data-v="${v}"><ha-icon icon="${i}"></ha-icon>${l}</button>`).join('');
     const scroll = this.shadowRoot.querySelector('.body'); const top = scroll ? scroll.scrollTop : 0;
     const keep = {}; const qa = this.shadowRoot.querySelectorAll;
+    const pk = {}; let fk = null;
+    if (qa) {
+      this.shadowRoot.querySelectorAll('[data-pk]').forEach((i) => { if (i.value !== '') pk[i.dataset.pk] = i.value; });
+      const ae = this.shadowRoot.activeElement; if (ae && ae.dataset && ae.dataset.pk) { fk = { k: ae.dataset.pk }; try { fk.s = ae.selectionStart; fk.e = ae.selectionEnd; } catch (_) { /* number-Felder */ } }
+    }
     if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((i) => { (keep[i.dataset.b] || (keep[i.dataset.b] = [])).push(i); });
     this.shadowRoot.innerHTML = `<style>${CSS}</style><div class="app" style="position:relative"><div class="body">${body}</div><div class="nav">${nav}</div>${this._sheetHtml()}</div>`;
     if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((n) => { const o = (keep[n.dataset.b] || []).shift(); if (o && o !== n) n.replaceWith(o); });
     const nb = this.shadowRoot.querySelector('.body'); if (nb) nb.scrollTop = top;
+    if (qa) {
+      Object.keys(pk).forEach((k) => { const i = this.shadowRoot.querySelector(`[data-pk="${k}"]`); if (i && !i.disabled) i.value = pk[k]; });
+      if (fk) { const i = this.shadowRoot.querySelector(`[data-pk="${fk.k}"]`); if (i) { i.focus(); try { if (fk.s != null) i.setSelectionRange(fk.s, fk.e); } catch (_) { /* number-Felder */ } } }
+    }
     if (['add', 'srcpick', 'quick'].includes(this._sheet)) this._fillList();
   }
   _num(id) { const st = this._hass.states[id]; const v = st ? parseFloat(st.state) : NaN; return isNaN(v) ? null : v; }
@@ -1291,6 +1402,523 @@ _more() {
     el.innerHTML = res.map((s) => `<div class="row" data-act="pick" data-id="${s.entity_id}"><ha-icon icon="${this._icon(s)}"></ha-icon><div class="t"><b>${esc(s.attributes.friendly_name || s.entity_id)}</b><span>${esc(s.entity_id)}${pinned.includes(s.entity_id) ? ' · angepinnt' : ''}</span></div></div>`).join('') || '<div class="empty">Nichts gefunden.</div>';
   }
 
+  /* ---------- Pool: Smart Pool Assistant + LayzSpa ---------- */
+  _P() { return this._pl || (this._pl = { open: {}, wx: {}, wxBusy: {}, eta: {}, etaBusy: {}, fetching: false, fetchErr: null, opt: {}, optAt: 0 }); }
+  _plCfg() { return (this._cfg && this._cfg.pool) || {}; }
+  _plFocus() { const r = this.shadowRoot; const a = r && r.activeElement; return !!(a && a.dataset && a.dataset.pk); }
+  _plRefresh() {
+    if (this._edit || this._dg || this._sheet || this._plFocus()) return;
+    clearTimeout(this._plr); this._plr = setTimeout(() => { this._sig = ''; this._render(); }, 250);
+  }
+  _plSig() {
+    const h = this._hass;
+    return ['pool_rec', 'pool_winter', 'pool_fetch', 'pool_pump', 'pool_heat', 'pool_temp', 'lz_conn', 'lz_ip', 'lz_rssi', 'lz_bubbles', 'lz_temp', 'lz_target', 'lz_ctl', 'lz_error']
+      .map((k) => { const id = this._slot(k); const s = id && h.states[id]; return s ? `${id}${s.state}${s.last_updated || ''}` : ''; }).join(',');
+  }
+  _plOpt(k, v) { const P = this._P(); return P.opt[k] !== undefined && Date.now() - P.optAt < 8000 ? P.opt[k] : v; }
+  _plNum(v) { return v === null || v === undefined || v === '' || typeof v === 'boolean' ? NaN : Number(v); }
+  _plKnown(v) { return v !== undefined && v !== null && v !== '' && v !== 'unknown' && v !== 'unavailable'; }
+  _plN(v, d = 2, sign) {
+    const n = this._plNum(v); if (!Number.isFinite(n)) return '--';
+    return n.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d, signDisplay: sign ? 'exceptZero' : 'auto' });
+  }
+  _plDose(v, unit) {
+    const n = this._plNum(v); if (!Number.isFinite(n)) return `-- ${unit}`;
+    return `${n.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 1 })} ${unit}`;
+  }
+  _plTime(raw) {
+    if (!raw) return '--'; const d = new Date(raw); if (Number.isNaN(d.getTime())) return '--';
+    return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  }
+  _plSpoons(value, unit) {
+    let rest = Math.round(this._plNum(value) * 2); if (!Number.isFinite(rest) || rest <= 0) return '';
+    const parts = [];
+    for (const sp of [15, 7.5, 5, 2.5, 1]) { const st = Math.round(sp * 2); while (rest >= st) { parts.push(this._plDose(sp, unit)); rest -= st; } }
+    return rest !== 0 || !parts.length ? '' : parts.join(' + ');
+  }
+  _plRange(a, lo, hi, leg) {
+    let l = this._plNum(a[lo]); let u = this._plNum(a[hi]); const g = this._plNum(a[leg]);
+    if (!Number.isFinite(l)) l = g; if (!Number.isFinite(u)) u = g;
+    if (!Number.isFinite(l) || !Number.isFinite(u)) return null;
+    return l <= u ? { low: l, high: u } : { low: u, high: l };
+  }
+  _plRangeTxt(r, suf = '') {
+    if (!r) return '--'; const f = (v) => v.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    return r.low === r.high ? `${f(r.low)}${suf}` : `${f(r.low)}-${f(r.high)}${suf}`;
+  }
+  _plCls(value, r, tol) {
+    const n = this._plNum(value); if (!Number.isFinite(n) || !r) return '';
+    if (n >= r.low && n <= r.high) return 'ok';
+    return (n < r.low ? r.low - n : n - r.high) <= tol ? 'wn' : 'bd';
+  }
+  _plCya(value, type) {
+    const n = this._plNum(value); const inorg = type === 'inorganic'; const T = '30-50 ppm';
+    if (!Number.isFinite(n)) return { label: '--', target: T, cls: '', action: inorg ? 'Noch kein CYA-Messwert vorhanden. Bei anorganischem Chlor nur separat relevant.' : 'Noch kein CYA-Messwert vorhanden.' };
+    if (n < 20) return { label: 'Zu niedrig', target: T, cls: 'wn', action: inorg ? 'Bei Bedarf separat Stabilisator dosieren, sonst bleibt Chlor unstabilisiert.' : 'Chlor wird zu schnell abgebaut, Cyanursäure erhöhen.' };
+    if (n < 30) return { label: 'Leicht niedrig', target: T, cls: 'wn', action: 'Noch leicht erhöhen, damit der Zielbereich stabil erreicht wird.' };
+    if (n <= 50) return { label: 'Optimal', target: T, cls: 'ok', action: inorg ? 'Guter Stabilisatorbereich. Mit anorganischem Chlor nicht unnötig weiter erhöhen.' : 'Perfekter Bereich, regelmäßig kontrollieren.' };
+    if (n <= 80) return { label: 'Erhöht', target: T, cls: 'wn', action: inorg ? 'Erhöht. Kein zusätzlicher Stabilisator nötig, Wasserwechsel einplanen.' : 'Noch akzeptabel, organisches Chlor sparsam nutzen und Wasserwechsel einplanen.' };
+    if (n <= 100) return { label: 'Zu hoch', target: T, cls: 'bd', action: inorg ? 'Teilwasserwechsel durchführen.' : 'Teilwasserwechsel durchführen und organisches Chlor vermeiden.' };
+    return { label: 'Kritisch', target: T, cls: 'bd', action: inorg ? 'Sehr hoher Wert. Großer Wasserwechsel erforderlich.' : 'Sehr hoher Wert. Wasserwechsel erforderlich und organisches Chlor sofort stoppen.' };
+  }
+  _plBath(a) {
+    const issues = []; const warns = []; const n = (v) => this._plNum(v);
+    const chlor = n(a.chlor_ist); const ph = n(a.ph_ist); const temp = n(a.temp_ist); const uv = n(a.weather_uv_today);
+    const rp = n(a.weather_rain_probability_today); const ra = n(a.weather_rain_amount_today); const wind = n(a.weather_wind_speed_today); const cond = a.weather_condition_today;
+    const cr = this._plRange(a, 'chlor_min', 'chlor_max', 'chlor_target'); const pr = this._plRange(a, 'ph_min', 'ph_max', 'ph_target');
+    if (a.awaiting_retest || a.awaiting_retest_chlor || a.awaiting_retest_ph) issues.push('Nachmessung abwarten');
+    if (a.data_source === 'Speicher' || !Number.isFinite(chlor) || !Number.isFinite(ph)) issues.push('aktuelle Chlor-/pH-Messung fehlt');
+    if (Number.isFinite(chlor) && cr) {
+      const lo = cr.low - chlor; const hi = chlor - cr.high;
+      if (chlor <= 0.3) issues.push('Chlor sehr niedrig');
+      else if (a.is_shock === true) issues.push('Chlor im Schockchlorungsbereich');
+      else if (chlor > 5 || hi > 0.9) issues.push('Chlor zu hoch');
+      else if (lo > 0.3) warns.push('Chlor niedrig');
+      else if (hi > 0.3) warns.push('Chlor erhöht');
+    }
+    if (Number.isFinite(ph) && pr) {
+      const d = ph < pr.low ? pr.low - ph : ph > pr.high ? ph - pr.high : 0;
+      if (ph < 6.8 || ph > 7.8 || d > 0.4) issues.push('pH deutlich außerhalb'); else if (d > 0.15) warns.push('pH nicht ideal');
+    }
+    if (Number.isFinite(temp)) { if (temp >= 41) issues.push('Temperatur sehr hoch'); else if (temp > 36) warns.push('warmes Wasser'); }
+    if (['lightning', 'lightning-rainy', 'lightning_rainy', 'exceptional'].includes(cond)) issues.push('Wetter unsicher'); else if (['pouring', 'rainy'].includes(cond)) warns.push('Regen erwartet');
+    if (Number.isFinite(wind)) { if (wind >= 50) issues.push('starker Wind'); else if (wind >= 30) warns.push('windig'); }
+    if (Number.isFinite(rp) && rp >= 60) warns.push('Regenrisiko');
+    if (Number.isFinite(ra) && ra >= 5) warns.push('Regenmenge');
+    if (Number.isFinite(uv) && uv >= 8 && !this._plOpt('covered', a.pool_covered)) warns.push('hohe UV-Belastung');
+    if (issues.length) return { cls: 'bd', title: 'Nicht empfohlen', detail: issues.slice(0, 2).join(', ') };
+    if (warns.length) return { cls: 'wn', title: 'Baden möglich', detail: warns.slice(0, 2).join(', ') };
+    return { cls: 'ok', title: 'Viel Spaß beim Baden', detail: 'Werte im grünen Bereich' };
+  }
+  _plStatus(rec) {
+    let t = rec.state || '✅ Alle Werte im Zielbereich'; let cls = 'ok';
+    if (t === 'unavailable' || t === 'unknown') t = '⚠️ Warte auf Daten...';
+    if (t.includes('⏳')) cls = 'bl';
+    else if (t.includes('⚠️') || t.includes('hoch') || t.includes('niedrig')) cls = t.includes('hoch') || t.includes('Schock') ? 'bd' : 'wn';
+    return { t, cls };
+  }
+  _plRetest(a) {
+    if (!a || a.awaiting_retest !== true) return '';
+    const l = [];
+    if (a.awaiting_retest_chlor === true) { const s = this._plTime(a.chlor_retest_window_start); const e = this._plTime(a.chlor_retest_window_end); if (s !== '--' && e !== '--') l.push(`Chlor: ${s} - ${e} Uhr`); }
+    if (a.awaiting_retest_ph === true && a.awaiting_retest_since) { const f = this._plTime(a.awaiting_retest_since); if (f !== '--') l.push(`pH: ab ${f} Uhr`); }
+    return l.join(' | ');
+  }
+  _plPlan(a) {
+    const P = this._P(); const opt = P.opt.bath !== undefined && Date.now() - P.optAt < 8000;
+    const hrs = this._plNum(opt ? P.opt.bath : a.bath_plan_hours); const on = Number.isFinite(hrs) && hrs > 0 && (opt || a.bath_plan_active === true);
+    return { on, hrs };
+  }
+  _plHrs(v, d = 1) { return Number(v).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: d }); }
+  _plDur(hv) {
+    if (!Number.isFinite(hv) || hv < 0) return 'Nicht genügend Daten'; if (hv <= 0.2) return 'jetzt';
+    const m = Math.max(1, Math.round(hv * 60)); const hh = Math.floor(m / 60); const mm = m % 60;
+    return hh <= 0 ? `${mm} min` : mm <= 0 ? `${hh} h` : `${hh} h ${mm} min`;
+  }
+  _plStars(v) {
+    if (!this._plKnown(v)) return 'Noch keine Bewertung';
+    if (typeof v === 'string' && /^[*-]{5}$/.test(v)) return v.replaceAll('*', '★').replaceAll('-', '☆');
+    const q = this._plNum(v); if (!Number.isFinite(q) || q <= 0) return 'Noch keine Bewertung';
+    const r = Math.max(0, Math.min(5, Math.round(q))); return '★'.repeat(r) + '☆'.repeat(5 - r);
+  }
+  _plLN(v, suf = '', d = 2, sign) { return this._plKnown(v) && Number.isFinite(this._plNum(v)) ? `${this._plN(v, d, sign)}${suf}` : 'Nicht genügend Daten'; }
+  _plLStatus(s) { return { learning: 'Lernphase', stable: 'Stabil', variable: 'Schwankend', unstable: 'Instabil' }[s] || 'Nicht genügend Daten'; }
+  _plSamples(v) { const n = this._plNum(v); return Number.isFinite(n) && n > 0 ? n : 0; }
+  _plSum(kind, d) { const n = this._plSamples(d.samples); return n < 3 ? `${kind}: Lernphase ${n}/3` : `${kind}: ${this._plLStatus(d.status)} ${this._plStars(d.quality)}`; }
+
+  /* --- Bereiche --- */
+  _plSec(k, icon, title, sum, body, badge) {
+    const o = !!this._P().open[k];
+    return `<div class="pool-sec"><div class="pool-sh" data-act="pl-open" data-k="${k}"><ha-icon icon="${icon}"></ha-icon><b>${esc(title)}</b><span class="pool-ss">${sum || ''}</span>${badge || ''}<ha-icon class="pool-ch" icon="${o ? 'mdi:chevron-up' : 'mdi:chevron-down'}"></ha-icon></div>${o ? `<div class="pool-sb">${typeof body === 'function' ? body() : body}</div>` : ''}</div>`;
+  }
+  _plStab(a) {
+    const ca = a.chlor_stability_attributes || {}; const da = a.chlor_dose_factor_attributes || {}; const fa = a.chlor_forecast_attributes || {}; const pa = a.ph_stability_attributes || {};
+    const cs = this._plSamples(ca.samples); const ds = this._plSamples(da.samples); const ps = this._plSamples(pa.samples);
+    const cq = ca.context_prediction_quality ?? ca.prediction_quality ?? a.chlor_prediction_quality; const pq = pa.prediction_quality ?? a.ph_prediction_quality;
+    const cst = a.chlor_stability || 'learning'; const pst = a.ph_stability || 'learning'; const trend = pa.trend || a.ph_trend;
+    const conf = { high: 'hoch', medium: 'mittel', low: 'niedrig', learning: 'Lernphase', unknown: 'unbekannt' };
+    const basis = { similar_intervals: 'ähnliche Intervalle', '14d_average': '14-Tage-Mittel', learning: 'Lernphase', no_measurement: 'keine Messung', insufficient: 'zu wenig Daten' };
+    const trendL = { learning: 'Lernphase', stable: 'stabil', rising: 'steigt', falling: 'fällt' }[trend] || 'Nicht genügend Daten';
+    const kv = (l, v) => `<div class="pool-kv"><span>${l}</span><b>${esc(v)}</b></div>`;
+    const sum = `${this._plSum('Chlor', { samples: cs, status: cst, quality: cq })} · ${this._plSum('pH', { samples: ps, status: pst, quality: pq })}`;
+    return this._plSec('stab', 'mdi:chart-bell-curve', 'Stabilität', esc(sum), () => `<div class="pool-2c">
+      <div class="pool-card2"><h5><span>Chlor</span><span>${this._plStars(cq)}</span></h5><div class="pool-sp">${cs < 3 ? `Lernphase: ${cs} von 3 Intervallen` : this._plLStatus(cst)}</div>
+        ${kv('Ø 14 Tage', this._plLN(ca.average_daily_loss ?? a.chlor_consumption_14d, ' mg/l/d'))}${kv('24h', this._plLN(a.chlor_consumption_24h, ' mg/l/d'))}${kv('7 Tage', this._plLN(a.chlor_consumption_7d, ' mg/l/d'))}
+        ${kv('Min / Max', `${this._plLN(ca.min_daily_loss, ' mg/l/d')} / ${this._plLN(ca.max_daily_loss, ' mg/l/d')}`)}${kv('Persönlicher Faktor', this._plLN(ca.personal_chlor_factor ?? a.personal_chlor_factor))}
+        ${kv('Dosierfaktor', this._plLN(a.personal_chlor_dose_factor))}${kv('Effektiver Wirkstoff', this._plLN(a.effective_chlor_content, '', 3))}${kv('Dosierqualität', `${this._plStars(a.chlor_dose_prediction_quality)} · ${ds} Samples`)}
+        ${kv('Prognose', a.chlor_forecast_message || 'Keine Prognose verfügbar')}${kv('Bis Minimum', this._plDur(this._plNum(a.chlor_hours_to_min)))}${kv('Bis 0,6 mg/l', this._plDur(this._plNum(a.chlor_hours_to_critical_low)))}
+        ${kv('Konfidenz', conf[a.chlor_forecast_confidence] || 'unbekannt')}${kv('Basis', basis[a.chlor_forecast_basis] || fa.basis || 'unbekannt')}</div>
+      <div class="pool-card2"><h5><span>pH</span><span>${this._plStars(pq)}</span></h5><div class="pool-sp">${ps < 3 ? `Lernphase: ${ps} von 3 Intervallen` : this._plLStatus(pst)}</div>
+        ${kv('Ø 14 Tage', this._plLN(pa.average_daily_drift ?? a.ph_drift_14d, ' pH/d', 3, true))}${kv('24h', this._plLN(a.ph_drift_24h, ' pH/d', 3, true))}${kv('7 Tage', this._plLN(a.ph_drift_7d, ' pH/d', 3, true))}
+        ${kv('Min / Max', `${this._plLN(pa.min_daily_drift, ' pH/d', 3, true)} / ${this._plLN(pa.max_daily_drift, ' pH/d', 3, true)}`)}${kv('Trend', trendL)}</div></div>`);
+  }
+
+  /* --- Wetter --- */
+  _plWxId(a) {
+    const h = this._hass; const c = this._plCfg().weather_entity;
+    if (c && h.states[c]) return c; if (a.weather_entity && h.states[a.weather_entity]) return a.weather_entity; return null;
+  }
+  _plWxLabel(c) { return { clear: 'Klar', 'clear-night': 'Klar', clear_night: 'Klar', cloudy: 'Bewölkt', exceptional: 'Extrem', fog: 'Nebel', hail: 'Hagel', lightning: 'Gewitter', 'lightning-rainy': 'Gewitterregen', lightning_rainy: 'Gewitterregen', partlycloudy: 'Sonne/Wolken', pouring: 'Starkregen', rainy: 'Regen', snowy: 'Schnee', 'snowy-rainy': 'Schneeregen', snowy_rainy: 'Schneeregen', sunny: 'Sonnig', windy: 'Windig', 'windy-variant': 'Windig', windy_variant: 'Windig' }[c] || c || '--'; }
+  _plWxIcon(c) { const k = String(c || '').replace(/_/g, '-'); return WX[k] || { clear: 'mdi:weather-sunny', exceptional: 'mdi:weather-hurricane', 'snowy-rainy': 'mdi:weather-snowy-rainy', 'windy-variant': 'mdi:weather-windy-variant' }[k] || 'mdi:weather-partly-cloudy'; }
+  _plWV(v, suf = '') { const n = this._plNum(v); return v === undefined || v === null || v === '' ? '--' : Number.isFinite(n) ? `${n.toFixed(0)}${suf}` : `${v}${suf}`; }
+  _plWind(v, unit) {
+    const n = this._plNum(v); if (v === undefined || v === null || v === '') return '--'; if (!Number.isFinite(n)) return `${v}`;
+    const u = `${unit || ''}`.trim().toLowerCase();
+    if (u.includes('km')) return `${n.toFixed(0)} km/h`; if (u.includes('m/s')) return `${n.toFixed(1)} m/s`;
+    return n >= 20 ? `${n.toFixed(0)} km/h` : `${n.toFixed(1)} m/s`;
+  }
+  _plUv(v) { const n = this._plNum(v); return !Number.isFinite(n) ? '' : n >= 8 ? 's-bd' : n >= 6 ? 's-wn' : 's-ok'; }
+  _plFcNorm(r, id) {
+    if (!r) return []; if (Array.isArray(r)) return r;
+    if (Array.isArray(r.forecast)) return r.forecast;
+    if (r.response) return this._plFcNorm(r.response, id);
+    if (Array.isArray(r.result && r.result.forecast)) return r.result.forecast;
+    const e = id ? r[id] : null; return Array.isArray(e && e.forecast) ? e.forecast : [];
+  }
+  _plFcLoad(id) {
+    const P = this._P(); if (!id || P.wxBusy[id]) return;
+    const c = P.wx[id]; if (c && !c.fc.length && Date.now() - c.at < 300000) return; if (c && c.fc.length && Date.now() - c.at < 1800000) return;
+    P.wxBusy[id] = true;
+    const h = this._hass;
+    const tries = [
+      () => h.callWS({ type: 'call_service', domain: 'weather', service: 'get_forecasts', service_data: { type: 'daily' }, target: { entity_id: id }, return_response: true }),
+      () => h.callWS({ type: 'weather/forecast', entity_id: id, forecast_type: 'daily' }),
+    ];
+    (async () => {
+      let fc = [];
+      for (const t of tries) { try { fc = this._plFcNorm(await t(), id); if (fc.length) break; } catch (_) { /* nächster Versuch */ } }
+      P.wx[id] = { fc, at: Date.now() }; P.wxBusy[id] = false; this._plRefresh();
+    })();
+  }
+  _plWxDays(a, ws, extra) {
+    const coord = Array.isArray(a.weather_forecast_days) && a.weather_forecast_days.length ? a.weather_forecast_days : null;
+    const fc = coord || (ws && Array.isArray(ws.attributes.forecast) && ws.attributes.forecast.length ? ws.attributes.forecast : extra);
+    if (!Array.isArray(fc) || !fc.length) return [];
+    return fc.slice(0, 2).map((e, i) => {
+      const d = e.datetime ? new Date(e.datetime) : null;
+      const lab = d ? d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : (i === 0 ? 'Heute' : 'Morgen');
+      const pp = e.precipitation_probability; const am = e.precipitation_amount ?? e.precipitation ?? e.native_precipitation;
+      const pr = pp !== null && pp !== undefined ? { v: pp, u: '%' } : am !== null && am !== undefined ? { v: am, u: ' mm' } : { v: null, u: '' };
+      return { label: `${i === 0 ? 'Heute' : 'Morgen'} · ${lab}`, cond: e.condition, pr: pr.v, pu: pr.u,
+        uv: i === 0 ? (a.weather_uv_today ?? e.uv_index ?? e.uv ?? null) : (e.uv_index ?? e.uv ?? null), wind: e.wind_speed ?? e.native_wind_speed ?? null,
+        wu: e.wind_speed_unit ?? a.weather_wind_speed_unit ?? (ws && ws.attributes.wind_speed_unit) ?? null, t: e.temperature ?? e.native_temperature ?? null, tl: e.templow ?? e.native_templow ?? e.low_temperature ?? null };
+    });
+  }
+  _plWx(a) {
+    const id = this._plWxId(a); const ws = id ? this._hass.states[id] : null; const P = this._P();
+    const cf = (id && P.wx[id] && P.wx[id].fc) || [];
+    if (id && !(Array.isArray(a.weather_forecast_days) && a.weather_forecast_days.length) && !(ws && Array.isArray(ws.attributes.forecast) && ws.attributes.forecast.length) && !cf.length) this._plFcLoad(id);
+    let days = this._plWxDays(a, ws, cf);
+    if (!days.length) {
+      const cond = a.weather_condition_today || (ws && !['unknown', 'unavailable'].includes(ws.state) ? ws.state : null);
+      const t = a.weather_temperature_today ?? (ws && ws.attributes.temperature) ?? null; const w = a.weather_wind_speed_today ?? (ws && ws.attributes.wind_speed) ?? null;
+      const rp = a.weather_rain_probability_today; const ra = a.weather_rain_amount_today; const pr = rp ?? ra ?? null; const uv = a.weather_uv_today ?? null;
+      if (cond !== null || t !== null || w !== null || pr !== null || uv !== null) days = [{ label: 'Heute', cond, pr, pu: rp !== null && rp !== undefined ? '%' : (ra !== null && ra !== undefined ? ' mm' : ''), uv, wind: w, wu: a.weather_wind_speed_unit ?? (ws && ws.attributes.wind_speed_unit) ?? null, t, tl: null }];
+    }
+    if (!days.length) {
+      if (!id) return '';
+      return this._plSec('wx', 'mdi:weather-partly-cloudy', 'Wetter', '', `<div class="empty">${P.wxBusy[id] ? 'Lade Tagesvorhersage...' : 'Keine Tagesvorhersage gefunden.'}</div>`);
+    }
+    const d0 = days[0]; const sp = [];
+    if (d0.cond) sp.push(this._plWxLabel(d0.cond)); if (d0.t !== null && d0.t !== undefined) sp.push(this._plWV(d0.t, '°'));
+    if (d0.uv !== null && d0.uv !== undefined) sp.push(`UV ${this._plWV(d0.uv)}`); if (d0.pr !== null && d0.pr !== undefined) sp.push(`Regen ${this._plWV(d0.pr, d0.pu || '')}`);
+    if (d0.wind !== null && d0.wind !== undefined) sp.push(`Wind ${this._plWind(d0.wind, d0.wu)}`);
+    return this._plSec('wx', 'mdi:weather-partly-cloudy', 'Wetter', esc(sp.join(', ') || 'Heute'), () => `<div class="pool-wx">${days.map((d) => `<div class="pool-wc"><div class="d">${esc(d.label)}</div>
+      <div class="t"><b>${this._plWV(d.t, '°')} / ${this._plWV(d.tl, '°')}</b><ha-icon icon="${this._plWxIcon(d.cond)}"></ha-icon></div><div class="pool-sp">${esc(this._plWxLabel(d.cond))}</div>
+      <div class="m"><span>Sonne/UV</span><b class="${this._plUv(d.uv)}">${this._plWV(d.uv)}</b></div><div class="m"><span>Regen</span><b>${this._plWV(d.pr, d.pu || '')}</b></div><div class="m"><span>Wind</span><b>${this._plWind(d.wind, d.wu)}</b></div></div>`).join('')}</div>
+      ${a.weather_note ? `<div class="pool-note">${esc(a.weather_note)}</div>` : ''}`);
+  }
+
+  /* --- LayzSpa --- */
+  _plLz() {
+    const h = this._hass; const g = (k) => { const id = this._xid(k); return id && h.states[id] ? id : null; };
+    const L = { conn: g('lz_conn'), ip: g('lz_ip'), rssi: g('lz_rssi'), pump: g('pool_pump'), heat: g('pool_heat'), bub: g('lz_bubbles'), cur: g('lz_temp'), tgt: g('lz_target'), ctl: g('lz_ctl'), err: g('lz_error') };
+    L.any = !!(L.conn || L.cur || L.pump || L.heat || L.bub);
+    return L;
+  }
+  _plCtl(L) {
+    const h = this._hass; const ok = (id) => id && h.states[id] && ['number', 'climate'].includes(dom(id));
+    const id = ok(L.ctl) ? L.ctl : ok(L.tgt) ? L.tgt : null; if (!id) return null;
+    const s = h.states[id]; const d = dom(id); const at = s.attributes || {};
+    const cur = parseFloat(d === 'climate' ? at.temperature : s.state); if (!Number.isFinite(cur)) return null;
+    const step = parseFloat(d === 'climate' ? (at.target_temp_step ?? 1) : (at.step ?? 1));
+    return { id, d, cur, step: Number.isFinite(step) && step > 0 ? step : 1, min: parseFloat(d === 'climate' ? at.min_temp : at.min), max: parseFloat(d === 'climate' ? at.max_temp : at.max) };
+  }
+  _plAdjust(dir) {
+    const L = this._plLz(); const i = this._plCtl(L); if (!i) return;
+    const p = String(i.step).includes('.') ? String(i.step).split('.')[1].length : 0;
+    let v = i.cur + dir * i.step; if (Number.isFinite(i.min)) v = Math.max(i.min, v); if (Number.isFinite(i.max)) v = Math.min(i.max, v);
+    v = Number(v.toFixed(p));
+    if (i.d === 'climate') this._hass.callService('climate', 'set_temperature', { entity_id: i.id, temperature: v });
+    else this._hass.callService('number', 'set_value', { entity_id: i.id, value: v });
+  }
+  _plRssi(v) {
+    const n = parseInt(v, 10); if (Number.isNaN(n)) return { l: '?', c: 's-bd' };
+    return { l: `${n} dBm`, c: n >= -65 ? 's-ok' : n >= -75 ? 's-wn' : 's-bd' };
+  }
+  _plLzErr(v) {
+    const c = Number(v); if (!Number.isInteger(c) || c === 0) return null;
+    if (c === 2) return { t: 'Fehlercode E02 – Wasserdurchfluss gestört', m: 'Die Pumpe erkennt zu wenig Wasserdurchfluss.', s: 'Filter reinigen oder tauschen. Ein- und Auslässe im Whirlpool auf Verstopfungen durch Schmutz oder Blätter prüfen und diese entfernen.' };
+    if (c === 4 || c === 8) return { t: `Fehlercode ${c === 4 ? 'E04' : 'E08'} – Temperatur zu hoch`, m: 'Das Wasser ist über 50 °C heiß oder die Pumpe stand zu lange in der prallen Sonne (Außentemperatur über 40 °C).', s: 'Wasser abkühlen lassen, Pumpe in den Schatten stellen und das System über die Reset-Taste neu starten.' };
+    return { t: `Unbekannter LayzSpa-Fehlercode (${c})`, m: 'Für diesen Fehlercode ist keine Anleitung hinterlegt.', s: 'Fehlercode in der LayzSpa-Anleitung nachschlagen.' };
+  }
+  _plEtaCfg() {
+    const c = this._plCfg().heat_eta || (this._plCfg().layzspa && this._plCfg().layzspa.heat_eta) || {}; const cl = (v, lo, hi, d) => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
+    return { on: c.enabled !== false, hours: cl(parseFloat(c.history_hours), 6, 168, 48), fb: cl(parseFloat(c.fallback_rate_c_per_hour), 0.1, 10, 3) };
+  }
+  _plLzDur(hv) {
+    if (!Number.isFinite(hv) || hv < 0) return '--'; const m = Math.max(1, Math.ceil(hv * 60)); const hh = Math.floor(m / 60); const mm = m % 60;
+    return hh <= 0 ? `${mm} min` : mm <= 0 ? `${hh} h` : `${hh} h ${mm} min`;
+  }
+  _plEta(L, cur, tgt, heatOn) {
+    const c = this._plEtaCfg(); if (!c.on || !L.cur || !L.heat) return null;
+    if (!Number.isFinite(cur) || !Number.isFinite(tgt)) return { v: '--', d: 'Temperaturdaten fehlen', c: '' };
+    const dl = tgt - cur; if (dl <= 0) return { v: 'Erreicht', d: 'Zieltemperatur erreicht', c: 's-ok' };
+    const key = `${L.cur}|${L.heat}|${c.hours}`; const ch = this._P().eta[key]; const rate = ch && ch.rate; const learned = Number.isFinite(rate) && rate > 0;
+    const eff = learned ? rate : c.fb; const dur = this._plLzDur(dl / eff);
+    const src = learned ? `${rate.toFixed(1).replace('.', ',')} °C/h aus ${ch.hours}h Verlauf` : `${c.fb.toFixed(1).replace('.', ',')} °C/h Fallback`;
+    this._plEtaLoad(L, c, key);
+    return { v: `ca. ${dur}`, d: heatOn ? src : `Heizung aus · ${src}`, c: heatOn ? (learned ? 's-ok' : 's-wn') : '' };
+  }
+  _plEtaLoad(L, c, key) {
+    const P = this._P(); if (P.etaBusy[key]) return; const ch = P.eta[key]; if (ch && Date.now() - ch.at < 600000) return;
+    P.etaBusy[key] = true; const end = new Date(); const start = new Date(end.getTime() - c.hours * 3600000);
+    this._hass.callWS({ type: 'history/history_during_period', start_time: start.toISOString(), end_time: end.toISOString(), entity_ids: [L.cur, L.heat], minimal_response: false, no_attributes: true })
+      .then((hist) => { P.eta[key] = { ...this._plRate(hist, L.cur, L.heat), hours: c.hours, at: Date.now() }; })
+      .catch(() => { P.eta[key] = { rate: null, hours: c.hours, at: Date.now() }; })
+      .finally(() => { delete P.etaBusy[key]; this._plRefresh(); });
+  }
+  _plRate(hist, tid, hid) {
+    const ser = Array.isArray(hist) ? hist : []; const ts = ser.find((x) => x && x[0] && x[0].entity_id === tid) || []; const hs = ser.find((x) => x && x[0] && x[0].entity_id === hid) || [];
+    const tp = ts.map((e) => ({ ts: Date.parse(e.last_changed || e.last_updated), v: parseFloat(e.state) })).filter((e) => Number.isFinite(e.ts) && Number.isFinite(e.v)).sort((x, y) => x.ts - y.ts);
+    const hp = hs.map((e) => ({ ts: Date.parse(e.last_changed || e.last_updated), s: e.state })).filter((e) => Number.isFinite(e.ts)).sort((x, y) => x.ts - y.ts);
+    if (tp.length < 2 || hp.length < 1) return { rate: null };
+    let hi = 0; let gain = 0; let hrs = 0;
+    const at = (t) => { if (!hp[hi] || hp[hi].ts > t) return null; while (hi + 1 < hp.length && hp[hi + 1].ts <= t) hi++; return hp[hi].s; };
+    for (let i = 1; i < tp.length; i++) {
+      const p = tp[i - 1]; const c = tp[i]; const dh = (c.ts - p.ts) / 3600000; const dt = c.v - p.v;
+      if (dh < 0.03 || dh > 4 || dt <= 0.02 || dt / dh > 8) continue;
+      if (at(p.ts) !== 'on' && at(c.ts) !== 'on') continue;
+      gain += dt; hrs += dh;
+    }
+    return hrs < 0.33 || gain < 0.2 ? { rate: null } : { rate: gain / hrs };
+  }
+  _plLzSec(L) {
+    const h = this._hass; const st = (id) => (id ? h.states[id] : null); const ok = L.conn ? st(L.conn).state === 'on' : true;
+    const cur = parseFloat(st(L.cur) && st(L.cur).state); const ctl = this._plCtl(L); const tgt = ctl ? ctl.cur : parseFloat(st(L.tgt) && st(L.tgt).state);
+    const eta = this._plEta(L, cur, tgt, st(L.heat) && st(L.heat).state === 'on'); const rs = this._plRssi(st(L.rssi) && st(L.rssi).state);
+    const tf = (v) => (Number.isFinite(v) ? `${v.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} °C` : '--');
+    const btn = (id, k, ic, lab) => (id ? `<button class="pool-cb ${st(id).state === 'on' ? 'on' : ''}" data-act="pl-sw" data-id="${id}" ${ok ? '' : 'disabled'}><ha-icon icon="${ic}"></ha-icon>${lab}</button>` : '');
+    const title = L.conn || L.cur ? 'LayzSpa' : 'Pumpe & Heizung';
+    const badge = L.conn ? `<span class="pool-lz ${ok ? 'on' : ''}"><i></i>${ok ? 'Verbunden' : 'Getrennt'}</span>` : '';
+    const sum = Number.isFinite(cur) ? `${tf(cur)}${Number.isFinite(tgt) ? ` → ${tf(tgt)}` : ''}` : '';
+    return this._plSec('lz', 'mdi:hot-tub', title, esc(sum), () => `${L.ip || L.rssi ? `<div class="pool-chips">${L.ip ? `<div class="pool-chip"><small>IP-Adresse</small><b>${esc(st(L.ip).state)}</b></div>` : ''}${L.rssi ? `<div class="pool-chip"><small>WLAN-Signal</small><b class="${rs.c}">${rs.l}</b></div>` : ''}</div>` : ''}
+      <div class="pool-ctrl">${btn(L.pump, 'pump', 'mdi:pump', 'Pumpe')}${btn(L.heat, 'heat', 'mdi:fire', 'Heizung')}${btn(L.bub, 'bub', 'mdi:chart-bubble', 'Blubber')}</div>
+      ${Number.isFinite(cur) || Number.isFinite(tgt) ? `<div class="pool-tmp"><div><small>Aktuell</small><b>${tf(cur)}</b></div><ha-icon icon="mdi:arrow-right-thin"></ha-icon><div><small>Ziel</small><b class="s-bl">${tf(tgt)}</b></div></div>` : ''}
+      ${eta ? `<div class="pool-eta"><small>Auf Wunschtemperatur</small><b class="${eta.c}">${eta.v}</b><i>${esc(eta.d)}</i></div>` : ''}
+      ${ctl ? `<div class="pool-adj"><button data-act="pl-adj" data-d="-1" ${ok ? '' : 'disabled'}>−</button><span>Zieltemperatur anpassen</span><button data-act="pl-adj" data-d="1" ${ok ? '' : 'disabled'}>+</button></div>` : ''}`, badge);
+  }
+
+  /* --- Hauptkarte --- */
+  _plFetchUi(a) {
+    const P = this._P(); const id = this._xid('pool_fetch'); const btn = id && this._hass.states[id] ? id : null;
+    const next = a.next_poollab_fetch_allowed_at ? Date.parse(a.next_poollab_fetch_allowed_at) : NaN; const left = Number.isFinite(next) ? Math.max(0, Math.ceil((next - Date.now()) / 1000)) : 0;
+    const last = a.last_poollab_fetch_completed_at ? new Date(a.last_poollab_fetch_completed_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : null;
+    if (!btn) return null;
+    if (P.fetching || a.poollab_fetch_result === 'running') return { dis: true, lab: 'Abruf läuft...', st: 'PoolLab wird gerade abgefragt.', meta: 'läuft', cls: 'bl' };
+    if (P.fetchErr) return { dis: false, lab: 'Erneut abrufen', st: P.fetchErr, meta: 'Fehler', cls: 'bd' };
+    if (left > 0) { clearTimeout(this._pft); this._pft = setTimeout(() => this._plRefresh(), left * 1000 + 500); return { dis: true, lab: 'Warten', st: `Nächster Abruf ab ${new Date(next).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr möglich.`, meta: 'wartet', cls: 'bl' }; }
+    if (a.poollab_fetch_result === 'error' && a.poollab_fetch_error) return { dis: false, lab: 'Erneut abrufen', st: a.poollab_fetch_error, meta: 'Fehler', cls: 'bd' };
+    return { dis: false, lab: 'Messwerte abrufen', st: last ? `Zuletzt erfolgreich um ${last} Uhr.` : 'Bereit für einen manuellen PoolLab-Abruf.', meta: 'bereit', cls: 'ok' };
+  }
+  async _plFetch() {
+    const P = this._P(); const id = this._xid('pool_fetch'); if (!id || P.fetching) return;
+    P.fetchErr = null; P.fetching = true; this._sig = ''; this._render();
+    try { await this._hass.callService('button', 'press', { entity_id: id }); } catch (e) { P.fetchErr = `Abruf fehlgeschlagen: ${(e && e.message) || e}`; }
+    P.fetching = false; this._sig = ''; this._render();
+  }
+  _plLog(type, amount, extra) {
+    const id = this._xid('pool_rec'); if (!id) return; const P = this._P();
+    const d = { entity_id: id, type, amount };
+    if (extra) Object.entries(extra).forEach(([k, v]) => { if (v !== null && v !== undefined && v !== '') d[k] = v; });
+    if (type === 'set_covered') P.opt.covered = amount > 0;
+    if (type === 'set_usage') P.opt.usage = ({ 0: 'none', 1: 'normal', 2: 'party' })[amount] || 'none';
+    if (type === 'set_bath_plan') P.opt.bath = amount;
+    if (['set_covered', 'set_usage', 'set_bath_plan'].includes(type)) P.optAt = Date.now();
+    this._hass.callService('smart_pool_assistant', 'log_maintenance', d);
+  }
+  _plGo(k) {
+    const f = (n) => { const i = this.shadowRoot.querySelector(`[data-pk="${n}"]`); return i ? parseFloat(String(i.value).replace(',', '.')) : NaN; };
+    const clr = (...ns) => ns.forEach((n) => { const i = this.shadowRoot.querySelector(`[data-pk="${n}"]`); if (i) i.value = ''; });
+    if (k === 'chlor') { const v = f('chlor'); if (!(v >= 0)) return false; this._plLog('chlor', v); clr('chlor'); return false; }
+    if (k === 'ph') {
+      const p = f('ph_plus'); const m = f('ph_minus');
+      if (p > 0) this._plLog('ph_plus', p); else if (m > 0) this._plLog('ph_minus', m); else return false;
+      clr('ph_plus', 'ph_minus'); return false;
+    }
+    if (k === 'wex') {
+      const l = f('wex_l'); const p = f('wex_p'); if (!Number.isFinite(l) && !Number.isFinite(p)) return false;
+      this._plLog('water_exchange', Number.isFinite(l) ? l : 0, { water_exchange_percent: Number.isFinite(p) ? p : null }); clr('wex_l', 'wex_p'); return false;
+    }
+    if (k === 'bath') { const v = f('bath'); if (!(v >= 0)) return false; this._plLog('set_bath_plan', v); clr('bath'); return true; }
+    return false;
+  }
+  _poolClick(t, act) {
+    const k = t.dataset.k; const P = this._P(); const h = this._hass;
+    switch (act) {
+      case 'pl-open': P.open[k] = !P.open[k]; return true;
+      case 'pl-go': return this._plGo(k);
+      case 'pl-fetch': this._plFetch(); return false;
+      case 'pl-sw': { const id = t.dataset.id; if (id && h.states[id]) h.callService(dom(id), h.states[id].state === 'on' ? 'turn_off' : 'turn_on', { entity_id: id }); return false; }
+      case 'pl-adj': this._plAdjust(Number(t.dataset.d)); return false;
+      case 'pl-cover': { const a = this._plAttr(); this._plLog('set_covered', this._plOpt('covered', a.pool_covered) ? 0 : 1); return true; }
+      case 'pl-usage': this._plLog('set_usage', Number(k)); return true;
+      case 'pl-bathclear': this._plLog('set_bath_plan', 0); return true;
+      case 'pl-filter': this._plLog(k === 'clean' ? 'filter_clean' : 'filter_replace', 0); return false;
+      case 'pl-full': this._set.size.pool = 'f'; this._save(); return true;
+      case 'pl-info': this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId: t.dataset.id }, bubbles: true, composed: true })); return false;
+      default: return false;
+    }
+  }
+  _plAttr() { const id = this._xid('pool_rec'); const s = id && this._hass.states[id]; return (s && s.attributes) || {}; }
+  _plRows(a) {
+    const fromStore = a.data_source === 'Speicher'; const awC = a.awaiting_retest_chlor === true; const awP = a.awaiting_retest_ph === true;
+    const n = (v) => this._plNum(v); const dose = n(a.chlor_dose); const pre = n(a.chlor_pre);
+    const hasChlor = this._plKnown(a.chlor_ist) && !fromStore; const cr = this._plRange(a, 'chlor_min', 'chlor_max', 'chlor_target');
+    const hi = hasChlor && cr ? n(a.chlor_ist) - cr.high : 0; const lo = hasChlor && cr ? cr.low - n(a.chlor_ist) : 0;
+    const { on: plan, hrs: bh } = this._plPlan(a);
+    const bTime = this._plTime(a.bath_plan_until); const sp = (v, u) => { const s = this._plSpoons(v, u); return s ? ` <span class="pool-sp">(Messlöffel: ${s})</span>` : ''; };
+    let ct;
+    if (awC) ct = '<i>Warten auf erneute Messung nach Chlor-Zugabe.</i>';
+    else if (!hasChlor) ct = fromStore ? '<i>Warte auf neue Messung (Werte aus Speicher)</i>' : 'Warte auf Messwerte...';
+    else if (a.chlor_product_type === 'inorganic' && (dose > 0 || pre > 0)) {
+      const preT = `<b>${this._plDose(pre, 'g')}</b>`; const doseT = `<b>${this._plDose(dose, 'g')}</b>`;
+      const preM = plan ? `Jetzt ${preT} zugeben${sp(pre, 'g')}. So passt der Mindestwert voraussichtlich in ca. <b>${this._plHrs(bh)}h</b> um <b>${bTime} Uhr</b> noch.` : `Vor dem Baden bei Bedarf nur ${preT} bis in den sicheren Bereich korrigieren${sp(pre, 'g')}.`;
+      const doseM = `Nach der Nutzung ${doseT} anorganisches Chlor zur aktiven Desinfektion zugeben${sp(dose, 'g')}.`;
+      ct = pre > 0 && dose > 0 ? `${preM} ${doseM}` : pre > 0 ? preM : doseM;
+    } else if (dose > 0) ct = `Bitte <b>${this._plDose(dose, 'g')}</b> Chlor für den Zielbereich hinzufügen${sp(dose, 'g')} (Vor Baden: ca. ${this._plDose(pre, 'g')}).`;
+    else ct = hi > 0.2 ? `<span class="s-bd">Chlorwert ist zu hoch! (+${this._plN(hi)} mg/l)</span>` : lo > 0.2 ? 'Chlorwert zu niedrig.' : 'Chlorwert ist im Zielbereich.';
+    const la = a.last_chlor_action || {}; const lpp = a.last_ph_plus_action || {}; const lpm = a.last_ph_minus_action || {}; const lw = a.last_water_exchange_action || {};
+    const chist = la.time ? `Zuletzt: ${this._plN(la.amount)} g (${esc(la.time)})` : '';
+    const fm = a.chlor_forecast_message; const conf = { high: 'hoch', medium: 'mittel', low: 'niedrig', learning: 'Lernphase', unknown: 'unbekannt' }[a.chlor_forecast_confidence] || 'unbekannt';
+    const fc = fm ? `<div class="pool-note">${esc(fm)} Konfidenz: ${conf}.</div>` : '';
+    let bk = '';
+    if (dose > 0 && !awC && a.awaiting_retest !== true) {
+      const b = (v) => n(v) || 0; const sg = (v) => `${v > 0 ? '+' : ''}${this._plN(v)} g`; const rw = (l, v) => (v !== 0 ? `<div><span>${l}</span><span>${sg(v)}</span></div>` : '');
+      const sum = b(a.chlor_breakdown_sum_raw); const md = b(a.chlor_breakdown_min_dose_applied); const vol = n(a.volume_m3); const lit = n(a.volume_liters); const df = n(a.personal_chlor_dose_factor); const ec = n(a.effective_chlor_content); const sm = n((a.chlor_dose_factor_attributes || {}).samples);
+      const body = `<div><span>Basis (Ziel-Ist)</span><span>${this._plN(b(a.chlor_breakdown_base))} g</span></div>${rw('Schockchlorungsziel', b(a.chlor_breakdown_shock_adj))}${rw('Temperatur-Zuschlag', b(a.chlor_breakdown_temp_adj))}${rw('Offenes Becken', b(a.chlor_breakdown_env_adj))}${rw('UV-Zuschlag', b(a.chlor_breakdown_uv_adj))}${rw('Nutzung', b(a.chlor_breakdown_bather_adj))}
+        <div class="sum"><span>Summe (vor Min/Max)</span><span>${this._plN(sum)} g</span></div>${md > 0 ? `<div><span>Mindestdosis angewendet</span><span>+${this._plN(md - sum)} g</span></div>` : (dose !== sum ? `<div><span>Schockchlorungsgrenze angewendet</span><span>${this._plN(dose - sum)} g</span></div>` : '')}
+        <div class="sum"><span>Empfohlene Menge</span><span>${this._plN(dose)} g</span></div>${Number.isFinite(vol) && vol > 0 ? `<div><span>Berechnetes Volumen</span><span>${this._plHrs(vol, 3)} m³${Number.isFinite(lit) && lit > 0 ? ` (${this._plHrs(lit, 0)} l)` : ''}</span></div>` : ''}
+        ${Number.isFinite(df) && df > 0 ? `<div><span>Gelernter Dosierfaktor</span><span>${this._plN(df)}${Number.isFinite(sm) && sm > 0 ? ` (${sm} Samples)` : ''}</span></div>` : ''}${Number.isFinite(ec) && ec > 0 ? `<div><span>Effektiver Wirkstoff</span><span>${this._plN(ec, 3)}</span></div>` : ''}`;
+      bk = `<div class="pool-lnk" data-act="pl-open" data-k="bk">Berechnungsdetails ${this._P().open.bk ? '▴' : '▾'}</div>${this._P().open.bk ? `<div class="pool-bk">${body}</div>` : ''}`;
+    }
+    const input = (key, ph, dis, step = '0.1', go = key) => `<input type="number" inputmode="decimal" min="0" step="${step}" data-pk="${key}" data-go="${go}" placeholder="${dis ? 'Neue Messung abwarten' : ph}" ${dis ? 'disabled' : ''}>`;
+    const lab = (l, inp) => `<label>${l}${inp}</label>`;
+    let pt = fromStore ? '<i>Warte auf neue Messung...</i>' : 'Warte auf Messwerte...';
+    if (awP) pt = '<i>Warten auf erneute Messung nach pH-Zugabe.</i>';
+    else if (this._plKnown(a.ph_ist) && !fromStore) {
+      pt = 'pH-Wert ist im Zielbereich.';
+      if (n(a.ph_senker_total) > 0) pt = `📉 pH-Minus: ca. <b>${this._plDose(a.ph_senker_total, 'ml')}</b> hinzufügen.${sp(a.ph_senker_total, 'ml')}`;
+      else if (n(a.ph_erhoeher_total) > 0) pt = `📈 pH-Plus: ca. <b>${this._plDose(a.ph_erhoeher_total, 'g')}</b> hinzufügen.${sp(a.ph_erhoeher_total, 'g')}`;
+    }
+    const phist = [lpp.time ? `Zuletzt pH+: ${this._plN(lpp.amount)} g (${esc(lpp.time)})` : '', lpm.time ? `Zuletzt pH−: ${this._plN(lpm.amount)} ml (${esc(lpm.time)})` : ''].filter(Boolean).join(' | ');
+    const whist = lw.time ? `Zuletzt Wasserwechsel: ${this._plN(lw.liters, 0)} l / ${this._plN(lw.percent, 1)} % (${esc(lw.time)})` : '';
+    const row = (ic, main, hist, extra, inputs) => `<div class="pool-rr"><ha-icon icon="${ic}"></ha-icon><div class="pool-rc"><div>${main}</div>${hist ? `<div class="pool-hist">${hist}</div>` : ''}${extra || ''}<div class="pool-in">${inputs}</div></div></div>`;
+    return row('mdi:pill', ct, chist, fc + bk, `${input('chlor', 'Menge g', awC)}<button class="pool-ok" data-act="pl-go" data-k="chlor" ${awC ? 'disabled' : ''}>OK</button>`)
+      + row('mdi:test-tube', pt, phist, '', `${input('ph_plus', 'Plus g', awP)}${input('ph_minus', 'Minus ml', awP, '0.1', 'ph')}<button class="pool-ok" data-act="pl-go" data-k="ph" ${awP ? 'disabled' : ''}>OK</button>`)
+      + row('mdi:water-sync', a.cya_forecast_message || 'Keine CYA-Prognose verfügbar.', whist, '', `${lab('Wasserwechsel l', input('wex_l', 'l', false, '1', 'wex'))}${lab('Wasserwechsel %', input('wex_p', '%', false, '0.1', 'wex'))}<button class="pool-ok" data-act="pl-go" data-k="wex">OK</button>`);
+  }
+  _plTable(a) {
+    const cr = this._plRange(a, 'chlor_min', 'chlor_max', 'chlor_target'); const pr = this._plRange(a, 'ph_min', 'ph_max', 'ph_target'); const cya = this._plCya(a.cyanuric_acid, a.chlor_product_type);
+    const src = (s, m) => `<b>${esc(s || '--')}</b>${m ? `<small>${esc(m)}</small>` : ''}`; const bt = this._P().fetching || a.bluetooth_connected === true;
+    const r = (l, v, tg, so) => `<div class="pool-tr"><b>${l}</b><div>${v}</div><div>${tg}</div><div class="r">${so}</div></div>`;
+    return `<div class="pool-tb"><div class="pool-tr th"><div>Messwert</div><div>Ist</div><div>Ziel</div><div class="r">Quelle</div></div>
+      ${r('Chlor', `<b class="s-${this._plCls(a.chlor_ist, cr, 0.7)}">${this._plN(a.chlor_ist)} mg/l</b>`, this._plRangeTxt(cr, ' mg/l'), src(a.chlor_source, a.chlor_measurement))}
+      ${r('pH-Wert', `<b class="s-${this._plCls(a.ph_ist, pr, 0.3)}">${this._plN(a.ph_ist)}</b>`, this._plRangeTxt(pr), src(a.ph_source, a.ph_measurement))}
+      ${r('Temperatur', `<b>${this._plN(a.temp_ist)} °C</b>`, '--', src(a.temp_source, a.temp_measurement))}
+      ${r('Cyanursäure', `<b class="s-${cya.cls}">${this._plN(a.cyanuric_acid)} ppm</b>`, `${cya.target}<small class="s-${cya.cls}">${cya.label}</small>`, `${src(a.cyanuric_acid_source, a.cyanuric_acid_measurement)}<small>${cya.action}</small>`)}
+      ${r('BT Verbindung', `<b class="s-${bt ? 'ok' : 'bd'}">Bluetooth: ${bt ? 'Ja' : 'Nein'}</b>`, esc(a.ble_measurement || '--'), bt ? 'aktiv' : 'inaktiv')}</div>`;
+  }
+  _plActs(a) {
+    const l = Array.isArray(a.last_activities) ? a.last_activities : []; if (!l.length) return '';
+    const txt = (e) => {
+      if (e && e.text) return e.text; const ty = e && e.type; const am = e && e.amount; const f0 = (v) => this._plN(v, 0);
+      if (ty === 'chlor') return am != null ? `${f0(am)} g Chlor hinzugefügt` : 'Chlor hinzugefügt';
+      if (ty === 'ph_plus') return am != null ? `${f0(am)} g pH-Plus hinzugefügt` : 'pH-Plus hinzugefügt';
+      if (ty === 'ph_minus') return am != null ? `${f0(am)} ml pH-Minus hinzugefügt` : 'pH-Minus hinzugefügt';
+      if (ty === 'water_exchange') return `${f0(e.liters || am || 0)} l Wasser gewechselt (${this._plN(e.percent || 0, 1)} %)`;
+      if (ty === 'filter_clean') return 'Filter gereinigt'; if (ty === 'filter_replace') return 'Filter getauscht';
+      if (ty === 'set_covered') return `Abdeckung: ${am > 0 ? 'Abgedeckt' : 'Offen'}`;
+      if (ty === 'set_usage') return `Nutzungsmodus: ${{ 0: 'Keine', 1: 'Normal', 2: 'Party', none: 'Keine', normal: 'Normal', party: 'Party' }[am] || 'Keine'}`;
+      return '--';
+    };
+    return this._plSec('act', 'mdi:history', 'Letzte Aktivitäten', `${l.length} Einträge`, () => `<div class="pool-tb">${l.map((e) => `<div class="pool-tr hs"><b>${e && e.type === 'set_covered' ? 'Abdeckung' : e && e.type === 'set_usage' ? 'Modus' : 'Aktivität'}</b><div>✅ ${esc(txt(e))}</div><div class="r">${esc((e && e.time) || '--')}</div><div></div></div>`).join('')}</div>`);
+  }
+  _plHist(a) {
+    const l = Array.isArray(a.last_measurements_display) && a.last_measurements_display.length ? a.last_measurements_display : (Array.isArray(a.last_api_measurements) ? a.last_api_measurements.map((m) => ({ ...m, source: 'API' })) : []);
+    if (!l.length) return '';
+    return this._plSec('mh', 'mdi:cloud-download-outline', 'Letzte Chemie-Messwerte', `${Math.min(5, l.length)} Einträge`, () => `<div class="pool-tb"><div class="pool-tr th hs"><div>Quelle</div><div>Parameter</div><div>Wert</div><div class="r">Zeit</div></div>${l.slice(0, 5).map((m) => {
+      const t = m.timestamp ? new Date(m.timestamp).toLocaleString('de-DE', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '--';
+      const v = !isNaN(parseFloat(m.value)) ? this._plN(m.value) : m.value;
+      return `<div class="pool-tr hs"><b>${esc(m.source || 'API')}</b><div>${esc(m.parameter ? String(m.parameter).replace('PL ', '') : 'Unbekannt')}</div><div><b>${esc(v)}</b></div><div class="r">${t}</div></div>`;
+    }).join('')}</div>`);
+  }
+  _plFilter(a) {
+    const c = (v, s) => `<b class="${s === 'ok' ? 's-ok' : s === 'warning' ? 's-wn' : s === 'critical' ? 's-bd' : ''}">${v !== null && v !== undefined ? v : '--'}</b>`;
+    const hc = a.hours_since_filter_clean; const dr = a.days_since_filter_replace;
+    return this._plSec('flt', 'mdi:air-filter', 'Filter Wartung', `Reinigung ${hc != null ? `${hc}h` : '--'}, Wechsel ${dr != null ? `${dr}d` : '--'}`, () => `<div class="pool-kv"><span>Reinigung: ${c(hc, a.filter_clean_status)} Stunden her <small>(Empf. alle ${a.filter_clean_interval ?? '--'} Stunden)</small></span><button class="pool-btn alt" data-act="pl-filter" data-k="clean">Gereinigt</button></div>
+      <div class="pool-kv"><span>Wechsel: ${c(dr, a.filter_replace_status)} Tage her <small>(Empf. alle ${a.filter_replace_interval ?? '--'} Tage)</small></span><button class="pool-btn alt" data-act="pl-filter" data-k="replace">Gewechselt</button></div>`);
+  }
+  _plUsage(a) {
+    const cov = !!this._plOpt('covered', a.pool_covered); const um = this._plOpt('usage', a.usage_mode); const L = { none: 'Keine', normal: 'Normal', party: 'Party' };
+    const { on: plan, hrs: ph } = this._plPlan(a);
+    const sum = `${cov ? 'Abgedeckt' : 'Offen'}, Nutzung ${L[um] || 'Keine'}${plan && Number.isFinite(ph) ? `, Baden in ${this._plHrs(ph)}h` : ''}`;
+    return this._plSec('use', 'mdi:pool', 'Status & Nutzung', esc(sum), () => `<div class="pool-modes"><button class="pool-btn ${cov ? 'sel' : 'alt'}" data-act="pl-cover"><ha-icon icon="${cov ? 'mdi:pool' : 'mdi:sun-side'}" style="--mdc-icon-size:16px"></ha-icon> ${cov ? 'Abgedeckt' : 'Offen'}</button>
+      <button class="pool-btn ${um === 'none' || !um ? 'sel' : 'alt'}" data-act="pl-usage" data-k="0">Keine</button><button class="pool-btn ${um === 'party' ? 'sel' : 'alt'}" data-act="pl-usage" data-k="2">Party</button></div>
+      <div class="pool-in">${`<label>Baden in (Stunden)<input type="number" inputmode="decimal" min="0.5" max="24" step="0.5" data-pk="bath" data-go="bath" placeholder="Stunden"></label>`}<button class="pool-ok" data-act="pl-go" data-k="bath">Setzen</button><button class="pool-btn alt" data-act="pl-bathclear">Zurücksetzen</button></div>
+      <div class="pool-sp" style="margin-top:8px">${plan && Number.isFinite(ph) ? `Badeplan aktiv: in ${this._plHrs(ph)}h${a.bath_plan_until ? `, geplant für ${this._plTime(a.bath_plan_until)} Uhr` : ''}.` : 'Kein Badezeitpunkt geplant. Ohne Zeitangabe bleibt die Hauptdosierung für nach der Nutzung.'}</div>`);
+  }
+  _poolHtml() {
+    const h = this._hass; const recId = this._xid('pool_rec'); const rec = recId && h.states[recId]; const L = this._plLz();
+    const wi = this._xs('pool_winter');
+    if (wi && wi.state === 'on') return this._edit ? '<div class="en nopt"><div class="hd"><div class="ib"><ha-icon icon="mdi:snowflake"></ha-icon></div><div><b>Pool</b><span>Winterschlaf aktiv · Karte ist ausgeblendet</span></div></div></div>' : '';
+    const pt = this._xs('pool_temp');
+    if (!rec && !L.any && !pt) return '';
+    const a = rec ? rec.attributes : {}; const size = this._set.size.pool || 'f';
+    const tempV = rec && this._plKnown(a.temp_ist) ? this._plNum(a.temp_ist) : parseFloat((this._xs('lz_temp') || pt || {}).state);
+    const tempId = (rec && this._plKnown(a.temp_ist) ? recId : (this._xs('lz_temp') ? this._xid('lz_temp') : pt && pt.entity_id)) || recId;
+    const big = Number.isFinite(tempV) ? `<div class="big" data-act="pl-info" data-id="${tempId}">${this._plN(tempV, 1)}°</div>` : '';
+    const lerr = L.err ? this._plLzErr(h.states[L.err].state) : null;
+    const errHtml = lerr ? `<div class="pool-err"><ha-icon icon="mdi:alert-circle"></ha-icon><div><b>${esc(lerr.t)}</b><br><b>Bedeutung:</b> ${esc(lerr.m)}<br><b>Lösung:</b> ${esc(lerr.s)}</div></div>` : '';
+    const head = (sub) => `<div class="pool-hd"><div class="ib"><ha-icon icon="mdi:pool"></ha-icon></div><div class="tt"><b>Pool</b><span>${esc(sub)}</span></div>${big}</div>`;
+    if (!rec) return `<div class="pool">${head(L.any ? 'LayzSpa' : 'Wassertemperatur')}${errHtml}${L.any ? this._plLzSec(L) : ''}</div>`;
+    const stx = this._plStatus(rec); const bath = this._plBath(a); const rt = this._plRetest(a);
+    const comb = stx.cls === 'bd' || bath.cls === 'bd' ? 'bd' : stx.cls === 'bl' ? 'bl' : stx.cls === 'wn' || bath.cls === 'wn' ? 'wn' : 'ok';
+    const hasChlor = this._plKnown(a.chlor_ist) && a.data_source !== 'Speicher';
+    const cr = this._plRange(a, 'chlor_min', 'chlor_max', 'chlor_target'); const pr = this._plRange(a, 'ph_min', 'ph_max', 'ph_target'); const cya = this._plCya(a.cyanuric_acid, a.chlor_product_type);
+    const val = (l, v, u, cls, sub, id) => `<div class="pool-v" data-act="pl-info" data-id="${id}"><small>${l}</small><b class="${cls ? `s-${cls}` : ''}">${v}${u}</b><em>${sub}</em></div>`;
+    const vals = `${val('Chlor', this._plN(a.chlor_ist), ' mg/l', this._plCls(a.chlor_ist, cr, 0.7), `Ziel ${this._plRangeTxt(cr)}`, recId)}${val('pH', this._plN(a.ph_ist), '', this._plCls(a.ph_ist, pr, 0.3), `Ziel ${this._plRangeTxt(pr)}`, recId)}${val('Temperatur', this._plN(a.temp_ist, 1), ' °C', '', esc(a.temp_source || '--'), recId)}${val('Cyanursäure', this._plN(a.cyanuric_acid, 0), ' ppm', cya.cls, cya.label, recId)}`;
+    if (size !== 'f') {
+      return `<div class="pool">${head(hasChlor ? `Messung: ${a.last_measurement || '--'}` : 'Warte auf Messwerte')}${errHtml}
+        <div class="pool-strip" style="grid-template-columns:1fr"><div class="pool-seg ${stx.cls}"><small>Status</small><b>${esc(stx.t)}</b>${rt ? `<i>Nachmessfenster: ${esc(rt)}</i>` : ''}</div><div class="pool-seg ${bath.cls}"><small>Baden</small><b>${esc(bath.title)}</b><i>${esc(bath.detail)}</i></div></div>
+        <div class="pool-vals" style="grid-template-columns:repeat(2,minmax(0,1fr))">${vals}</div><div class="pool-in"><button class="pool-btn" data-act="pl-full">Alle Funktionen</button></div></div>`;
+    }
+    const fe = this._plFetchUi(a);
+    const fetchSeg = fe ? `<div class="pool-seg ${fe.cls}"><small>PoolLab</small><b>${esc(fe.st)}</b><i>Manueller Abruf direkt aus der Karte.</i><div class="pool-ab"><span class="pool-tag s-${fe.cls}">${fe.meta}</span><button class="pool-btn" data-act="pl-fetch" ${fe.dis ? 'disabled' : ''}>${fe.lab}</button></div></div>` : '';
+    const msum = `Chlor ${this._plN(a.chlor_ist)} mg/l, pH ${this._plN(a.ph_ist)}, ${this._plN(a.temp_ist, 1)} °C, CYA ${this._plN(a.cyanuric_acid, 0)} ppm`;
+    const lastCalc = a.last_calculation_raw || rec.last_updated;
+    return `<div class="pool">${head(`${a.data_source ? `Datenquelle: ${a.data_source}` : 'Smart Pool Assistant'}`)}${errHtml}
+      <div class="pool-strip" style="${fe ? '' : 'grid-template-columns:1fr 1fr'}"><div class="pool-seg ${stx.cls}"><small>Status</small><b>${esc(stx.t)}</b>${rt ? `<i>Nachmessfenster: ${esc(rt)}</i>` : ''}</div>
+        <div class="pool-seg ${bath.cls}"><small>Baden</small><b>${esc(bath.title)}</b><i>${esc(bath.detail)}</i></div>${fetchSeg}</div>
+      <div class="pool-vals">${vals}</div>
+      ${this._plRows(a)}
+      ${this._plWx(a)}${this._plStab(a)}
+      ${this._plSec('meas', 'mdi:gauge', 'Aktuelle Messwerte', esc(msum), () => this._plTable(a))}
+      ${L.any ? this._plLzSec(L) : ''}
+      ${this._plActs(a)}${this._plHist(a)}${this._plFilter(a)}${this._plUsage(a)}
+      <div class="pool-ft">Berechnet: ${esc(a.last_calculation || '--')} | Messung: ${esc(a.last_measurement || '--')}${a.last_measurement_source ? ` (${esc(a.last_measurement_source)})` : ''}<br>Daten-Aktualität: ${lastCalc ? ago(lastCalc) : '--'}</div></div>`;
+  }
+
   /* ---------- Aktionen ---------- */
   _click(e) {
     const t = e.target.closest('[data-act]'); if (!t) return;
@@ -1299,6 +1927,7 @@ _more() {
     e.stopPropagation();
     if (Date.now() - (this._dgAt || 0) < 450) return;
     if (this._edit && ['info', 'toggle', 'vstart', 'vdock', 'qrun'].includes(act)) return;
+    if (act.startsWith('pl-')) { if (this._edit) return; if (this._poolClick(t, act)) { this._sig = ''; this._render(); } return; }
     switch (act) {
       case 'nav': this._view = t.dataset.v; this._sheet = null; this._edit = false; break;
       case 'floor': this._floor = id; this._area = null; break;
@@ -1439,13 +2068,8 @@ registerCard({ id: 'printer', label: '3D-Drucker', icon: 'mdi:printer-3d-nozzle'
   return items;
 } });
 registerCard({ id: 'pool', label: 'Pool', icon: 'mdi:pool', items: (c) => {
-  const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };
-    const pt = c._xs('pool_temp');
-    if (pt) {
-      const sw = (k, l) => { const s = h.states[c._xid(k)]; return s ? `<button class="pill ${s.state === 'on' ? 'sel' : ''}" data-act="toggle" data-id="${s.entity_id}">${l} ${s.state === 'on' ? 'an' : 'aus'}</button>` : ''; };
-      add('pool', c._panel('mdi:pool', 'Pool', 'Wassertemperatur', `${c._de(parseFloat(pt.state), 1)}°`, `<div class="pills">${sw('pool_pump', 'Pumpe')}${sw('pool_heat', 'Heizung')}</div>`, pt.entity_id), true);
-    }
-  return items;
+  const html = c._poolHtml();
+  return html ? [{ id: 'pool', html, size: 'f' }] : [];
 } });
 registerCard({ id: 'wx', label: 'Wetter', icon: 'mdi:weather-partly-cloudy', items: (c) => {
   const h = c._hass; const items = []; const add = (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); };

@@ -10,6 +10,7 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - "Aktiv jetzt" mit Lichtern, Medien und frei hinzufügbaren Karten, optional nur bei Aktivität
 - Steckdosen-Karten: Ein/Aus, aktuelle Leistung in Watt und Tagesspitze mit Uhrzeit (Leistungssensor am selben Gerät wird automatisch zugeordnet)
 - Räume je Etage und Area, Kameraübersicht; Temperatur und Luftfeuchte im Raumkopf automatisch aus der Area (abgeleitete Werte wie Taupunkt werden ignoriert), pro Raum wählbar unter Bearbeiten, Sensoren
+- Pool-Karte (Smart Pool Assistant + LayzSpa): Status, Badeampel, PoolLab-Abruf, Chlor-/pH-/CYA-Empfehlung mit Eintragen von Zugaben und Wasserwechsel, Berechnungsdetails, Wetter, Stabilität, Messwerte, LayzSpa (Pumpe, Heizung, Blubber, Zieltemperatur, Heizzeit-Prognose, Fehlercodes), Aktivitäten, Filterwartung, Abdeckung, Nutzung und Badeplan. Winterschlaf blendet sie aus. Ohne Integration bleibt die LayzSpa-Steuerung
 - Tab "Mehr": Haushaltsgeräte (Waschmaschine, Trockner, Spülmaschine mit Programm, Fortschritt, Restzeit), Pakete, Energie, Zähler (Strom, Gas, Wasser, Ersparnis), 3D-Drucker, Pool, Wetter, Tankzeit, HA-Health, Pi-hole, Lage Deutschland. Karten ohne verfügbare Daten bleiben ausgeblendet
 - Warn-Chips neben "x Lampen an" und in der Meldungszeile: DWD-Wetterwarnungen (automatisch erkannt), NINA-Warnungen, Eiswarnung, Fahrrad-Hinweis, Pollen (nur bei Belastung) und Fahrzeiten (Waze, Bahn); Details per Tipp. Ein- und ausschaltbar unter Meldungen
 - Lüftungszeile unter Temperatur und Luftfeuchte (Room Climate): Empfehlung, Dauer, erste Räume, nächstes Lüftungsfenster
@@ -67,6 +68,24 @@ info:              # optional
 color_from: "#f2eadb"
 color_to: "#d6c5a8"
 ```
+
+## Pool-Karte
+
+Alle Entitäten werden automatisch erkannt (Quellen, Gruppe Pool) und lassen sich unter "Quellen" oder per YAML überschreiben:
+
+```yaml
+type: custom:lumora-card
+extras:
+  pool_rec: sensor.pool_empfehlung
+  pool_winter: input_boolean.pool_winterschlaf
+  lz_conn: binary_sensor.layzspa_connection
+  lz_ctl: climate.layzspa_temperature_control
+pool:                      # optional
+  weather_entity: weather.home
+  heat_eta: { enabled: true, history_hours: 48, fallback_rate_c_per_hour: 3 }
+```
+
+Die Karte ist standardmäßig in voller Breite; bei klein oder breit zeigt sie nur Status, Badeampel und Messwerte.
 
 ## Releases
 
