@@ -401,6 +401,13 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .dvm{display:flex;flex-direction:column;gap:8px}.dvm>div{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:13px;cursor:pointer}.dvm span{color:var(--fg2)}
 .dvm i{grid-column:1/-1;height:5px;border-radius:3px;background:var(--line);overflow:hidden}.dvm i u{display:block;height:100%;background:var(--b)}.dvm i.lo u{background:#c9694f}
 .dverr{display:flex;gap:8px;align-items:center;background:rgba(200,80,60,.16);border-radius:12px;padding:8px 10px;font-size:13px}.dverr ha-icon{--mdc-icon-size:20px;flex:none}
+.bb{height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:5px}.bb u{display:block;height:100%;background:#7fa56a}.bb.wn u{background:#d9a441}.bb.lo u{background:#c9694f}
+.br em.lo,.br>ha-icon.lo{color:#c9694f}.br em.wn,.br>ha-icon.wn{color:#b8862b}
+.px{display:grid;grid-template-columns:auto minmax(0,1fr) 74px 74px;gap:4px 10px;align-items:center;padding:9px 0;border-top:1px solid var(--line);cursor:pointer;margin-top:4px}
+.px>ha-icon{--mdc-icon-size:22px}.px .t{min-width:0}.px .t b{display:block;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.px .t span{font-size:12px;color:var(--fg2)}
+.px>span{font-size:12.5px;text-align:right;white-space:nowrap}.px.off>ha-icon,.px.off .st{color:#c9694f}.px.na{opacity:.55}.px .st{grid-column:span 2;font-weight:600}
+.dvc.pxoff{opacity:.85}
+@media (max-width:480px){.px{grid-template-columns:auto minmax(0,1fr) 62px 62px;gap:4px 6px}.px>span{font-size:12px}}
 `;
 
 const SIZES = ['s', 'w', 'f'];
@@ -1077,7 +1084,7 @@ _more() {
     const n = dv && (dv.name_by_user || dv.name); if (n) return n;
     return cleanName(String((h.states[id] && h.states[id].attributes.friendly_name) || id).replace(/\s*(batterie|battery|akku)\s*(level|stand)?\s*$/i, ''));
   }
-  _batteries() {
+  _batteries(all) {
     const h = this._hass; const lim = this._set.battLimit; const ig = this._set.ignore; const out = [];
     for (const id in h.states) {
       const d = dom(id); if (d !== 'sensor' && d !== 'binary_sensor') continue;
@@ -1086,7 +1093,7 @@ _more() {
       if (BATX.test(norm(`${id} ${a.friendly_name || ''}`))) continue;
       let v = null;
       if (d === 'sensor') {
-        v = parseFloat(st.state); if (isNaN(v) || v > lim) continue;
+        v = parseFloat(st.state); if (isNaN(v) || (!all && v > lim)) continue;
         if (a.unit_of_measurement && a.unit_of_measurement !== '%') continue;
       } else if (st.state !== 'on') continue;
       out.push({ id, v, name: this._devName(id) });
@@ -1099,6 +1106,61 @@ _more() {
     const more = l.length > 8 ? `<div class="pkr"><span>+ ${l.length - 8} weitere</span></div>` : '';
     const ed = this._edit ? `<div class="pills" style="margin-top:10px"><button class="pill" data-act="bl">Grenze ${lim} %</button>${ig ? `<button class="pill" data-act="ignclear">${ig} ausgeblendet, zurücksetzen</button>` : ''}</div>` : '';
     return `<div class="en nopt"><div class="hd"><div class="ib"><ha-icon icon="mdi:battery-alert-variant-outline"></ha-icon></div><div><b>Batterien schwach</b><span>bis ${lim} %</span></div><div class="big">${l.length}</div></div>${rows || '<div class="empty">Alle Batterien in Ordnung.</div>'}${more}${ed}</div>`;
+  }
+  _battAllHtml(l) {
+    const lim = this._set.battLimit; const ig = this._set.ignore.length;
+    const low = l.filter((x) => x.v === null || x.v <= lim).length;
+    const rows = l.slice(0, this._battMore ? l.length : 8).map((x) => {
+      const cls = x.v === null || x.v <= 10 ? 'lo' : x.v <= lim ? 'wn' : '';
+      const ic = x.v === null || x.v <= 5 ? 'mdi:battery-alert-variant-outline' : x.v >= 95 ? 'mdi:battery' : `mdi:battery-${Math.max(10, Math.round(x.v / 10) * 10)}`;
+      const bar = x.v === null ? '' : `<div class="bb ${cls}"><u style="width:${Math.max(2, Math.min(100, x.v))}%"></u></div>`;
+      return `<div class="br" data-act="info" data-id="${x.id}"><ha-icon class="${cls}" icon="${ic}"></ha-icon><div class="t"><b>${esc(x.name)}</b><span>${esc(this._aname(this._areaOf(x.id)))}</span>${bar}</div><em class="${cls}">${x.v === null ? 'schwach' : `${Math.round(x.v)} %`}</em>${this._edit ? `<span class="mini" data-act="ign" data-id="${x.id}"><ha-icon icon="mdi:eye-off"></ha-icon></span>` : ''}</div>`;
+    }).join('');
+    const more = l.length > 8 ? `<div class="pills" style="margin-top:8px"><button class="pill" data-act="battmore">${this._battMore ? 'Weniger anzeigen' : `Alle ${l.length} anzeigen`}</button></div>` : '';
+    const ed = this._edit ? `<div class="pills" style="margin-top:10px"><button class="pill" data-act="bl">Warnschwelle ${lim} %</button>${ig ? `<button class="pill" data-act="ignclear">${ig} ausgeblendet, zurücksetzen</button>` : ''}</div>` : '';
+    return `<div class="en nopt"><div class="hd"><div class="ib"><ha-icon icon="mdi:battery-heart-variant"></ha-icon></div><div><b>Batterien</b><span>${low ? `${low} schwach (bis ${lim} %)` : 'alle in Ordnung'}</span></div><div class="big">${l.length}</div></div>${rows}${more}${ed}</div>`;
+  }
+  /* ---------- Proxmox (Integration proxmoxve): Node, LXC, VM ---------- */
+  _pxDur(ms) { const m = Math.max(0, Math.floor(ms / 60000)); const d = Math.floor(m / 1440); const hh = Math.floor((m % 1440) / 60); return d ? `${d} d ${hh} h` : hh ? `${hh} h ${m % 60} min` : `${m} min`; }
+  _pxAgo(iso) { const t = new Date(iso).getTime(); if (isNaN(t)) return ''; const m = Math.max(0, Math.round((Date.now() - t) / 60000)); return m < 60 ? `vor ${m} min` : m < 1440 ? `vor ${Math.floor(m / 60)} h` : `vor ${Math.floor(m / 1440)} d`; }
+  _pxState(F) {
+    const s = this._dvS(F.state); const rn = F.running && this._hass.states[F.running];
+    if (s) return { key: s.state, on: s.state === 'running' || s.state === 'online', txt: PX_ST[s.state] || s.state };
+    if (rn && rn.state === 'on') return { key: 'running', on: true, txt: PX_ST.running };
+    if (rn && rn.state === 'off') return { key: 'stopped', on: false, txt: PX_ST.stopped };
+    return { key: 'na', on: false, txt: 'Nicht verfügbar' };
+  }
+  _pxUse(F, k, kmax, kp) {
+    const u = this._num(F[k]); const m = this._num(F[kmax]); let p = kp ? this._num(F[kp]) : null;
+    if (p === null && u !== null && m) p = u / m * 100;
+    const st = F[k] && this._hass.states[F[k]];
+    return { u, m, p, unit: st ? st.attributes.unit_of_measurement || '' : '' };
+  }
+  _pxDevices() {
+    const h = this._hass; const reg = h.entities || {}; const by = {};
+    for (const id in reg) { const r = reg[id]; if (!r || r.platform !== 'proxmoxve' || !r.device_id || r.hidden || !h.states[id]) continue; (by[r.device_id] || (by[r.device_id] = [])).push(id); }
+    const out = [];
+    for (const did in by) {
+      const ids = by[did]; const F = {};
+      for (const k in PXF) F[k] = ids.find((i) => this._dvMatch(i, PXF[k])) || null;
+      F.running = ids.find((i) => dom(i) === 'binary_sensor' && h.states[i].attributes.device_class === 'running') || null;
+      const dv = h.devices && h.devices[did];
+      out.push({ did, F, kind: pxKind(dv && dv.model, F), name: dv ? (dv.name_by_user || dv.name) : did, st: this._pxState(F), main: F.running || F.state || ids[0] });
+    }
+    const ord = { node: 0, lxc: 1, vm: 2 };
+    return out.sort((a, b) => ord[a.kind] - ord[b.kind] || String(a.name).localeCompare(String(b.name), 'de'));
+  }
+  _pxHtml(l) {
+    const run = l.filter((x) => x.st.on).length; const node = l.find((x) => x.kind === 'node');
+    const lb = node && this._dvS(node.F.lastbackup); const bp = node && node.F.backup && this._hass.states[node.F.backup];
+    const sub = `${run} von ${l.length} laufen${lb ? ` · Backup ${this._pxAgo(lb.state)}` : ''}${bp && bp.state === 'on' ? ' · Backup-Problem' : ''}`;
+    const rows = l.map((x) => {
+      const K = PX_KIND[x.kind]; const cls = x.st.on ? '' : x.st.key === 'na' ? 'na' : 'off';
+      const c = this._num(x.F.cpu); const r = this._pxUse(x.F, 'ram', 'rammax', 'ramp').p;
+      const vals = x.st.on ? `<span>${c !== null ? `CPU ${this._de(c, c < 10 ? 1 : 0)} %` : ''}</span><span>${r !== null ? `RAM ${this._de(r)} %` : ''}</span>` : `<span class="st">${esc(x.st.txt)}</span>`;
+      return `<div class="px ${cls}" data-act="info" data-id="${x.main}"><ha-icon icon="${K.icon}"></ha-icon><div class="t"><b>${esc(x.name)}</b><span>${K.l}</span></div>${vals}</div>`;
+    }).join('');
+    return `<div class="en nopt"><div class="hd"><div class="ib"><ha-icon icon="mdi:server"></ha-icon></div><div><b>Proxmox</b><span>${esc(sub)}</span></div><div class="big">${run}/${l.length}</div></div>${rows}</div>`;
   }
   _offline() {
     const h = this._hass; const ig = this._set.ignore; const dev = {};
@@ -1490,9 +1552,12 @@ _more() {
   /* ---------- Gerätekarten: Vorlagen mit automatischer Zuordnung ---------- */
   _dvAll() { return this._set.devices.filter((x) => DEVTPL[x.type]); }
   _dvMains(tp) {
-    const sp = tp.main; const out = Object.values(this._hass.states).filter((x) => {
+    const sp = tp.main; const reg0 = this._hass.entities || {};
+    const usePl = sp.platform && Object.values(reg0).some((r) => r && r.platform === sp.platform);
+    const out = Object.values(this._hass.states).filter((x) => {
       const id = x.entity_id; const a = x.attributes;
       if (![].concat(sp.dom).includes(dom(id))) return false;
+      if (usePl && !(reg0[id] && reg0[id].platform === sp.platform)) return false;
       if (sp.dc && a.device_class !== sp.dc) return false;
       if (sp.unit && !sp.unit.includes(a.unit_of_measurement)) return false;
       const r = this._hass.entities && this._hass.entities[id]; return !(r && r.hidden);
@@ -2265,6 +2330,7 @@ _more() {
       }
       case 'ign': if (!s.ignore.includes(id)) s.ignore.push(id); this._bd = null; this._save(); break;
       case 'ignclear': s.ignore = []; this._bd = null; this._save(); break;
+      case 'battmore': this._battMore = !this._battMore; break;
       case 'bl': { const Lm = [10, 15, 20, 30]; s.battLimit = Lm[(Lm.indexOf(s.battLimit) + 1) % Lm.length]; this._bd = null; this._save(); break; }
       case 'cc': if (s.devices.some((x) => x.id === id)) { this._sheet = 'dv'; this._dvId = id; } else { this._sheet = 'cc'; this._ccId = id; } break;
       case 'cckind': { const cu = s.custom.find((x) => x.id === this._ccId); if (cu) { cu.kind = t.dataset.k; this._save(); } break; }
@@ -2486,6 +2552,73 @@ registerDevice({
       ${c._spark(c._hist(id, 24), 56, 'a')}${stats ? `<div class="dvs">${stats}</div>` : ''}${strs ? `<div class="dvm">${strs}</div>` : ''}</div>`;
   },
 });
+/* Proxmox: Entitäten der Integration proxmoxve (deutsche und englische Namen). Pro Gerät (Node, LXC, VM) werden sie am selben Gerät gesucht. */
+const MAXS = 'maximal|maximum|max_|_max(?:[^a-z]|$)';
+const MEMS = '(?:^|[^a-z])ram(?:[^a-z]|$)|arbeitsspeicher|memory';
+const DSKS = 'massenspeicher|disk|storage';
+const pxMax = (w) => new RegExp(`(?=.*(?:${w}))(?=.*(?:${MAXS}))`);
+const PXF = {
+  state: { l: 'Status', dom: 'sensor', dc: 'enum', re: /status|state|zustand/, not: /backup/ },
+  cpu: { l: 'CPU-Auslastung', dom: 'sensor', unit: ['%'], re: /cpu/, not: new RegExp(MAXS) },
+  cpumax: { l: 'CPU-Kerne', dom: 'sensor', re: pxMax('cpu') },
+  ram: { l: 'RAM belegt', dom: 'sensor', dc: 'data_size', re: new RegExp(MEMS), not: new RegExp(MAXS) },
+  ramp: { l: 'RAM in Prozent', dom: 'sensor', unit: ['%'], re: new RegExp(MEMS) },
+  rammax: { l: 'RAM gesamt', dom: 'sensor', dc: 'data_size', re: pxMax(MEMS) },
+  disk: { l: 'Speicher belegt', dom: 'sensor', dc: 'data_size', re: new RegExp(DSKS), not: new RegExp(`${MAXS}|${MEMS}`) },
+  diskmax: { l: 'Speicher gesamt', dom: 'sensor', dc: 'data_size', re: pxMax(DSKS) },
+  uptime: { l: 'Betriebszeit', dom: 'sensor', re: /betriebszeit|uptime/ },
+  netin: { l: 'Netzwerk ein', dom: 'sensor', dc: 'data_size', re: /netzwerk.?eingang|network.?in(?:[^a-z]|$)|net.?in(?:[^a-z]|$)/ },
+  netout: { l: 'Netzwerk aus', dom: 'sensor', dc: 'data_size', re: /netzwerk.?ausgang|network.?out|net.?out/ },
+  backup: { l: 'Backup-Problem (Node)', dom: 'binary_sensor', re: /backup/ },
+  lastbackup: { l: 'Letztes Backup (Node)', dom: 'sensor', re: /letztes.?backup|last.?backup/ },
+  backupdur: { l: 'Backup-Dauer (Node)', dom: 'sensor', re: /backup.?dauer|backup.?duration/ },
+};
+const PX_KIND = { node: { l: 'Node', icon: 'mdi:server' }, lxc: { l: 'LXC', icon: 'mdi:cube-outline' }, vm: { l: 'VM', icon: 'mdi:monitor' } };
+const PX_ST = { running: 'Läuft', stopped: 'Gestoppt', suspended: 'Pausiert', online: 'Online', offline: 'Offline', unknown: 'Unbekannt' };
+const pxKind = (model, F) => (F.backup || F.lastbackup || /node|host/i.test(model || '') ? 'node' : /container|lxc/i.test(model || '') ? 'lxc' : 'vm');
+registerDevice({
+  type: 'proxmox', label: 'Proxmox (Node, LXC, VM)', icon: 'mdi:server', desc: 'Status, CPU, RAM, Speicher, Laufzeit, Netzwerk und Backup', size: 'w',
+  main: { dom: 'binary_sensor', dc: 'running', platform: 'proxmoxve', prefer: /proxmox|pve|lxc/ },
+  fields: PXF,
+  render: (c, iv, F, st) => {
+    const id = iv.main; const r0 = c._hass.entities && c._hass.entities[id]; const dd = r0 && r0.device_id && c._hass.devices && c._hass.devices[r0.device_id];
+    const kind = pxKind(dd && dd.model, F); const K = PX_KIND[kind]; const S = c._pxState({ ...F, running: id });
+    const name = iv.title || (dd && (dd.name_by_user || dd.name)) || st.attributes.friendly_name || id;
+    const up = c._dvS(F.uptime); const upMs = up ? Date.now() - new Date(up.state).getTime() : NaN;
+    const sub = [K.l, S.txt, S.on && !isNaN(upMs) ? `seit ${c._pxDur(upMs)}` : ''].filter(Boolean).join(' · ');
+    const cpu = c._num(F.cpu); const cores = c._num(F.cpumax);
+    const bar = (l, p, txt, eid) => (p === null ? '' : `<div data-act="info" data-id="${eid}"><b>${l}</b><span>${txt}</span><i class="${p >= 90 ? 'lo' : ''}"><u style="width:${Math.max(1, Math.min(100, p))}%"></u></i></div>`);
+    const use = (k, kmax, kp, eid, l) => {
+      const o = c._pxUse(F, k, kmax, kp); if (o.p === null) return '';
+      const txt = o.u !== null && o.m ? `${c._de(o.u, 1)} von ${c._de(o.m, 1)} ${esc(o.unit)} · ${c._de(o.p)} %` : `${c._de(o.p)} %`;
+      return bar(l, o.p, txt, eid);
+    };
+    const bars = S.on ? [
+      cpu === null ? '' : bar('CPU', cpu, `${c._de(cpu, cpu < 10 ? 1 : 0)} %${cores ? ` · ${c._de(cores)} Kerne` : ''}`, F.cpu),
+      use('ram', 'rammax', 'ramp', F.ram || F.ramp, 'Arbeitsspeicher'),
+      use('disk', 'diskmax', null, F.disk, 'Speicher'),
+    ].join('') : '';
+    const stat = (l, s2, d) => (s2 ? `<div data-act="info" data-id="${s2.entity_id}"><small>${l}</small><b>${c._dvVal(s2, d)}</b></div>` : '');
+    const lb = c._dvS(F.lastbackup); const bd = c._dvS(F.backupdur);
+    const stats = [
+      S.on ? stat('Netzwerk ein', c._dvS(F.netin), 1) : '', S.on ? stat('Netzwerk aus', c._dvS(F.netout), 1) : '',
+      lb ? `<div data-act="info" data-id="${lb.entity_id}"><small>Letztes Backup</small><b>${esc(c._pxAgo(lb.state))}</b></div>` : '',
+      bd ? `<div data-act="info" data-id="${bd.entity_id}"><small>Backup-Dauer</small><b>${esc(c._state(bd))}</b></div>` : '',
+    ].join('');
+    const bp = F.backup && c._hass.states[F.backup];
+    const err = bp && bp.state === 'on' ? '<div class="dverr"><ha-icon icon="mdi:alert-circle"></ha-icon><div>Backup-Problem</div></div>' : '';
+    return `<div class="dvc ${S.on ? 'run' : 'pxoff'}"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="${K.icon}"></ha-icon></div><div class="tt"><b>${esc(name)}</b><span>${esc(sub)}</span></div>${S.on && cpu !== null ? `<div class="big">${c._de(cpu, cpu < 10 ? 1 : 0)} %</div>` : ''}</div>${err}
+      ${S.on && F.cpu ? c._spark(c._hist(F.cpu, 24), 40, 'a') : ''}${bars ? `<div class="dvm">${bars}</div>` : ''}${stats ? `<div class="dvs">${stats}</div>` : ''}</div>`;
+  },
+});
+registerCard({ id: 'proxmox', label: 'Proxmox', icon: 'mdi:server', size: 'w', items: (c) => {
+  const l = c._pxDevices();
+  return l.length ? [{ id: 'proxmox', html: c._pxHtml(l), size: 'w' }] : [];
+} });
+registerCard({ id: 'batt_all', label: 'Batterien Übersicht', icon: 'mdi:battery-heart-variant', size: 'w', items: (c) => {
+  const l = c._batteries(true);
+  return l.length ? [{ id: 'batt_all', html: c._battAllHtml(l), size: 'w' }] : [];
+} });
 registerCard({ id: 'dev', label: 'Gerätekarten', icon: 'mdi:view-grid-plus-outline', home: true, size: 'w', items: (c) => c._dvAll().map((iv) => {
   const tp = DEVTPL[iv.type]; const st = c._hass.states[iv.main];
   if (!st) return c._edit ? { id: iv.id, html: `<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="${tp.icon}"></ha-icon></div><div class="tt"><b>${esc(iv.title || tp.label)}</b><span>${esc(iv.main)} nicht gefunden</span></div></div></div>`, size: tp.size, cfg: true } : null;
