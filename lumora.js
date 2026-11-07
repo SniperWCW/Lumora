@@ -1293,6 +1293,11 @@ _more() {
       if (d === 'sensor' && !['temperature', 'humidity', ...SENSOR_CLASSES].includes(dc)) continue;
       (areas[a] || (areas[a] = [])).push(st);
     }
+    /* Räume ohne eigene Entitäten bleiben sichtbar, sobald eine Karte (z. B. Proxmox) dorthin verschoben wurde */
+    new Set(Object.values(this._set.place).filter((p) => typeof p === 'string' && p.startsWith('area:')).map((p) => p.slice(5))).forEach((aid) => {
+      if (areas[aid] || !(h.areas && h.areas[aid])) return;
+      if (this._regItems(`area:${aid}`).some((x) => this._edit || !this._set.hidden.includes(x.id))) areas[aid] = [];
+    });
     const floors = {};
     const fl = h.floors || {};
     Object.keys(areas).forEach((aid) => {
