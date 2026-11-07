@@ -139,7 +139,7 @@ const dom = (id) => id.split('.')[0];
 const merge = (v) => {
   v = v || {};
   const arr = (k) => [...(v[k] || DEF[k])];
-  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify } };
+  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify } };
 };
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -591,8 +591,25 @@ const Fx = (() => {
     g.addColorStop(0, `rgba(255,214,120,${(0.2 + 0.03 * Math.sin(t * 0.6)) * a})`); g.addColorStop(1, 'rgba(255,214,120,0)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   };
+  /* Mond weicht der Kopfzeile aus (Alarm-Pille, HA-Leiste): neben ihr, bei Platzmangel darunter */
+  let mpAt = 0; let mp = null;
+  const moonPos = (r) => {
+    const now = Date.now();
+    if (!mp || mp.r !== r || now - mpAt > 500) {
+      mpAt = now; let y = 56 + r * 2.2;
+      try {
+        const o = owners.values().next().value; const top = o && o.shadowRoot && o.shadowRoot.querySelector('.top');
+        if (top) {
+          const b = top.getBoundingClientRect(); const last = top.lastElementChild; const lr = last ? last.getBoundingClientRect() : b;
+          y = (W - lr.right) < r * 3.4 + 12 ? b.bottom + r * 2 : b.top + b.height / 2;
+        }
+      } catch { /* ignore */ }
+      mp = { r, x: W - r * 2.4 - 8, y: Math.max(56 + r * 2, Math.min(y, H * 0.3)) };
+    }
+    return [mp.x, mp.y];
+  };
   const drawMoon = (a) => {
-    const r = Math.max(22, Math.min(34, W * 0.03)); const mx = W - r * 2.6; const my = r * 2.4; const p = moonPhase();
+    const r = W < 600 ? 16 : Math.max(22, Math.min(34, W * 0.03)); const [mx, my] = moonPos(r); const p = moonPhase();
     ctx.save(); ctx.translate(mx, my);
     const g = ctx.createRadialGradient(0, 0, r * 0.8, 0, 0, r * 3.2);
     g.addColorStop(0, `rgba(230,236,255,${0.28 * a})`); g.addColorStop(1, 'rgba(230,236,255,0)');
@@ -854,8 +871,10 @@ class LumoraCard extends HTMLElement {
     const base = this._cfg && this._cfg.layout && this._cfg.shared !== false ? this._cfg.layout : null;
     /* Jeder Benutzer darf bearbeiten: eigene Einstellungen haben Vorrang, sonst gilt das veröffentlichte Gruppenlayout */
     this._hasBase = !!base;
-    const pick = mine || base;
-    if (pick) this._set = merge(pick);
+    /* Wurde das Gruppenlayout nach den eigenen Einstellungen veröffentlicht, gilt es (Stempel _pub/_base) */
+    const bp = base ? (base._pub || 0) : 0; const useMine = !!mine && (!base || (mine._base || 0) >= bp);
+    const pick = useMine ? mine : base;
+    if (pick) { this._set = merge(pick); if (!useMine) this._set._base = bp; }
     this._loaded = true; this._sig = this._signature(); this._fxUpdate(true); this._render();
   }
   async _save() {
@@ -867,7 +886,7 @@ class LumoraCard extends HTMLElement {
   /* Eigene Einstellungen verwerfen, danach gilt wieder das veröffentlichte Gruppenlayout */
   async _resetMine() {
     const base = this._cfg && this._cfg.layout; if (!base) return;
-    this._set = merge(base);
+    this._set = merge(base); this._set._base = base._pub || 0;
     try { localStorage.removeItem(KEY); } catch { /* ignore */ }
     try { await this._hass.callWS({ type: 'frontend/set_user_data', key: KEY, value: null }); } catch { /* ignore */ }
     this._msg = 'Zurückgesetzt: Es gilt wieder das Gruppenlayout.'; this._sig = ''; this._render();
@@ -1748,12 +1767,14 @@ _more() {
     const h = this._hass; const seg = (location.pathname.split('/')[1] || ''); const url = !seg || seg === 'lovelace' ? null : seg;
     this._msg = 'Speichere …'; this._render();
     try {
+      this._set._pub = Date.now(); this._set._base = this._set._pub;
       const cfg = await h.callWS({ type: 'lovelace/config', url_path: url, force: true });
       let hit = false;
       const walk = (o) => { if (!o || typeof o !== 'object' || hit) return; if (o.type === 'custom:lumora-card') { o.layout = JSON.parse(JSON.stringify(this._set)); hit = true; return; } Object.values(o).forEach(walk); };
       walk(cfg);
       if (!hit) throw new Error('Karte nicht im Dashboard gefunden');
       await h.callWS({ type: 'lovelace/config/save', url_path: url, config: cfg });
+      this._hasBase = true; this._save();
       this._msg = 'Layout gespeichert. Andere Benutzer sehen es nach dem Neuladen.';
     } catch (e) { this._msg = `Speichern nicht möglich (${(e && (e.message || e.code)) || e}). Das Dashboard muss im Bearbeitungsmodus der Oberfläche liegen und du Administrator sein.`; }
     this._render(); clearTimeout(this._mt); this._mt = setTimeout(() => { this._msg = null; if (!this._dg) this._render(); }, 6000);
