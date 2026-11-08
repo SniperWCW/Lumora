@@ -114,7 +114,9 @@ const DOM_ICON = {
   climate: 'mdi:thermostat', media_player: 'mdi:speaker', camera: 'mdi:cctv', fan: 'mdi:fan', lock: 'mdi:lock',
   vacuum: 'mdi:robot-vacuum', scene: 'mdi:palette', script: 'mdi:script-text', sensor: 'mdi:eye',
   binary_sensor: 'mdi:checkbox-blank-circle-outline', humidifier: 'mdi:air-humidifier',
+  button: 'mdi:gesture-tap-button', alarm_control_panel: 'mdi:shield-home', automation: 'mdi:robot', input_button: 'mdi:gesture-tap-button', update: 'mdi:package-up', lawn_mower: 'mdi:robot-mower', valve: 'mdi:valve',
 };
+const NAME_ICON = [[/stumm|mute|silence/i, 'mdi:bell-off'], [/restart|neustart|reboot/i, 'mdi:restart'], [/identify|finden|locate/i, 'mdi:map-marker-radius']];
 const DC_ICON = {
   door: ['mdi:door-open', 'mdi:door-closed'], garage_door: ['mdi:garage-open', 'mdi:garage'],
   window: ['mdi:window-open-variant', 'mdi:window-closed-variant'], opening: ['mdi:square-outline', 'mdi:square-outline'],
@@ -148,12 +150,15 @@ const ago = (iso) => {
   const h = Math.floor(m / 60);
   return h < 24 ? `seit ${h} h` : `seit ${Math.floor(h / 24)} d`;
 };
+const EVT_SUFFIX = [[/\s+Latest\s+Object\s+Detector\s+Snapshot\s*$/i, 'Letzte Erkennung'], [/\s+Latest\s+Thumbnail\s*$/i, 'Letztes Ereignis']];
 const cleanName = (n) => {
   let s = String(n || '').replace(/\s*(Motion Detected|Belegung|Bewegung|Person Detection|Motion Alarm)\s*$/i, '').trim();
+  let tail = '';
+  for (const [re, label] of EVT_SUFFIX) if (re.test(s)) { s = s.replace(re, '').trim(); tail = label; break; }
   const w = s.split(' ');
   const half = w.length / 2;
   if (Number.isInteger(half) && w.slice(0, half).join(' ') === w.slice(half).join(' ')) s = w.slice(0, half).join(' ');
-  return s;
+  return tail ? `${s} · ${tail}` : s;
 };
 
 const CSS = `
@@ -285,6 +290,7 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .en .rl span:last-child{white-space:nowrap;flex:none}
 .mw.sz-w{grid-column:span 2}.mw.sz-f{grid-column:1/-1}
 .mw>.card,.mw>.en,.mw>.qs{height:100%;box-sizing:border-box}
+.mw.qw{align-self:start}.mw.qw>.qs{height:auto}
 .card.sz-w,.vc.sz-w,.cl.sz-w,.ap.sz-w{grid-column:span 2}.card.sz-f,.vc.sz-f,.cl.sz-f,.ap.sz-f{grid-column:1/-1}
 .mw .tools{flex-wrap:wrap;justify-content:flex-end;max-width:100%}.mw .tools .mini{width:30px;height:30px}.mw .tools .mini ha-icon{--mdc-icon-size:17px}
 .mini.sz{position:absolute;top:6px;left:70px;z-index:2;background:rgba(40,30,20,.72);color:#fff;width:26px;height:26px}
@@ -914,6 +920,7 @@ class LumoraCard extends HTMLElement {
     if (d === 'light') return on ? 'mdi:lightbulb' : 'mdi:lightbulb-outline';
     if (d === 'cover') return st.state === 'open' ? 'mdi:window-shutter-open' : 'mdi:window-shutter';
     if (d === 'lock') return st.state === 'unlocked' ? 'mdi:lock-open' : 'mdi:lock';
+    if (d === 'button' || d === 'input_button') { const nm = NAME_ICON.find(([re]) => re.test(`${st.entity_id} ${a.friendly_name || ''}`)); if (nm) return nm[1]; }
     return DOM_ICON[d] || 'mdi:circle-outline';
   }
   _alerts() {
@@ -1417,7 +1424,7 @@ _more() {
     const hd = this._set.hidden.includes(x.id);
     if (hd && !this._edit) return '';
     const opts = { size: x.size, place: x.def.fixed ? null : scope, cfg: x.cfg };
-    return `<div class="mw sz-${x.size} ${hd ? 'hid' : ''}">${this._tools(scope, x.id, 'hidden', opts)}${x.html}</div>`;
+    return `<div class="mw sz-${x.size} ${x.id === 'quick' ? 'qw' : ''} ${hd ? 'hid' : ''}">${this._tools(scope, x.id, 'hidden', opts)}${x.html}</div>`;
   }
 
   /* ---------- Verlauf (Sparklines) ---------- */
