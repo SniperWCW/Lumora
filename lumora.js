@@ -26,6 +26,7 @@ const DEF = {
   fx: {},
   snooze: {},
   notify: { push: '', tts: '', min: 0 },
+  door: { bell: [], motion: [], cam: '', secs: 30 },
 };
 const norm = (t) => String(t || '').toLowerCase().replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ß/g, 'ss');
 const PV = '(?:^|[^a-z])pv(?:[^a-z]|$)|solar|photovolt';
@@ -141,7 +142,7 @@ const dom = (id) => id.split('.')[0];
 const merge = (v) => {
   v = v || {};
   const arr = (k) => [...(v[k] || DEF[k])];
-  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify } };
+  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify }, door: { ...DEF.door, ...v.door, bell: [...((v.door && v.door.bell) || [])], motion: [...((v.door && v.door.motion) || [])] } };
 };
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -290,6 +291,14 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .en .rl span:last-child{white-space:nowrap;flex:none}
 .mw.sz-w{grid-column:span 2}.mw.sz-f{grid-column:1/-1}
 .mw>.card,.mw>.en,.mw>.qs{height:100%;box-sizing:border-box}
+.dbp{position:fixed;top:0;right:0;bottom:0;left:0;z-index:50}
+.dbb{position:absolute;top:0;right:0;bottom:0;left:0;background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box}
+.dbc{width:100%;max-width:720px;max-height:100%;overflow:auto;background:var(--sheet);color:var(--fg);border-radius:24px;padding:14px;box-sizing:border-box}
+.dbh{display:flex;align-items:center;gap:12px;margin-bottom:10px}.dbh>div{flex:1;min-width:0}.dbh b{display:block;font-size:18px}.dbh span{font-size:12.5px;color:var(--fg2)}.dbh>ha-icon{--mdc-icon-size:28px;color:var(--accent)}
+.dbv{position:relative;height:0;padding-top:56.25%;border-radius:16px;overflow:hidden;background:#000}.dbv img,.dbv ha-camera-stream{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block}
+.dbbar{height:4px;border-radius:2px;background:var(--line);margin:10px 0;overflow:hidden}.dbbar i{display:block;height:100%;background:var(--accent);animation:dbbar linear forwards}
+@keyframes dbbar{from{width:100%}to{width:0}}
+.dbf{display:flex;gap:8px;justify-content:flex-end}
 .mw.qw{align-self:start}.mw.qw>.qs{height:auto}
 [data-act]:focus{outline:none}[data-act]:focus-visible{outline:2px solid var(--accent,#c28a2c);outline-offset:2px}
 .card.sz-w,.vc.sz-w,.cl.sz-w,.ap.sz-w{grid-column:span 2}.card.sz-f,.vc.sz-f,.cl.sz-f,.ap.sz-f{grid-column:1/-1}
@@ -765,6 +774,7 @@ class LumoraCard extends HTMLElement {
       if (e.target.dataset && e.target.dataset.pk) setTimeout(() => { if (!this._plFocus() && this._hass) { this._sig = ''; this.hass = this._hass; } }, 200);
     });
     this.shadowRoot.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this._db) { this._doorHide(true); return; }
       if (e.key === 'Escape' && this._sheet) { this._sheet = null; this._sig = ''; this._render(); return; }
       const ka = e.target && e.target.closest && e.target.closest('[data-act]');
       if ((e.key === 'Enter' || e.key === ' ') && ka && ka === e.target && !/^(BUTTON|INPUT|TEXTAREA|SELECT|A)$/.test(ka.tagName) && !e.target.dataset.go) { e.preventDefault(); ka.click(); return; }
@@ -815,14 +825,15 @@ class LumoraCard extends HTMLElement {
       if (el && al.length > 1) { this._ai = (this._ai + 1) % al.length; el.textContent = al[this._ai].text; if (el.parentElement) el.parentElement.className = `note sv${al[this._ai].sev}`; }
     }, 5000);
   }
-  disconnectedCallback() { clearInterval(this._tick); Fx.detach(this); }
+  disconnectedCallback() { clearInterval(this._tick); this._doorHide(); Fx.detach(this); }
 
   set hass(h) {
     const first = !this._hass;
     this._hass = h;
     if (first) this._load();
     if (this._loaded) this._notifyAlerts();
-    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'dv', 'dvadd', 'dvmain', 'dvpick'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
+    if (this._loaded) this._doorCheck();
+    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'dv', 'dvadd', 'dvmain', 'dvpick', 'dbpick'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
     if (this._down && this._edit) { this._pend = true; return; }
     if (this._plFocus()) return;
     this._fxUpdate();
@@ -1145,6 +1156,80 @@ class LumoraCard extends HTMLElement {
     if (on('trav') && hasTr) out.push('<button class="pill" data-act="trav"><ha-icon icon="mdi:car-clock"></ha-icon>Fahrzeiten</button>');
     return out.join('');
   }
+  /* ---------- Türklingel & Bewegung: Kamera-Popup ---------- */
+  _doorCheck() {
+    const d = this._set.door; const h = this._hass; if (!d || !h) return;
+    const prev = this._dbPrev || (this._dbPrev = {}); const first = !this._dbInit; this._dbInit = true;
+    const BAD = ['unavailable', 'unknown', 'off', 'idle', 'none', 'clear', 'closed', 'not_home', 'standby'];
+    [...d.bell.map((id) => [id, 'bell']), ...d.motion.map((id) => [id, 'motion'])].forEach(([id, kind]) => {
+      const st = h.states[id]; const was = prev[id]; prev[id] = st ? st.state : undefined;
+      if (!st || first || was === undefined || was === st.state || was === 'unavailable' || BAD.includes(st.state)) return;
+      if (Date.now() - new Date(st.last_changed).getTime() > 30000) return;
+      this._doorShow(id, kind);
+    });
+  }
+
+  _doorCam(id, kind) {
+    const h = this._hass; const d = this._set.door;
+    const area = id && this._areaOf(id);
+    const inArea = area ? (Object.values(h.states).find((s) => dom(s.entity_id) === 'camera' && s.state !== 'unavailable' && this._areaOf(s.entity_id) === area && !/_latest_(thumbnail|object_detector_snapshot)$/.test(s.entity_id)) || {}).entity_id : '';
+    const order = kind === 'bell' ? [d.cam, inArea] : [inArea, d.cam];
+    return order.find((c) => c && h.states[c]) || '';
+  }
+
+  _doorShow(id, kind) {
+    const h = this._hass; const d = this._set.door; const now = Date.now();
+    if (kind === 'motion' && now < (this._dbCool || 0)) return;
+    if (this._db && this._db.kind === 'bell' && kind !== 'bell') return;
+    const cam = this._doorCam(id, kind); if (!cam) return;
+    const st = h.states[id]; const area = id && this._areaOf(id);
+    const title = kind === 'bell' ? 'Es hat geklingelt' : `Bewegung${area ? ` · ${this._aname(area)}` : ''}`;
+    const sub = `${(st && st.attributes.friendly_name) || ''}${st ? ' · ' : ''}${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+    clearTimeout(this._dbT);
+    this._dbT = setTimeout(() => this._doorHide(), Math.max(5, d.secs || 30) * 1000);
+    if (this._db && this._db.cam === cam && this._db.kind === kind) { this._doorBar(); return; }
+    this._doorHide(); this._db = { cam, kind };
+    const el = document.createElement('div'); el.className = 'dbp'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', title);
+    const secs = Math.max(5, d.secs || 30);
+    el.innerHTML = `<div class="dbb" data-act="dbclose"><div class="dbc" data-act="noop"><div class="dbh"><ha-icon icon="${kind === 'bell' ? 'mdi:bell-ring' : 'mdi:motion-sensor'}"></ha-icon><div><b>${esc(title)}</b><span>${esc(sub)}</span></div></div><div class="dbv"></div><div class="dbbar"><i style="animation-duration:${secs}s"></i></div><div class="dbf"><button class="pill" data-act="dbopen" data-id="${esc(cam)}"><ha-icon icon="mdi:cctv"></ha-icon>Details</button><button class="pill sel" data-act="dbclose">Schließen</button></div></div></div>`;
+    this._dbEl = el; this.shadowRoot.appendChild(el); this._doorMedia();
+    this._dbI = setInterval(() => this._doorMedia(), 2000);
+    this._a11y();
+  }
+
+  _doorBar() {
+    const i = this._dbEl && this._dbEl.querySelector('.dbbar i'); if (!i) return;
+    i.style.animation = 'none'; void i.offsetWidth; i.style.animation = '';
+  }
+
+  _doorMedia() {
+    const v = this._dbEl && this._dbEl.querySelector('.dbv'); const st = this._db && this._hass.states[this._db.cam]; if (!v || !st) return;
+    if (customElements.get('ha-camera-stream')) {
+      let s = v.querySelector('ha-camera-stream');
+      if (!s) { s = document.createElement('ha-camera-stream'); s.muted = true; s.controls = false; s.setAttribute('muted', ''); v.appendChild(s); }
+      s.hass = this._hass; s.stateObj = st; return;
+    }
+    const base = st.attributes.entity_picture; if (!base) return;
+    let img = v.querySelector('img'); if (!img) { img = document.createElement('img'); img.alt = ''; v.appendChild(img); }
+    img.src = `${base}${base.includes('?') ? '&' : '?'}_t=${Date.now()}`;
+  }
+
+  _doorHide(manual) {
+    clearTimeout(this._dbT); clearInterval(this._dbI);
+    if (manual && this._db && this._db.kind === 'motion') this._dbCool = Date.now() + 20000;
+    if (this._dbEl && this._dbEl.parentNode) this._dbEl.parentNode.removeChild(this._dbEl);
+    this._dbEl = null; this._db = null;
+  }
+
+  _doorCands(kind, q) {
+    const BELL = /klingel|doorbell|bell|ring/i; const MOT = /motion|occupancy|person|bewegung|presence/i;
+    const rx = kind === 'bell' ? BELL : MOT; const doms = kind === 'bell' ? ['event', 'binary_sensor', 'button', 'input_button', 'sensor'] : ['binary_sensor', 'event'];
+    return Object.values(this._hass.states).filter((s) => doms.includes(dom(s.entity_id)))
+      .map((s) => ({ id: s.entity_id, name: s.attributes.friendly_name || s.entity_id, ok: rx.test(`${s.entity_id} ${s.attributes.friendly_name || ''} ${s.attributes.device_class || ''}`) ? 1 : 0 }))
+      .filter((x) => (q ? norm(`${x.id} ${x.name}`).includes(q) : x.ok))
+      .sort((a, b) => b.ok - a.ok || a.name.localeCompare(b.name, 'de')).slice(0, 80);
+  }
+
   /* Klickbare Flächen für Tastatur und Screenreader erreichbar machen */
   _a11y() {
     const sh = this.shadowRoot.querySelector('.sheet'); if (sh && !sh.getAttribute('role')) { sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'true'); }
@@ -1178,13 +1263,14 @@ class LumoraCard extends HTMLElement {
     if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((i) => { (keep[i.dataset.b] || (keep[i.dataset.b] = [])).push(i); });
     this.shadowRoot.innerHTML = `<style>${CSS}</style><div class="app" style="position:relative"><div class="body">${body}</div><div class="nav">${nav}</div>${this._sheetHtml()}</div>`;
     this._a11y();
+    if (this._dbEl) this.shadowRoot.appendChild(this._dbEl);
     if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((n) => { const o = (keep[n.dataset.b] || []).shift(); if (o && o !== n) n.replaceWith(o); });
     const nb = this.shadowRoot.querySelector('.body'); if (nb) nb.scrollTop = top;
     if (qa) {
       Object.keys(pk).forEach((k) => { const i = this.shadowRoot.querySelector(`[data-pk="${k}"]`); if (i && !i.disabled) i.value = pk[k]; });
       if (fk) { const i = this.shadowRoot.querySelector(`[data-pk="${fk.k}"]`); if (i) { i.focus(); try { if (fk.s != null) i.setSelectionRange(fk.s, fk.e); } catch (_) { /* number-Felder */ } } }
     }
-    if (['add', 'srcpick', 'quick', 'dvmain', 'dvpick'].includes(this._sheet)) this._fillList();
+    if (['add', 'srcpick', 'quick', 'dvmain', 'dvpick', 'dbpick'].includes(this._sheet)) this._fillList();
   }
   _num(id) { const st = this._hass.states[id]; const v = st ? parseFloat(st.state) : NaN; return isNaN(v) ? null : v; }
   _w(v) { return Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')} kW` : `${Math.round(v)} W`; }
@@ -1236,7 +1322,7 @@ class LumoraCard extends HTMLElement {
       this._chipOn('outdoor') ? wpill : '',
       this._infoPills(al),
       al.length && this._chipOn('count') ? `<button class="pill ${al.some((a) => a.sev === 0) ? 'bad' : 'warn'}" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>${al.length} Meldung${al.length > 1 ? 'en' : ''}</button>` : '',
-      this._edit ? '<button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips</button><button class="pill" data-act="src"><ha-icon icon="mdi:link-variant"></ha-icon>Quellen</button><button class="pill" data-act="hc"><ha-icon icon="mdi:cctv"></ha-icon>Kameras</button><button class="pill" data-act="fx"><ha-icon icon="mdi:weather-night"></ha-icon>Effekte</button>' : '',
+      this._edit ? '<button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips</button><button class="pill" data-act="src"><ha-icon icon="mdi:link-variant"></ha-icon>Quellen</button><button class="pill" data-act="hc"><ha-icon icon="mdi:cctv"></ha-icon>Kameras</button><button class="pill" data-act="door"><ha-icon icon="mdi:bell-ring"></ha-icon>Klingel</button><button class="pill" data-act="fx"><ha-icon icon="mdi:weather-night"></ha-icon>Effekte</button>' : '',
     ].join('');
     const cards = [];
     if (lights.length) {
@@ -1943,6 +2029,20 @@ _more() {
         <div class="row"><div class="t"><b>Bewegung reduzieren beachten</b><span>Gerät meldet „weniger Animationen“: keine Effekte</span></div>${tg('respect', f.respect)}</div>
         <h4>Effekte</h4>${FX_KEYS.map((k) => { const e = f.e[k]; const ml = k === 'weather' ? FX_WMODE_L[e.m] : FX_MODE_L[e.m]; return `<div class="row"><div class="t"><b>${FX_LABEL[k][0]}</b><span>${FX_LABEL[k][1]}</span></div><button class="${e.m === 'off' ? '' : 'sel'}" data-act="fxm" data-k="${k}">${ml}</button><button data-act="fxd" data-k="${k}">${durL(e.d)}</button></div>`; }).join('')}
         <div class="hint">Beim Wetter lassen sich Regen, Schnee, Gewitter und Nebel zum Ausprobieren fest einstellen.</div>`;
+    } else if (this._sheet === 'door') {
+      const d = this._set.door; const cn = d.cam && this._hass.states[d.cam];
+      const lst = (k) => d[k].map((id) => `<div class="row"><ha-icon icon="${k === 'bell' ? 'mdi:bell-ring' : 'mdi:motion-sensor'}"></ha-icon><div class="t"><b>${esc((this._hass.states[id] && this._hass.states[id].attributes.friendly_name) || id)}</b><span>${esc(id)}</span></div><button data-act="dbdel" data-k="${k}" data-id="${esc(id)}">Entfernen</button></div>`).join('');
+      c = `<h2>Türklingel &amp; Bewegung</h2><div class="hint">Bei Auslösung öffnet sich die Kamera als Popup und schließt von selbst. Wirkt nur, solange Lumora geöffnet ist (z. B. am Wandtablet). Bewegung nutzt bevorzugt die Kamera im selben Raum.</div>
+        <h4>Standard-Kamera</h4><div class="row" data-act="dbcam"><ha-icon icon="mdi:cctv"></ha-icon><div class="t"><b>${esc(cn ? cn.attributes.friendly_name : 'Nicht gewählt')}</b><span>Für die Türklingel und wenn im Raum keine Kamera liegt</span></div></div>
+        <h4>Anzeigedauer</h4><div class="row"><div class="t"><b>${d.secs} Sekunden</b></div><button data-act="dbsecs">Ändern</button></div>
+        <h4>Türklingel</h4>${lst('bell')}<div class="row" data-act="dbadd" data-k="bell"><ha-icon icon="mdi:plus"></ha-icon><div class="t"><b>Auslöser hinzufügen</b></div></div>
+        <h4>Bewegung</h4>${lst('motion')}<div class="row" data-act="dbadd" data-k="motion"><ha-icon icon="mdi:plus"></ha-icon><div class="t"><b>Bewegungsmelder hinzufügen</b></div></div>
+        <div class="row" style="border:0"><button data-act="dbtest">Popup testen</button><button class="sel" data-act="close">Fertig</button></div>`;
+    } else if (this._sheet === 'dbcam') {
+      const cams = (this._byDomain().camera || []).filter((x) => x.state !== 'unavailable'); const cur = this._set.door.cam;
+      c = `<h2>Standard-Kamera</h2>${cams.map((x) => `<div class="row" data-act="dbsetcam" data-id="${esc(x.entity_id)}"><ha-icon icon="mdi:cctv"></ha-icon><div class="t"><b>${esc(cleanName(x.attributes.friendly_name))}</b><span>${esc(x.entity_id)}</span></div><ha-icon icon="${cur === x.entity_id ? 'mdi:check-circle' : 'mdi:circle-outline'}"></ha-icon></div>`).join('') || '<div class="empty">Keine Kameras gefunden.</div>'}`;
+    } else if (this._sheet === 'dbpick') {
+      c = `<h2>${this._dbk === 'bell' ? 'Türklingel-Auslöser' : 'Bewegungsmelder'}</h2><div class="hint">Binärsensor, Ereignis- oder Tasten-Entität. Ohne Suche erscheinen passende Vorschläge.</div><input class="srch" placeholder="Suchen" value="${esc(this._q)}"><div class="list"></div><div class="row" style="border:0"><button class="sel" data-act="dbback">Fertig</button></div>`;
     } else if (this._sheet === 'quick') {
       c = `<h2>Schnellaktionen</h2><div class="hint">Szenen, Skripte und Tasten mit einem Tipp auslösen. Mehrfachauswahl möglich.</div><input class="srch" placeholder="Suchen" value="${esc(this._q)}"><div class="list"></div>`;
     } else if (this._sheet === 'cc') {
@@ -1980,6 +2080,11 @@ _more() {
       const l = Object.values(this._hass.states).filter((x) => [].concat(sp.dom).includes(dom(x.entity_id)) && (!q || norm(`${x.entity_id} ${x.attributes.friendly_name || ''}`).includes(q)));
       l.sort((a, b) => (near.has(b.entity_id) ? 1 : 0) - (near.has(a.entity_id) ? 1 : 0));
       el.innerHTML = l.slice(0, 60).map((x) => `<div class="row" data-act="dvset" data-k="${k}" data-id="${esc(x.entity_id)}"><ha-icon icon="mdi:link-variant"></ha-icon><div class="t"><b>${esc(x.attributes.friendly_name || x.entity_id)}</b><span>${esc(x.entity_id)}${near.has(x.entity_id) ? ' · am selben Gerät' : ''}</span></div></div>`).join('') || '<div class="empty">Nichts gefunden.</div>';
+      return;
+    }
+    if (this._sheet === 'dbpick') {
+      const sel = this._set.door[this._dbk] || [];
+      el.innerHTML = this._doorCands(this._dbk, norm(this._q)).map((x) => `<div class="row" data-act="dbtog" data-id="${esc(x.id)}"><ha-icon icon="${this._dbk === 'bell' ? 'mdi:bell-ring' : 'mdi:motion-sensor'}"></ha-icon><div class="t"><b>${esc(x.name)}</b><span>${esc(x.id)}</span></div><ha-icon icon="${sel.includes(x.id) ? 'mdi:check-circle' : 'mdi:circle-outline'}"></ha-icon></div>`).join('') || '<div class="empty">Nichts gefunden. Suche nach einem Namen.</div>';
       return;
     }
     if (this._sheet === 'quick') {
@@ -2752,6 +2857,17 @@ _more() {
       case 'fxg': { const f = s.fx; const k = t.dataset.k; if (k === 'level') f.level = FX_LEVELS[(FX_LEVELS.findIndex((l) => l[1] === f.level) + 1) % FX_LEVELS.length][1]; else f[k] = !f[k]; this._save(); break; }
       case 'fxm': { const e = s.fx.e[t.dataset.k]; const L = t.dataset.k === 'weather' ? FX_WMODES : FX_MODES; e.m = L[(L.indexOf(e.m) + 1) % L.length]; this._save(); break; }
       case 'fxd': { const e = s.fx.e[t.dataset.k]; e.d = FX_DURS[(FX_DURS.indexOf(e.d) + 1) % FX_DURS.length]; this._save(); break; }
+      case 'door': this._sheet = 'door'; break;
+      case 'dbcam': this._sheet = 'dbcam'; break;
+      case 'dbsetcam': s.door.cam = id; this._save(); this._sheet = 'door'; break;
+      case 'dbsecs': { const L = [15, 30, 60, 120]; s.door.secs = L[(L.indexOf(s.door.secs) + 1) % L.length]; this._save(); break; }
+      case 'dbadd': this._dbk = t.dataset.k; this._q = ''; this._sheet = 'dbpick'; break;
+      case 'dbtog': { const l = s.door[this._dbk]; s.door[this._dbk] = l.includes(id) ? l.filter((x) => x !== id) : [...l, id]; this._save(); this._fillList(); return; }
+      case 'dbdel': s.door[t.dataset.k] = s.door[t.dataset.k].filter((x) => x !== id); this._save(); break;
+      case 'dbback': this._sheet = 'door'; break;
+      case 'dbtest': this._sheet = null; this._doorShow('', 'bell'); break;
+      case 'dbclose': this._doorHide(true); return;
+      case 'dbopen': this._doorHide(); this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId: id }, bubbles: true, composed: true })); return;
       case 'hc': this._sheet = 'hc'; break;
       case 'hcam': s.homeCams = s.homeCams.includes(id) ? s.homeCams.filter((x) => x !== id) : [...s.homeCams, id]; this._save(); break;
       case 'src': this._sheet = 'src'; this._ac = null; break;
