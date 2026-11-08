@@ -28,6 +28,13 @@ jobs:
           cp lumora.js "$RUNNER_TEMP/lumora.mjs"
           node --check "$RUNNER_TEMP/lumora.mjs"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Tests
+        run: npm test
+
       - name: Calculate next version
         id: version
         run: |

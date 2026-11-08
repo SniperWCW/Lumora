@@ -1,8 +1,8 @@
-/* Lumora v0.1.0
+/* Lumora
  * Schnelle, abhängigkeitsfreie Karte: Startseite mit gefilterten Meldungen + Räume je Etage/Area + Kameras.
  * Einbindung: Ressource /local/lumora/lumora.js (Typ: JavaScript-Modul), Karte: type: custom:lumora-card (Panel-Ansicht). Optional: theme: forest.
  */
-const VERSION = '0.1.0';
+const VERSION = '0.0.0-dev';
 const KEY = 'lumora_panel';
 const DEF = {
   alerts: { door: true, window: true, motion: true, smoke: true, alarm: true, lock: false, weather: true, climate: true },
@@ -291,6 +291,7 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .mw.sz-w{grid-column:span 2}.mw.sz-f{grid-column:1/-1}
 .mw>.card,.mw>.en,.mw>.qs{height:100%;box-sizing:border-box}
 .mw.qw{align-self:start}.mw.qw>.qs{height:auto}
+[data-act]:focus{outline:none}[data-act]:focus-visible{outline:2px solid var(--accent,#c28a2c);outline-offset:2px}
 .card.sz-w,.vc.sz-w,.cl.sz-w,.ap.sz-w{grid-column:span 2}.card.sz-f,.vc.sz-f,.cl.sz-f,.ap.sz-f{grid-column:1/-1}
 .mw .tools{flex-wrap:wrap;justify-content:flex-end;max-width:100%}.mw .tools .mini{width:30px;height:30px}.mw .tools .mini ha-icon{--mdc-icon-size:17px}
 .mini.sz{position:absolute;top:6px;left:70px;z-index:2;background:rgba(40,30,20,.72);color:#fff;width:26px;height:26px}
@@ -765,6 +766,8 @@ class LumoraCard extends HTMLElement {
     });
     this.shadowRoot.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this._sheet) { this._sheet = null; this._sig = ''; this._render(); return; }
+      const ka = e.target && e.target.closest && e.target.closest('[data-act]');
+      if ((e.key === 'Enter' || e.key === ' ') && ka && ka === e.target && !/^(BUTTON|INPUT|TEXTAREA|SELECT|A)$/.test(ka.tagName) && !e.target.dataset.go) { e.preventDefault(); ka.click(); return; }
       if (e.key !== 'Enter' || !e.target.dataset || !e.target.dataset.go) return;
       e.preventDefault(); if (this._poolClick({ dataset: { k: e.target.dataset.go } }, 'pl-go')) { this._sig = ''; this._render(); }
     });
@@ -791,7 +794,13 @@ class LumoraCard extends HTMLElement {
   }
   setConfig(cfg) {
     this._cfg = cfg || {};
-    if (cfg && cfg.theme) this.setAttribute('theme', cfg.theme);
+    if (this._mq && this._mqf) { try { this._mq.removeEventListener('change', this._mqf); } catch (_) { /* ältere Browser */ } this._mq = this._mqf = null; }
+    if (cfg && cfg.theme === 'auto' && window.matchMedia) {
+      this._mq = window.matchMedia('(prefers-color-scheme: dark)');
+      this._mqf = () => this.setAttribute('theme', this._mq.matches ? 'forest' : 'sand');
+      this._mqf();
+      try { this._mq.addEventListener('change', this._mqf); } catch (_) { /* ältere Browser */ }
+    } else if (cfg && cfg.theme) this.setAttribute('theme', cfg.theme);
     if (cfg && cfg.color_from) this.style.setProperty('--zp-from', cfg.color_from);
     if (cfg && cfg.color_to) this.style.setProperty('--zp-to', cfg.color_to);
   }
@@ -1136,6 +1145,15 @@ class LumoraCard extends HTMLElement {
     if (on('trav') && hasTr) out.push('<button class="pill" data-act="trav"><ha-icon icon="mdi:car-clock"></ha-icon>Fahrzeiten</button>');
     return out.join('');
   }
+  /* Klickbare Flächen für Tastatur und Screenreader erreichbar machen */
+  _a11y() {
+    const sh = this.shadowRoot.querySelector('.sheet'); if (sh && !sh.getAttribute('role')) { sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'true'); }
+    this.shadowRoot.querySelectorAll('[data-act]').forEach((el) => {
+      if (/^(BUTTON|INPUT|TEXTAREA|SELECT|A)$/.test(el.tagName) || el.getAttribute('role') || el.dataset.act === 'noop' || el.classList.contains('sbg')) return;
+      el.setAttribute('role', 'button'); el.setAttribute('tabindex', '0');
+    });
+  }
+
   _byDomain() {
     const D = {};
     for (const id in this._hass.states) { const st = this._hass.states[id]; const r = this._hass.entities && this._hass.entities[id]; if (r && r.hidden) continue; (D[dom(id)] || (D[dom(id)] = [])).push(st); }
@@ -1159,6 +1177,7 @@ class LumoraCard extends HTMLElement {
     }
     if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((i) => { (keep[i.dataset.b] || (keep[i.dataset.b] = [])).push(i); });
     this.shadowRoot.innerHTML = `<style>${CSS}</style><div class="app" style="position:relative"><div class="body">${body}</div><div class="nav">${nav}</div>${this._sheetHtml()}</div>`;
+    this._a11y();
     if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((n) => { const o = (keep[n.dataset.b] || []).shift(); if (o && o !== n) n.replaceWith(o); });
     const nb = this.shadowRoot.querySelector('.body'); if (nb) nb.scrollTop = top;
     if (qa) {
@@ -1940,6 +1959,10 @@ _more() {
     return `<div class="sbg" data-act="close"><div class="sheet" data-act="noop"><div class="sxw"><button class="sx" data-act="close" aria-label="Schließen"><ha-icon icon="mdi:close"></ha-icon></button></div>${c}</div></div>`;
   }
   _fillList() {
+    this._fillList0(); this._a11y();
+  }
+
+  _fillList0() {
     const el = this.shadowRoot.querySelector('.list'); if (!el) return;
     if (this._sheet === 'srcpick') {
       const q = norm(this._q); const k = this._sk;

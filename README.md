@@ -33,6 +33,8 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - Freie Platzierung: im Bearbeiten-Modus am Ordner-Symbol einer Karte (Zuhause, Mehr oder ein beliebiger Raum wählen); in Räumen über "Karte" Karten in den Raum holen
 - Gerätekarten: vordefinierte Karten pro Gerät (Karte hinzufügen, Gerätekarte), derzeit Staubsauger (Start/Pause, Station, Finden, Saugstufe, Fläche, Dauer, Filter und Bürsten, Fehler), PV-Anlage (Leistung, Verlauf, Ertrag heute und gesamt, Strings, Prognose) und Proxmox (Node, LXC oder VM: Status, Laufzeit, CPU mit 24-h-Verlauf, RAM, Speicher, Netzwerk, beim Node Backup-Alter, Dauer und Backup-Problem; in der Auswahl erscheinen nur Geräte der Proxmox-Integration). Passende Entitäten werden automatisch gefunden, zuerst am selben Gerät, dann an gleichem Namensanfang. Jedes Feld lässt sich über das Zahnrad der Karte selbst wählen oder abschalten. Mehrere Karten desselben Typs sind möglich. Eigene Vorlagen: `window.LumoraDevices.register({ type, label, icon, main, fields, render })`
 - Effekte: Stimmungs-Overlay über dem ganzen Dashboard (Canvas, ohne Abhängigkeiten): Wetter (Regen, Schnee, Hagel, Gewitter, Nebel, Wolken nach Wetter-Entität), Nachthimmel (Sterne, Mond mit Phase, Sternschnuppen nach Sonnenstand), Herbst (Blätter), Halloween (Fledermäuse, Spinne, Geister) und Weihnachten (Schnee, Lichterkette, Schlitten). Bearbeiten, Effekte: je Effekt Auto, Immer an oder Aus und eine Dauer (dauerhaft bis 1 Std.), dazu Intensität. Pausiert bei verstecktem Tab und beachtet "Bewegung reduzieren" des Geräts
+- Bedienung per Tastatur (Tab, Enter, Leertaste) mit sichtbarem Fokus; Dialoge sind für Screenreader als solche markiert
+- Kameras mit Ereignisbildern (z. B. Tapo/Frigate „Latest Thumbnail“ und „Object Detector Snapshot“) heißen „… · Letztes Ereignis“ bzw. „… · Letzte Erkennung"
 - Karten-Register: jede Karte ist ein Objekt (`id`, `label`, `icon`, `home`, `size`, `items`). Fehler in einer Karte legen nicht das Dashboard lahm. Erweiterbar per `window.LumoraCards.register({...})`
 
 ## Installation
@@ -54,7 +56,7 @@ Dashboard-Ansicht vom Typ `panel` mit folgender Karte:
 ```yaml
 type: custom:lumora-card
 # optional
-theme: sand        # Standard; alternativ: forest
+theme: sand        # Standard; alternativ: forest oder auto (hell/dunkel nach Gerät)
 name: Anna         # optional, sonst Name aus der Person des Benutzers
 energy:            # optional, überschreibt die automatische Erkennung
   pv: sensor.pv_leistung
@@ -117,3 +119,12 @@ Die Version ergibt sich aus den Commit-Nachrichten seit dem letzten Tag:
 | `BREAKING CHANGE` oder `feat!:` | Major |
 | `feat: ...` | Minor |
 | alles andere | Patch |
+
+## Entwicklung
+
+```
+npm test     # Tests (Node 22, ohne Browser)
+npm run check
+```
+
+`VERSION` steht im Quelltext auf `0.0.0-dev`; die Release-Action ersetzt sie im Release-Asset durch die berechnete Version.

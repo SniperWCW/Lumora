@@ -1,0 +1,9 @@
+{
+  "name": "lumora",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "cp lumora.js \"${TMPDIR:-/tmp}/lumora.check.mjs\" && node --check \"${TMPDIR:-/tmp}/lumora.check.mjs\"",
+    "test": "node --test test/*.test.mjs"
+  }
+}
