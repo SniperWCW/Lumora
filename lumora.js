@@ -268,7 +268,8 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .nav button.sel{background:var(--b);color:var(--fg)}.nav ha-icon{--mdc-icon-size:22px}
 .sbg{position:absolute;inset:0;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;z-index:5}
 .sheet{width:100%;max-width:560px;max-height:82%;overflow:auto;background:var(--sheet);border-radius:24px 24px 0 0;padding:18px 18px 28px}
-.sheet h2{margin:0 0 12px;font-size:20px}.sheet h4{margin:18px 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);font-weight:500}
+.sxw{position:sticky;top:-6px;height:0;z-index:3;display:flex;justify-content:flex-end;overflow:visible}.sx{width:44px;height:44px;margin:-8px -8px 0 0;border:0;border-radius:50%;background:var(--b);color:var(--fg);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow);touch-action:manipulation}.sx ha-icon{--mdc-icon-size:24px}
+.sheet h2{margin:0 52px 12px 0;font-size:20px}.sheet h4{margin:18px 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);font-weight:500}
 .row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
 .row .t{flex:1;min-width:0}.row .t b{display:block;font-size:15px;font-weight:500}.row .t span{font-size:12.5px;color:var(--fg2)}
 .row button{border:0;border-radius:99px;padding:7px 12px;background:var(--a);color:inherit;font:inherit;font-size:13px;cursor:pointer}
@@ -756,6 +757,7 @@ class LumoraCard extends HTMLElement {
       if (e.target.dataset && e.target.dataset.pk) setTimeout(() => { if (!this._plFocus() && this._hass) { this._sig = ''; this.hass = this._hass; } }, 200);
     });
     this.shadowRoot.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this._sheet) { this._sheet = null; this._sig = ''; this._render(); return; }
       if (e.key !== 'Enter' || !e.target.dataset || !e.target.dataset.go) return;
       e.preventDefault(); if (this._poolClick({ dataset: { k: e.target.dataset.go } }, 'pl-go')) { this._sig = ''; this._render(); }
     });
@@ -1927,7 +1929,7 @@ _more() {
           <div class="row" style="border:0"><button data-act="ccdel">Karte löschen</button><button class="sel" data-act="close">Fertig</button></div>`;
       }
     }
-    return `<div class="sbg" data-act="close"><div class="sheet" data-act="noop">${c}</div></div>`;
+    return `<div class="sbg" data-act="close"><div class="sheet" data-act="noop"><div class="sxw"><button class="sx" data-act="close" aria-label="Schließen"><ha-icon icon="mdi:close"></ha-icon></button></div>${c}</div></div>`;
   }
   _fillList() {
     const el = this.shadowRoot.querySelector('.list'); if (!el) return;
