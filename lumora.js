@@ -171,6 +171,7 @@ const CSS = `
 .top{display:flex;align-items:center;gap:12px}
 .logo{width:48px;height:48px;border-radius:14px;background:var(--a);display:grid;place-items:center}
 .ttl{font-size:18px;font-weight:600;flex:1}
+[data-act]{cursor:pointer;-webkit-tap-highlight-color:transparent}[data-act=noop]{cursor:auto}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:99px;background:var(--a);cursor:pointer;border:0;color:inherit;font:inherit;font-size:14px}
 .pill.warn{background:var(--warn)}.pill.bad{background:var(--bad);color:var(--badfg)}.pill.ok{background:var(--okbg)}
 .pill ha-icon{--mdc-icon-size:18px}
@@ -266,7 +267,7 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .nav{display:flex;gap:8px;padding:10px 14px calc(12px + env(safe-area-inset-bottom));background:var(--nav)}
 .nav button{flex:1;border:0;background:transparent;color:var(--fg2);display:flex;flex-direction:column;align-items:center;gap:2px;font:inherit;font-size:12px;padding:6px;border-radius:99px;cursor:pointer}
 .nav button.sel{background:var(--b);color:var(--fg)}.nav ha-icon{--mdc-icon-size:22px}
-.sbg{position:absolute;inset:0;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;z-index:5}
+.sbg{position:absolute;top:0;right:0;bottom:0;left:0;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;z-index:5}
 .sheet{width:100%;max-width:560px;max-height:82%;overflow:auto;background:var(--sheet);border-radius:24px 24px 0 0;padding:18px 18px 28px}
 .sxw{position:sticky;top:-6px;height:0;z-index:3;display:flex;justify-content:flex-end;overflow:visible}.sx{width:44px;height:44px;margin:-8px -8px 0 0;border:0;border-radius:50%;background:var(--b);color:var(--fg);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow);touch-action:manipulation}.sx ha-icon{--mdc-icon-size:24px}
 .sheet h2{margin:0 52px 12px 0;font-size:20px}.sheet h4{margin:18px 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);font-weight:500}
@@ -485,7 +486,7 @@ const Fx = (() => {
   const mount = () => {
     if (cv) return;
     cv = document.createElement('canvas'); cv.id = 'lumora-fx';
-    cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:5';
+    cv.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5';
     cv.setAttribute('aria-hidden', 'true');
     ctx = cv.getContext('2d'); document.body.appendChild(cv); resize();
     window.addEventListener('resize', resize); document.addEventListener('visibilitychange', vis);
@@ -1237,7 +1238,7 @@ class LumoraCard extends HTMLElement {
       <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${persons.length ? `${home}/${persons.length} zu Hause` : ''}</div></div></div>
       ${note}<div class="pills">${pills}</div>${regCells ? `<div class="grid reg">${regCells}</div>` : ''}
       ${this._homeCams()}
-      <h3>Aktiv jetzt<span class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</span></h3>
+      <h3>Aktiv jetzt<button class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button></h3>
       ${this._hint()}<div class="grid">${cards.join('')}</div>`;
   }
   _card(st, sub, pinId, edit, cls, p) {
