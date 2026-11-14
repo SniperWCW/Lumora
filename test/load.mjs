@@ -11,6 +11,6 @@ export function load() {
   ctx.globalThis = ctx;
   vm.createContext(ctx);
   // const-Deklarationen sichtbar machen, damit Hilfsfunktionen testbar sind
-  vm.runInContext(`${src}\n;globalThis.__t = { cleanName, VERSION, DOM_ICON, NAME_ICON };`, ctx, { filename: 'lumora.js' });
+  vm.runInContext(`${src}\n;globalThis.__t = { parseYaml, embedConfig, cleanName, VERSION, DOM_ICON, NAME_ICON };`, ctx, { filename: 'lumora.js' });
   return { ...ctx.__t, card: reg['lumora-card'], win };
 }

@@ -162,3 +162,51 @@ test('Adventskalender: 24 Türchen, Sperre vor Dezember, Testmodus öffnet alle'
   c._hass.states = {};
   assert.equal(c._advHtml(), '');
 });
+
+test('Fremdkarten: YAML-Parser liest Maps, Listen, Flow-Syntax, Block-Text und Kommentare', () => {
+  const { parseYaml } = load();
+  const y = `# Kommentar
+type: custom:mushroom-chips-card
+alignment: center
+chips:
+  - type: entity
+    entity: light.wohnzimmer   # Licht
+    tap_action: { action: toggle }
+  - type: template
+    content: "Hallo: {{ states('sensor.x') }}"
+    icon_color: [255, 0, 'a']
+  - weather
+template: |
+  Zeile 1
+    Zeile 2
+count: 3
+on: true
+none:
+`;
+  assert.deepEqual(JSON.parse(JSON.stringify(parseYaml(y))), {
+    type: 'custom:mushroom-chips-card', alignment: 'center',
+    chips: [{ type: 'entity', entity: 'light.wohnzimmer', tap_action: { action: 'toggle' } }, { type: 'template', content: "Hallo: {{ states('sensor.x') }}", icon_color: [255, 0, 'a'] }, 'weather'],
+    template: 'Zeile 1\n  Zeile 2\n', count: 3, on: true, none: null,
+  });
+});
+
+test('Fremdkarten: Liste auf gleicher Ebene wie der Schlüssel, JSON und Fehler', () => {
+  const { parseYaml, embedConfig } = load();
+  assert.deepEqual(JSON.parse(JSON.stringify(parseYaml('entities:\n- sensor.a\n- entity: sensor.b\n  name: B\nx: 1'))), { entities: ['sensor.a', { entity: 'sensor.b', name: 'B' }], x: 1 });
+  assert.deepEqual(JSON.parse(JSON.stringify(parseYaml('{"type":"entities","entities":["a"]}'))), { type: 'entities', entities: ['a'] });
+  assert.ok(embedConfig('type: x\n\tfoo: 1').err.includes('Tabulator'));
+  assert.ok(embedConfig('foo: 1').err.includes('type'));
+  assert.ok(embedConfig('- a\n- b').err);
+  assert.ok(embedConfig('   ').empty);
+  assert.equal(embedConfig('type: gauge\nentity: sensor.x').cfg.type, 'gauge');
+  assert.throws(() => parseYaml('a: "offen'));
+});
+
+test('Fremdkarten: Kachel ist registriert, leere Karte versteckt, Fehler sichtbar', () => {
+  const { card } = load();
+  const c = Object.create(card.prototype);
+  c._edit = false;
+  assert.equal(c._embHtml({ id: 'em1', yaml: '' }), '');
+  assert.ok(c._embHtml({ id: 'em1', yaml: 'foo: 1' }).includes('YAML fehlerhaft'));
+  assert.ok(c._embHtml({ id: 'em1', yaml: 'type: gauge' }).includes('data-emb="em1"'));
+});

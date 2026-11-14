@@ -18,6 +18,7 @@ const DEF = {
   sources: {},
   quick: [],
   custom: [],
+  embeds: [],
   devices: [],
   size: {},
   place: {},
@@ -139,10 +140,178 @@ const FLT_LABEL = { all: 'Alle', light: 'Licht', switch: 'Schalter', climate: 'K
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const dom = (id) => id.split('.')[0];
+/* ---------- Mini-YAML (für Fremdkarten) ----------
+   Reicht für Karten-Konfigurationen: Maps, Listen, verschachtelt, Zeichenketten in Anführungszeichen, [a, b] und {a: b},
+   Block-Texte (| und >) und Kommentare. Anker, Tags und mehrere Dokumente werden nicht unterstützt. */
+const yamlScalar = (x) => {
+  const s = x.trim();
+  if (s === '' || s === '~' || s === 'null') return null;
+  if (s === 'true') return true;
+  if (s === 'false') return false;
+  if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
+  if (s[0] === '"' || s[0] === "'") {
+    if (s.length < 2 || s[s.length - 1] !== s[0]) throw new Error('Anführungszeichen nicht geschlossen');
+    const b = s.slice(1, -1);
+    return s[0] === '"' ? b.replace(/\\(["\\nt])/g, (m, c) => (c === 'n' ? '\n' : c === 't' ? '\t' : c)) : b.replace(/''/g, "'");
+  }
+  if (s[0] === '[' || s[0] === '{') return yamlFlow(s);
+  return s;
+};
+const yamlFlow = (src) => {
+  let i = 0;
+  const ws = () => { while (i < src.length && /\s/.test(src[i])) i++; };
+  const quoted = () => {
+    const q = src[i]; let j = i + 1;
+    while (j < src.length && src[j] !== q) j++;
+    if (j >= src.length) throw new Error('Anführungszeichen nicht geschlossen');
+    const r = yamlScalar(src.slice(i, j + 1)); i = j + 1; return r;
+  };
+  const plain = (stop) => {
+    let j = i; while (j < src.length && !stop.includes(src[j])) j++;
+    const r = src.slice(i, j); i = j; return r;
+  };
+  const key = () => { ws(); if (src[i] === '"' || src[i] === "'") return String(quoted()); return plain(':,}]').trim(); };
+  const val = () => {
+    ws();
+    if (src[i] === '[') {
+      i++; const a = []; ws();
+      if (src[i] === ']') { i++; return a; }
+      for (;;) {
+        a.push(val()); ws();
+        if (src[i] === ',') { i++; ws(); if (src[i] === ']') { i++; return a; } continue; }
+        if (src[i] === ']') { i++; return a; }
+        throw new Error('Liste in [ ] ist nicht korrekt');
+      }
+    }
+    if (src[i] === '{') {
+      i++; const o = {}; ws();
+      if (src[i] === '}') { i++; return o; }
+      for (;;) {
+        const k = key(); ws();
+        if (src[i] !== ':') throw new Error('Objekt in { } ist nicht korrekt');
+        i++; o[k] = val(); ws();
+        if (src[i] === ',') { i++; ws(); if (src[i] === '}') { i++; return o; } continue; }
+        if (src[i] === '}') { i++; return o; }
+        throw new Error('Objekt in { } ist nicht korrekt');
+      }
+    }
+    if (src[i] === '"' || src[i] === "'") return quoted();
+    return yamlScalar(plain(',]}'));
+  };
+  const r = val(); ws();
+  if (i < src.length) throw new Error('Unerwartete Zeichen nach ] oder }');
+  return r;
+};
+const yamlStrip = (s) => {
+  let q = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) { if (c === q) q = null; } else if (c === '"' || c === "'") { if (i === 0 || /[\s:[{,-]/.test(s[i - 1])) q = c; } else if (c === '#' && (i === 0 || /\s/.test(s[i - 1]))) return s.slice(0, i);
+  }
+  return s;
+};
+const yamlKey = (tx) => {
+  if (tx[0] === '[' || tx[0] === '{') return null;
+  if (tx[0] === '"' || tx[0] === "'") {
+    const e = tx.indexOf(tx[0], 1);
+    if (e < 0 || tx[e + 1] !== ':' || (tx[e + 2] && tx[e + 2] !== ' ')) return null;
+    return [tx.slice(1, e), tx.slice(e + 2).trim()];
+  }
+  const m = /^(.*?):(?:\s+(.*))?$/.exec(tx);
+  return m ? [m[1].trim(), (m[2] || '').trim()] : null;
+};
+const parseYaml = (text) => {
+  const src = String(text || '');
+  const t = src.trim();
+  if (!t) return null;
+  if (t[0] === '{' || t[0] === '[') { try { return JSON.parse(t); } catch (_) { return yamlFlow(t); } }
+  const L = src.replace(/\r/g, '').split('\n').map((raw, n) => {
+    if (/^\t/.test(raw)) throw new Error(`Zeile ${n + 1}: Tabulator statt Leerzeichen`);
+    return { raw, n: n + 1 };
+  });
+  let p = 0;
+  const indOf = (r) => r.match(/^ */)[0].length;
+  const skip = () => { while (p < L.length) { const x = L[p].raw.trim(); if (x === '' || x[0] === '#' || x === '---') p++; else break; } };
+  const isSeq = (tx) => tx === '-' || tx.startsWith('- ');
+  const value = (rest, ind, ln) => {
+    if (rest === '') {
+      skip(); if (p >= L.length) return null;
+      const i = indOf(L[p].raw); const tx = yamlStrip(L[p].raw).trim();
+      return i > ind || (i === ind && isSeq(tx)) ? block() : null;
+    }
+    if (/^[|>][+-]?\d*$/.test(rest)) {
+      const ls = []; let bi = -1;
+      while (p < L.length) {
+        const r = L[p].raw;
+        if (r.trim() === '') { ls.push(''); p++; continue; }
+        const i = indOf(r); if (i <= ind) break;
+        if (bi < 0) bi = i;
+        ls.push(r.slice(Math.min(bi, i))); p++;
+      }
+      while (ls.length && ls[ls.length - 1] === '') ls.pop();
+      const body = rest[0] === '|' ? ls.join('\n') : ls.join(' ');
+      return rest.includes('-') ? body : `${body}\n`;
+    }
+    if (rest[0] === '[' || rest[0] === '{') {
+      const bal = (x) => { let d = 0; let q = null; for (const c of x) { if (q) { if (c === q) q = null; } else if (c === '"' || c === "'") q = c; else if (c === '[' || c === '{') d++; else if (c === ']' || c === '}') d--; } return d; };
+      let s2 = rest;
+      while (bal(s2) > 0 && p < L.length) { s2 += ` ${yamlStrip(L[p].raw).trim()}`; p++; }
+      return yamlFlow(s2);
+    }
+    try { return yamlScalar(rest); } catch (e) { throw new Error(`Zeile ${ln.n}: ${e.message}`); }
+  };
+  const map = (ind) => {
+    const o = {};
+    for (;;) {
+      skip(); if (p >= L.length) break;
+      const ln = L[p]; const i = indOf(ln.raw);
+      if (i < ind) break;
+      if (i > ind) throw new Error(`Zeile ${ln.n}: Einrückung passt nicht`);
+      const tx = yamlStrip(ln.raw).trim(); const kv = yamlKey(tx);
+      if (!kv) { if (isSeq(tx)) break; throw new Error(`Zeile ${ln.n}: „schlüssel: wert“ erwartet`); }
+      p++; o[kv[0]] = value(kv[1], ind, ln);
+    }
+    return o;
+  };
+  const seq = (ind) => {
+    const a = [];
+    for (;;) {
+      skip(); if (p >= L.length) break;
+      const ln = L[p]; const i = indOf(ln.raw);
+      if (i < ind) break;
+      if (i > ind) throw new Error(`Zeile ${ln.n}: Einrückung passt nicht`);
+      const tx = yamlStrip(ln.raw).trim();
+      if (!isSeq(tx)) break;
+      const after = tx.slice(1); const rest = after.replace(/^\s+/, ''); const sp = after.length - rest.length;
+      if (!rest) { p++; skip(); a.push(p < L.length && indOf(L[p].raw) > ind ? block() : null); } else { L[p] = { raw: `${' '.repeat(i + 1 + sp)}${rest}`, n: ln.n }; a.push(block()); }
+    }
+    return a;
+  };
+  const block = () => {
+    skip(); if (p >= L.length) return null;
+    const ln = L[p]; const i = indOf(ln.raw); const tx = yamlStrip(ln.raw).trim();
+    if (isSeq(tx)) return seq(i);
+    if (yamlKey(tx)) return map(i);
+    p++; return value(tx, i - 1, ln);
+  };
+  const r = block(); skip();
+  if (p < L.length) throw new Error(`Zeile ${L[p].n}: Einrückung passt nicht`);
+  return r;
+};
+/* Konfiguration einer Fremdkarte prüfen: { cfg } oder { err } */
+const embedConfig = (yaml) => {
+  if (!String(yaml || '').trim()) return { empty: true };
+  try {
+    const cfg = parseYaml(yaml);
+    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) return { err: 'Erwartet wird eine Karte mit „type: …“' };
+    if (!cfg.type || typeof cfg.type !== 'string') return { err: 'Es fehlt „type: …“ (z. B. type: custom:mushroom-chips-card)' };
+    return { cfg };
+  } catch (e) { return { err: e.message || String(e) }; }
+};
 const merge = (v) => {
   v = v || {};
   const arr = (k) => [...(v[k] || DEF[k])];
-  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify }, door: { ...DEF.door, ...v.door, bell: [...((v.door && v.door.bell) || [])], motion: [...((v.door && v.door.motion) || [])] } };
+  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), embeds: JSON.parse(JSON.stringify(v.embeds || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify }, door: { ...DEF.door, ...v.door, bell: [...((v.door && v.door.bell) || [])], motion: [...((v.door && v.door.motion) || [])] } };
 };
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -291,8 +460,11 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .row .t{flex:1;min-width:0}.row .t b{display:block;font-size:15px;font-weight:500}.row .t span{font-size:12.5px;color:var(--fg2)}
 .row button{border:0;border-radius:99px;padding:7px 12px;background:var(--a);color:inherit;font:inherit;font-size:13px;cursor:pointer}
 .row button.sel{background:var(--selbg);color:var(--selfg)}
-.srch,.ccin{width:100%;padding:12px 14px;border-radius:12px;border:0;background:var(--a);color:var(--fg);font:inherit;font-size:15px;margin-bottom:10px;outline:none}
-.srch::placeholder,.ccin::placeholder{color:var(--fg2)}
+.srch,.ccin,.embyaml{width:100%;padding:12px 14px;border-radius:12px;border:0;background:var(--a);color:var(--fg);font:inherit;font-size:15px;margin-bottom:10px;outline:none}
+.srch::placeholder,.ccin::placeholder,.embyaml::placeholder{color:var(--fg2)}
+textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow:auto}
+.emb{display:block;min-width:0}.emb:empty{min-height:56px}.embe{padding:12px;border-radius:14px;background:var(--a);color:var(--fg2);font-size:13px}
+:host(.ed) .emb>*{pointer-events:none}
 .tile.sz-w,.pl.sz-w{grid-column:span 2}.tile.sz-f,.pl.sz-f{grid-column:1/-1}
 .tile .tools .mini{width:30px;height:30px}.tile .tools .mini ha-icon{--mdc-icon-size:17px}
 .mw{container-type:inline-size}.enw{height:100%}.enw>.en{height:100%;box-sizing:border-box}
@@ -815,6 +987,11 @@ class LumoraCard extends HTMLElement {
       else if (e.target.classList.contains('ccin')) {
         const cu = this._set.custom.find((x) => x.id === this._ccId); if (!cu) return;
         cu.title = e.target.value; clearTimeout(this._ct); this._ct = setTimeout(() => this._save(), 600);
+      } else if (e.target.classList.contains('embyaml')) {
+        const em = this._set.embeds.find((x) => x.id === this._embId); if (!em) return;
+        em.yaml = e.target.value; const r = embedConfig(em.yaml);
+        const st = this.shadowRoot.querySelector('.embst'); if (st) st.textContent = r.err ? r.err : r.cfg ? `Karte: ${r.cfg.type}` : '';
+        clearTimeout(this._ct); this._ct = setTimeout(() => this._save(), 600);
       } else if (e.target.classList.contains('dvin')) {
         const iv = this._set.devices.find((x) => x.id === this._dvId); if (!iv) return;
         iv.title = e.target.value; clearTimeout(this._ct); this._ct = setTimeout(() => { this._save(); this._sig = ''; }, 600);
@@ -849,10 +1026,11 @@ class LumoraCard extends HTMLElement {
   set hass(h) {
     const first = !this._hass;
     this._hass = h;
+    this._embHass(h);
     if (first) this._load();
     if (this._loaded) this._notifyAlerts();
     if (this._loaded) this._doorCheck();
-    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'dv', 'dvadd', 'dvmain', 'dvpick', 'dbpick'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
+    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'emb', 'dv', 'dvadd', 'dvmain', 'dvpick', 'dbpick'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
     if (this._down && this._edit) { this._pend = true; return; }
     if (this._plFocus()) return;
     this._fxUpdate();
@@ -1283,7 +1461,7 @@ class LumoraCard extends HTMLElement {
     }
     if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((i) => { (keep[i.dataset.b] || (keep[i.dataset.b] = [])).push(i); });
     this.shadowRoot.innerHTML = `<style>${CSS}</style><div class="app" style="position:relative"><div class="body">${body}</div><div class="nav">${nav}</div>${this._sheetHtml()}</div>`;
-    this._a11y(); this._advBind();
+    this._a11y(); this._advBind(); this._embMount();
     if (this._dbEl) this.shadowRoot.appendChild(this._dbEl);
     if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((n) => { const o = (keep[n.dataset.b] || []).shift(); if (o && o !== n) n.replaceWith(o); });
     const nb = this.shadowRoot.querySelector('.body'); if (nb) nb.scrollTop = top;
@@ -1790,6 +1968,69 @@ _more() {
     }
     return `<div class="card cu" data-act="info" data-id="${cu.entity}">${ic}<div><b>${val}</b><span>${esc(name)}</span></div></div>`;
   }
+  /* ---------- Fremdkarten ----------
+     Beliebige Karten (HACS, Mushroom, ApexCharts …) per YAML einbetten. Die Elemente werden gemerkt und nach jedem
+     Neuzeichnen wieder eingesetzt, damit sie weder flackern noch ihren Zustand verlieren. */
+  _embHass(h) {
+    const c = this._emb; if (!c) return;
+    for (const k of Object.keys(c)) { const e = c[k]; if (e.el && e.el.isConnected) { try { e.el.hass = h; } catch (_) { /* Karte meldet Fehler selbst */ } } }
+  }
+  _embHtml(em) {
+    const r = embedConfig(em.yaml);
+    if (r.empty) return this._edit ? `<div class="card cu"><ha-icon icon="mdi:puzzle-outline"></ha-icon><div><b>Fremdkarte</b><span>Zahnrad: YAML der Karte einfügen</span></div></div>` : '';
+    if (r.err) return `<div class="card cu"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><div><b>Fremdkarte: YAML fehlerhaft</b><span>${esc(r.err)}</span></div></div>`;
+    return `<div class="emb" data-emb="${esc(em.id)}"></div>`;
+  }
+  async _embBuild(e, cfg) {
+    const tag = cfg.type.indexOf('custom:') === 0 ? cfg.type.slice(7) : '';
+    let el = null;
+    try {
+      const H = typeof window.loadCardHelpers === 'function' ? await window.loadCardHelpers() : null;
+      if (H && H.createCardElement) el = H.createCardElement(cfg);
+      else if (tag) {
+        if (!customElements.get(tag)) throw new Error(`„${tag}“ ist nicht geladen (Ressource in HA eingetragen?)`);
+        el = document.createElement(tag); if (el.setConfig) el.setConfig(cfg);
+      } else {
+        el = document.createElement(`hui-${cfg.type}-card`); if (el.setConfig) el.setConfig(cfg);
+      }
+    } catch (x) {
+      el = document.createElement('div'); el.className = 'embe';
+      el.textContent = `Fremdkarte konnte nicht erstellt werden: ${(x && x.message) || x}`;
+      if (tag && window.customElements && customElements.whenDefined) customElements.whenDefined(tag).then(() => { if (this._emb && this._emb[e.id] === e) this._embBuild(e, cfg); });
+    }
+    if (!this._emb || this._emb[e.id] !== e) return;
+    /* HA baut Karten neu, sobald deren Ressource nachgeladen ist */
+    if (el.addEventListener) el.addEventListener('ll-rebuild', (ev) => { ev.stopPropagation(); if (this._emb && this._emb[e.id] === e) this._embBuild(e, cfg); });
+    try { el.hass = this._hass; } catch (_) { /* ignore */ }
+    const old = e.el; e.el = el;
+    if (old && old.parentNode) old.parentNode.replaceChild(el, old); else this._embMount();
+  }
+  _embMount() {
+    const root = this.shadowRoot; if (!root || !root.querySelectorAll) return;
+    const cache = this._emb || (this._emb = {});
+    const ids = this._set.embeds.map((x) => x.id);
+    Object.keys(cache).forEach((k) => { if (!ids.includes(k)) delete cache[k]; });
+    root.querySelectorAll('[data-emb]').forEach((ph) => {
+      const em = this._set.embeds.find((x) => x.id === ph.dataset.emb); if (!em) return;
+      let e = cache[em.id];
+      if (!e || e.yaml !== em.yaml) {
+        const r = embedConfig(em.yaml); if (!r.cfg) return;
+        e = cache[em.id] = { id: em.id, yaml: em.yaml, el: null };
+        this._embBuild(e, r.cfg);
+      }
+      if (e.el) { if (e.el.parentNode !== ph) ph.appendChild(e.el); try { e.el.hass = this._hass; } catch (_) { /* ignore */ } }
+    });
+  }
+  _embSheet() {
+    const em = this._set.embeds.find((x) => x.id === this._embId); if (!em) return '';
+    const r = embedConfig(em.yaml); const sz = this._set.size[em.id] || 'w';
+    const SZ = [['s', 'Klein'], ['w', 'Breit'], ['f', 'Volle Breite']];
+    return `<h2>Fremdkarte</h2><div class="hint">Konfiguration einer beliebigen Karte als YAML einfügen, z. B. <code>type: custom:mushroom-chips-card</code>. Die Karte muss in Home Assistant als Ressource geladen sein.</div>
+      <textarea class="embyaml" spellcheck="false" autocapitalize="off" autocomplete="off" rows="10" placeholder="type: custom:…">${esc(em.yaml)}</textarea>
+      <div class="hint embst">${r.err ? esc(r.err) : r.cfg ? `Karte: ${esc(r.cfg.type)}` : ''}</div>
+      <h4>Breite</h4><div class="tabs">${SZ.map(([k, l]) => `<button class="pill ${sz === k ? 'sel' : ''}" data-act="embsize" data-k="${k}">${l}</button>`).join('')}</div>
+      <div class="row" style="border:0"><button data-act="embdel">Karte löschen</button><button class="sel" data-act="close">Fertig</button></div>`;
+  }
   _customMissing(cu) {
     return `<div class="card cu"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><div><b>Entität fehlt</b><span>${esc(cu.entity)}</span></div></div>`;
   }
@@ -2076,6 +2317,7 @@ _more() {
         <div class="tabs">${Object.keys(FLT).map((k) => `<button class="pill ${this._flt === k ? 'sel' : ''}" data-act="flt" data-k="${k}">${FLT_LABEL[k]}</button>`).join('')}</div>
         <div class="row"><div class="t"><b>Nur anzeigen, wenn aktiv</b><span>Karte erscheint nur bei Zustand an, offen oder läuft</span></div><button class="${this._only ? 'sel' : ''}" data-act="onlyact">${this._only ? 'An' : 'Aus'}</button></div>
         <div class="row"><div class="t"><b>Gerätekarte</b><span>Staubsauger, PV-Übersicht und mehr: Entitäten werden automatisch gefunden</span></div><button data-act="adddv">Wählen</button></div>
+        <div class="row"><div class="t"><b>Fremdkarte einbetten</b><span>Beliebige Karte (HACS, Mushroom, ApexCharts …) per YAML anzeigen</span></div><button data-act="addemb">Einfügen</button></div>
         <div class="row"><div class="t"><b>Als eigene Karte</b><span>Wert, Verlauf oder Schalter statt Kachel</span></div><button class="${this._cust ? 'sel' : ''}" data-act="ascust">${this._cust ? 'An' : 'Aus'}</button></div>
         <div class="list"></div>`;
     } else if (this._sheet === 'place') {
@@ -2132,6 +2374,8 @@ _more() {
       c = this._advSheet();
     } else if (this._sheet === 'quick') {
       c = `<h2>Schnellaktionen</h2><div class="hint">Szenen, Skripte und Tasten mit einem Tipp auslösen. Mehrfachauswahl möglich.</div><input class="srch" placeholder="Suchen" value="${esc(this._q)}"><div class="list"></div>`;
+    } else if (this._sheet === 'emb') {
+      c = this._embSheet();
     } else if (this._sheet === 'cc') {
       const cu = this._set.custom.find((x) => x.id === this._ccId);
       if (cu) {
@@ -3003,7 +3247,15 @@ _more() {
       case 'ignclear': s.ignore = []; this._bd = null; this._save(); break;
       case 'battmore': this._battMore = !this._battMore; break;
       case 'bl': { const Lm = [10, 15, 20, 30]; s.battLimit = Lm[(Lm.indexOf(s.battLimit) + 1) % Lm.length]; this._bd = null; this._save(); break; }
-      case 'cc': if (s.devices.some((x) => x.id === id)) { this._sheet = 'dv'; this._dvId = id; } else { this._sheet = 'cc'; this._ccId = id; } break;
+      case 'cc': if (s.embeds.some((x) => x.id === id)) { this._sheet = 'emb'; this._embId = id; } else if (s.devices.some((x) => x.id === id)) { this._sheet = 'dv'; this._dvId = id; } else { this._sheet = 'cc'; this._ccId = id; } break;
+      case 'addemb': {
+        const eid = `em${Date.now().toString(36)}`;
+        s.embeds.push({ id: eid, yaml: '' });
+        if (this._view === 'more') s.place[eid] = 'more';
+        this._sheet = 'emb'; this._embId = eid; this._save(); break;
+      }
+      case 'embsize': s.size[this._embId] = t.dataset.k; this._save(); break;
+      case 'embdel': { const eid = this._embId; s.embeds = s.embeds.filter((x) => x.id !== eid); delete s.size[eid]; delete s.place[eid]; s.hidden = s.hidden.filter((x) => x !== eid); this._save(); this._sheet = null; break; }
       case 'cckind': { const cu = s.custom.find((x) => x.id === this._ccId); if (cu) { cu.kind = t.dataset.k; this._save(); } break; }
       case 'cchrs': { const cu = s.custom.find((x) => x.id === this._ccId); if (cu) { cu.hours = Number(t.dataset.k); this._save(); } break; }
       case 'ccdel': { const cid = this._ccId; s.custom = s.custom.filter((x) => x.id !== cid); delete s.size[cid]; delete s.place[cid]; s.hidden = s.hidden.filter((x) => x !== cid); this._save(); this._sheet = null; break; }
@@ -3160,6 +3412,10 @@ registerCard({ id: 'custom', label: 'Eigene Karten', icon: 'mdi:card-text-outlin
   const st = c._hass.states[cu.entity];
   if (!st) return c._edit ? { id: cu.id, html: c._customMissing(cu), cfg: true } : null;
   return { id: cu.id, html: c._customHtml(cu, st), size: cu.kind === 'spark' ? 'w' : 's', cfg: true };
+}).filter(Boolean) });
+
+registerCard({ id: 'embed', label: 'Fremdkarten', icon: 'mdi:puzzle-outline', home: true, size: 'w', items: (c) => c._set.embeds.map((em) => {
+  const html = c._embHtml(em); return html ? { id: em.id, html, size: c._set.size[em.id] || 'w', cfg: true } : null;
 }).filter(Boolean) });
 
 /* ---------- Gerätekarten-Vorlagen ----------
