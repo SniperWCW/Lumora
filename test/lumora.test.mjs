@@ -146,3 +146,19 @@ test('Pool-Gerätekarte: Winterschlaf blendet die Karte aus', () => {
   c._pdv = { ...c._dvMap(c._set.devices[0]), pool_rec: 'sensor.pool_empfehlung' };
   assert.equal(c._poolHtml('dv1'), '');
 });
+
+test('Adventskalender: 24 Türchen, Sperre vor Dezember, Testmodus öffnet alle', () => {
+  const c = Object.create(L.card.prototype);
+  c._hass = { states: { 'input_text.advent_geoffnet': { state: '1,2' }, 'input_text.advent_gefunden': { state: '1' }, 'input_boolean.advent_testmodus': { state: 'off' } } };
+  c._advToday = () => 3;
+  assert.deepEqual([...c._advList('input_text.advent_geoffnet')], [1, 2]);
+  assert.equal(c._advOk(3), true);
+  assert.equal(c._advOk(4), false);
+  const html = c._advHtml();
+  assert.equal((html.match(/class="advd /g) || []).length, 24);
+  assert.match(html, /1 von 24 gefunden/);
+  c._hass.states['input_boolean.advent_testmodus'].state = 'on';
+  assert.equal(c._advOk(24), true);
+  c._hass.states = {};
+  assert.equal(c._advHtml(), '');
+});

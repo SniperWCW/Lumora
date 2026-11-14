@@ -274,6 +274,16 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .nav button{flex:1;border:0;background:transparent;color:var(--fg2);display:flex;flex-direction:column;align-items:center;gap:2px;font:inherit;font-size:12px;padding:6px;border-radius:99px;cursor:pointer}
 .nav button.sel{background:var(--b);color:var(--fg)}.nav ha-icon{--mdc-icon-size:22px}
 .sbg{position:absolute;top:0;right:0;bottom:0;left:0;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;z-index:5}
+.adv{background:var(--a);border-radius:20px;padding:16px}.adv .hd{display:flex;align-items:center;gap:12px}.adv .ib{width:44px;height:44px;border-radius:14px;background:var(--b);display:grid;place-items:center;flex:none}
+.adv .hd b{display:block;font-size:16px;font-weight:600}.adv .hd span{font-size:12.5px;color:var(--fg2)}
+.advg{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-top:14px}
+.advd{position:relative;aspect-ratio:1;border:0;border-radius:14px;color:#fff;font:inherit;font-size:18px;font-weight:700;cursor:pointer;display:grid;place-items:center;text-shadow:0 1px 3px rgba(0,0,0,.35);touch-action:manipulation}
+.advd.lock{opacity:.4}.advd.today{outline:3px solid var(--selbg);outline-offset:2px}.advd ha-icon{position:absolute;right:3px;bottom:3px;--mdc-icon-size:15px;opacity:.95}
+.advd.open{filter:saturate(.55);opacity:.85}
+@container (max-width:300px){.advg{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.advm{position:relative;border-radius:18px;overflow:hidden;aspect-ratio:16/9;display:grid;place-items:center;color:#fff;margin-bottom:12px}
+.advm>ha-icon{--mdc-icon-size:72px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))}.advm img,.advm video{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
+.advt{font-size:16px;margin:0 0 12px;line-height:1.4}
 .sheet{width:100%;max-width:560px;max-height:82%;overflow:auto;background:var(--sheet);border-radius:24px 24px 0 0;padding:18px 18px 28px}
 .sxw{position:sticky;top:-6px;height:0;z-index:3;display:flex;justify-content:flex-end;overflow:visible}.sx{width:44px;height:44px;margin:-8px -8px 0 0;border:0;border-radius:50%;background:var(--b);color:var(--fg);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow);touch-action:manipulation}.sx ha-icon{--mdc-icon-size:24px}
 .sheet h2{margin:0 52px 12px 0;font-size:20px}.sheet h4{margin:18px 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);font-weight:500}
@@ -454,6 +464,7 @@ const BATX = /phone|ipad|watch|handy|tablet|pixel|galaxy|saug|vacuum|robo|laptop
 /* Karten-Register: jede Karte ist ein Objekt { id, label, icon, home, fixed, size, items(card) -> [{ id, html, size, cfg }] }.
    Auch von außen erweiterbar: window.LumoraCards.register({...}). */
 const REG = [];
+const ADV_ICONS = ['mdi:unicorn', 'mdi:crown', 'mdi:star-four-points', 'mdi:castle', 'mdi:butterfly', 'mdi:heart'];
 const hmMin = (m) => { const hh = Math.floor(m / 60); const mm = m % 60; return hh <= 0 ? `${mm} min` : mm <= 0 ? `${hh} h` : `${hh} h ${mm} min`; };
 const dvStat = (c, l, s2, d) => (s2 ? `<div data-act="info" data-id="${s2.entity_id}"><small>${l}</small><b>${c._dvVal(s2, d)}</b></div>` : '');
 const newItems = () => { const items = []; return { items, add: (id, html, wide) => { if (html) items.push({ id, html, size: wide ? 'f' : 's' }); } }; };
@@ -872,6 +883,7 @@ class LumoraCard extends HTMLElement {
     if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
     parts.push(this._bd.s);
     parts.push('sn' + this._snoozed().length);
+    for (const id of ['input_text.advent_geoffnet', 'input_text.advent_gefunden', 'input_boolean.advent_testmodus']) if (h.states[id]) parts.push(id + h.states[id].state);
     return parts.join('|');
   }
 
@@ -1271,7 +1283,7 @@ class LumoraCard extends HTMLElement {
     }
     if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((i) => { (keep[i.dataset.b] || (keep[i.dataset.b] = [])).push(i); });
     this.shadowRoot.innerHTML = `<style>${CSS}</style><div class="app" style="position:relative"><div class="body">${body}</div><div class="nav">${nav}</div>${this._sheetHtml()}</div>`;
-    this._a11y();
+    this._a11y(); this._advBind();
     if (this._dbEl) this.shadowRoot.appendChild(this._dbEl);
     if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((n) => { const o = (keep[n.dataset.b] || []).shift(); if (o && o !== n) n.replaceWith(o); });
     const nb = this.shadowRoot.querySelector('.body'); if (nb) nb.scrollTop = top;
@@ -1630,6 +1642,34 @@ _more() {
     const more = l.length > 8 ? `<div class="pills" style="margin-top:8px"><button class="pill" data-act="battmore">${this._battMore ? 'Weniger anzeigen' : `Alle ${l.length} anzeigen`}</button></div>` : '';
     const ed = this._edit ? `<div class="pills" style="margin-top:10px"><button class="pill" data-act="bl">Warnschwelle ${lim} %</button>${ig ? `<button class="pill" data-act="ignclear">${ig} ausgeblendet, zurücksetzen</button>` : ''}</div>` : '';
     return `<div class="en nopt"><div class="hd"><div class="ib"><ha-icon icon="mdi:battery-heart-variant"></ha-icon></div><div><b>Batterien</b><span>${low ? `${low} schwach (bis ${lim} %)` : 'alle in Ordnung'}</span></div><div class="big">${l.length}</div></div>${rows}${more}${ed}</div>`;
+  }
+  /* ---------- Adventskalender (Skripte und Helfer: script.advent_oeffnen, input_text.advent_geoffnet) ---------- */
+  _advOn() { return !!this._hass.states['input_text.advent_geoffnet']; }
+  _advList(id) { const st = this._hass.states[id]; return st ? String(st.state).split(',').map((x) => parseInt(x, 10)).filter((x) => x >= 1 && x <= 24) : []; }
+  _advToday() { const d = new Date(); return d.getMonth() === 11 ? d.getDate() : 0; }
+  _advTest() { const st = this._hass.states['input_boolean.advent_testmodus']; return !!st && st.state === 'on'; }
+  _advOk(n) { return this._advTest() || n <= this._advToday(); }
+  _advBg(n) { return `linear-gradient(135deg,hsl(${(n * 37) % 360} 70% 62%),hsl(${(n * 37 + 55) % 360} 70% 52%))`; }
+  _advIcon(n) { return ADV_ICONS[n % ADV_ICONS.length]; }
+  _advHtml() {
+    if (!this._advOn()) return '';
+    const open = this._advList('input_text.advent_geoffnet'); const found = this._advList('input_text.advent_gefunden'); const today = this._advToday();
+    const sub = today >= 1 && today <= 24 ? `Heute: Türchen ${today}` : (new Date().getMonth() === 11 ? 'Frohe Weihnachten' : 'Ab dem 1. Dezember');
+    const doors = Array.from({ length: 24 }, (_, i) => i + 1).map((n) => {
+      const cls = `${this._advOk(n) ? '' : 'lock'} ${open.includes(n) ? 'open' : ''} ${n === today ? 'today' : ''}`;
+      const ic = found.includes(n) ? 'mdi:star' : open.includes(n) ? 'mdi:gift-open-outline' : this._advOk(n) ? '' : 'mdi:lock-outline';
+      return `<button class="advd ${cls}" style="background:${this._advBg(n)}" data-act="adv" data-id="${n}" aria-label="Türchen ${n}">${n}${ic ? `<ha-icon icon="${ic}"></ha-icon>` : ''}</button>`;
+    }).join('');
+    return `<div class="adv"><div class="hd"><div class="ib"><ha-icon icon="mdi:gift-outline"></ha-icon></div><div><b>Adventskalender</b><span>${esc(sub)} · ${found.length} von 24 gefunden</span></div></div><div class="advg">${doors}</div></div>`;
+  }
+  _advSheet() {
+    const n = this._advN || 1; const nn = String(n).padStart(2, '0'); const found = this._advList('input_text.advent_gefunden').includes(n);
+    return `<h2>Türchen ${n}</h2><div class="advm" style="background:${this._advBg(n)}"><ha-icon icon="${this._advIcon(n)}"></ha-icon><img src="/local/advent/${nn}.jpg" alt=""><video src="/local/advent/${nn}.mp4" controls playsinline preload="metadata"></video></div>
+      <div class="hint">Bild und Video liegen unter /config/www/advent/${nn}.jpg und ${nn}.mp4. Ohne Dateien zeigt das Türchen den bunten Platzhalter.</div>
+      <div class="row" style="border:0"><button data-act="advagain">Nochmal vorlesen</button><button class="sel" data-act="advfound">${found ? 'Gefunden' : 'Gefunden!'}</button><button data-act="close">Fertig</button></div>`;
+  }
+  _advBind() {
+    this.shadowRoot.querySelectorAll('.advm img,.advm video').forEach((el) => { if (el._ab) return; el._ab = 1; el.addEventListener('error', () => el.remove()); });
   }
   /* ---------- Proxmox (Integration proxmoxve): Node, LXC, VM ---------- */
   _pxDur(ms) { const m = Math.max(0, Math.floor(ms / 60000)); const d = Math.floor(m / 1440); const hh = Math.floor((m % 1440) / 60); return d ? `${d} d ${hh} h` : hh ? `${hh} h ${m % 60} min` : `${m} min`; }
@@ -2088,6 +2128,8 @@ _more() {
       c = `<h2>Standard-Kamera</h2>${cams.map((x) => `<div class="row" data-act="dbsetcam" data-id="${esc(x.entity_id)}"><ha-icon icon="mdi:cctv"></ha-icon><div class="t"><b>${esc(cleanName(x.attributes.friendly_name))}</b><span>${esc(x.entity_id)}</span></div><ha-icon icon="${cur === x.entity_id ? 'mdi:check-circle' : 'mdi:circle-outline'}"></ha-icon></div>`).join('') || '<div class="empty">Keine Kameras gefunden.</div>'}`;
     } else if (this._sheet === 'dbpick') {
       c = `<h2>${this._dbk === 'bell' ? 'Türklingel-Auslöser' : 'Bewegungsmelder'}</h2><div class="hint">Binärsensor, Ereignis- oder Tasten-Entität. Ohne Suche erscheinen passende Vorschläge.</div><input class="srch" placeholder="Suchen" value="${esc(this._q)}"><div class="list"></div><div class="row" style="border:0"><button class="sel" data-act="dbback">Fertig</button></div>`;
+    } else if (this._sheet === 'advent') {
+      c = this._advSheet();
     } else if (this._sheet === 'quick') {
       c = `<h2>Schnellaktionen</h2><div class="hint">Szenen, Skripte und Tasten mit einem Tipp auslösen. Mehrfachauswahl möglich.</div><input class="srch" placeholder="Suchen" value="${esc(this._q)}"><div class="list"></div>`;
     } else if (this._sheet === 'cc') {
@@ -2923,6 +2965,14 @@ _more() {
       case 'trav': this._sheet = 'trav'; break;
       case 'lights': this._sheet = 'lights'; break;
       case 'lightsoff': h.callService('light', 'turn_off', { entity_id: (this._byDomain().light || []).filter((x) => x.state === 'on').map((x) => x.entity_id) }); this._sheet = null; break;
+      case 'adv': {
+        const n = Number(id); if (!(n >= 1 && n <= 24)) return;
+        h.callService('script', 'advent_oeffnen', { tag: n });
+        if (this._advOk(n)) { this._advN = n; this._sheet = 'advent'; } else { t.classList.add('lock'); return; }
+        break;
+      }
+      case 'advagain': h.callService('script', 'advent_oeffnen', { tag: this._advN }); return;
+      case 'advfound': h.callService('script', 'advent_gefunden', { tag: this._advN }); break;
       case 'close': this._sheet = null; break;
       case 'cat': s.alerts[t.dataset.k] = !s.alerts[t.dataset.k]; this._save(); break;
       case 'hide': if (!s.excludeEntities.includes(id)) s.excludeEntities.push(id); this._save(); break;
@@ -3283,6 +3333,11 @@ registerCard({ id: 'dev', label: 'Gerätekarten', icon: 'mdi:view-grid-plus-outl
   if (!st) return c._edit ? { id: iv.id, html: `<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="${tp.icon}"></ha-icon></div><div class="tt"><b>${esc(iv.title || tp.label)}</b><span>${esc(iv.main)} nicht gefunden</span></div></div></div>`, size: tp.size, cfg: true } : null;
   return { id: iv.id, html: tp.render(c, iv, c._dvMap(iv), st), size: tp.size, cfg: true };
 }).filter(Boolean) });
+
+registerCard({ id: 'advent', label: 'Adventskalender', icon: 'mdi:gift-outline', size: 'w', items: (c) => {
+  const h = c._advHtml();
+  return h ? [{ id: 'advent', html: h, size: 'w' }] : [];
+} });
 
 window.LumoraCards = { register: registerCard, list: () => REG.map((x) => ({ id: x.id, label: x.label })) };
 window.LumoraDevices = { register: registerDevice, list: () => Object.values(DEVTPL).map((x) => ({ type: x.type, label: x.label })) };
