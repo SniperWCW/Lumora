@@ -438,6 +438,14 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .px>span{font-size:12.5px;text-align:right;white-space:nowrap}.px.off>ha-icon,.px.off .st{color:#c9694f}.px.na{opacity:.55}.px .st{grid-column:span 2;font-weight:600}
 .dvc.pxoff{opacity:.85}
 @media (max-width:480px){.px{grid-template-columns:auto minmax(0,1fr) 62px 62px;gap:4px 6px}.px>span{font-size:12px}}
+.ps{padding:10px 0 2px;border-top:1px solid var(--line);margin-top:10px;cursor:pointer}.ps:first-of-type{margin-top:12px}
+.ps .pt{display:flex;align-items:center;gap:10px;min-width:0}.ps .pt>ha-icon{--mdc-icon-size:22px;flex:none}.ps .pt .t{min-width:0;flex:1}
+.ps .pt b{display:block;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ps .pt span{display:block;font-size:12px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ps .pt em{font-style:normal;font-size:13px;font-weight:600;white-space:nowrap}
+.pz{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+.pz>div{background:var(--line);border-radius:14px;padding:8px 6px;text-align:center;min-width:0;cursor:pointer}.pz small{display:block;font-size:11px;color:var(--fg2)}.pz b{font-size:17px;font-weight:600}
+.pz>div.wn b{color:#b8862b}.pz>div.lo b{color:#c9694f}.pz>div.na{opacity:.5}
+@media (max-width:480px){.pz{gap:6px}.pz>div{border-radius:12px;padding:7px 4px}.pz b{font-size:16px}}
 `;
 
 const SIZES = ['s', 'w', 'f'];
@@ -1663,6 +1671,42 @@ _more() {
       return `<div class="px ${cls}" data-act="info" data-id="${x.main}"><ha-icon icon="${K.icon}"></ha-icon><div class="t"><b>${esc(x.name)}</b><span>${K.l}</span></div>${vals}</div>`;
     }).join('');
     return `<div class="en nopt"><div class="hd"><div class="ib"><ha-icon icon="mdi:server"></ha-icon></div><div><b>Proxmox</b><span>${esc(sub)}</span></div><div class="big">${run}/${l.length}</div></div>${rows}</div>`;
+  }
+  /* ---------- Packstation (Integration dhl_packstation_availability): freie Fächer ---------- */
+  _psStations() {
+    const h = this._hass; const by = {};
+    for (const id in h.states) {
+      const m = PS_RE.exec(id); if (!m) continue;
+      (by[m[1]] || (by[m[1]] = {}))[m[2]] = id;
+    }
+    const out = [];
+    for (const key in by) {
+      const F = by[key]; const ids = Object.values(F); const live = ids.filter((i) => this._dvS(i));
+      if (!live.length) continue;
+      const first = h.states[live[0]]; const fn = String(first.attributes.friendly_name || '');
+      const nm = /^(?:DHL\s+)?Packstation\s+(.+?)\s+Freie\s+F/i.exec(fn);
+      const name = nm ? nm[1] : key.replace(/^dhl_packstation_/, '').replace(/_/g, ' ');
+      const sizes = PS_SIZES.map(([k, l]) => ({ k, l, id: F[k] || null, n: this._num(F[k]) }));
+      let total = this._num(F.gesamt);
+      if (total === null && sizes.some((x) => x.n !== null)) total = sizes.reduce((a, x) => a + (x.n || 0), 0);
+      const ts = live.map((i) => h.states[i].attributes.source_timestamp).filter(Boolean).sort().pop() || null;
+      out.push({ key, name, address: first.attributes.address || '', ts, sizes, total, main: F.gesamt || live[0] });
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  }
+  _psHtml(l) {
+    const all = l.reduce((a, x) => a + (x.total || 0), 0);
+    const sub = l.length === 1 ? l[0].name : `${l.length} Stationen`;
+    const rows = l.map((x) => {
+      const ago = x.ts ? this._pxAgo(x.ts) : '';
+      const meta = [x.address, ago ? `Stand ${ago}` : ''].filter(Boolean).join(' · ');
+      const tiles = x.sizes.filter((z) => z.id).map((z) => {
+        const cls = z.n === null ? 'na' : z.n === 0 ? 'lo' : z.n <= 2 ? 'wn' : '';
+        return `<div class="${cls}" data-act="info" data-id="${z.id}"><small>${z.l}</small><b>${z.n === null ? '–' : this._de(z.n)}</b></div>`;
+      }).join('');
+      return `<div class="ps"><div class="pt" data-act="info" data-id="${x.main}"><ha-icon icon="mdi:package-variant"></ha-icon><div class="t"><b>${esc(x.name)}</b><span>${esc(meta)}</span></div>${x.total !== null ? `<em>${this._de(x.total)} frei</em>` : ''}</div>${tiles ? `<div class="pz">${tiles}</div>` : ''}</div>`;
+    }).join('');
+    return `<div class="en nopt"><div class="hd"><div class="ib"><ha-icon icon="mdi:package-variant"></ha-icon></div><div><b>Packstation</b><span>${esc(`${sub} · freie Fächer`)}</span></div><div class="big">${this._de(all)}</div></div>${rows}</div>`;
   }
   _offline() {
     const h = this._hass; const ig = this._set.ignore; const dev = {};
@@ -3148,6 +3192,8 @@ const PXF = {
   lastbackup: { l: 'Letztes Backup (Node)', dom: 'sensor', re: /letztes.?backup|last.?backup/ },
   backupdur: { l: 'Backup-Dauer (Node)', dom: 'sensor', re: /backup.?dauer|backup.?duration/ },
 };
+const PS_RE = /^sensor\.(dhl_packstation_.+?)_freie_facher_(gesamt|s|m|l|xl)$/;
+const PS_SIZES = [['s', 'S'], ['m', 'M'], ['l', 'L'], ['xl', 'XL']];
 const PX_KIND = { node: { l: 'Node', icon: 'mdi:server' }, lxc: { l: 'LXC', icon: 'mdi:cube-outline' }, vm: { l: 'VM', icon: 'mdi:monitor' } };
 const PX_ST = { running: 'Läuft', stopped: 'Gestoppt', suspended: 'Pausiert', online: 'Online', offline: 'Offline', unknown: 'Unbekannt' };
 const pxKind = (model, F) => (F.backup || F.lastbackup || /node|host/i.test(model || '') ? 'node' : /container|lxc/i.test(model || '') ? 'lxc' : 'vm');
@@ -3189,6 +3235,11 @@ registerDevice({
 registerCard({ id: 'proxmox', label: 'Proxmox', icon: 'mdi:server', size: 'w', items: (c) => {
   const l = c._pxDevices();
   return l.length ? [{ id: 'proxmox', html: c._pxHtml(l), size: 'w' }] : [];
+} });
+/* Packstation: Sensoren der Integration dhl_packstation_availability, z. B. sensor.dhl_packstation_<station>_freie_facher_<gesamt|s|m|l|xl>. Mehrere Stationen werden in einer Karte untereinander gezeigt. */
+registerCard({ id: 'packstation', label: 'Packstation', icon: 'mdi:package-variant', size: 'w', items: (c) => {
+  const l = c._psStations();
+  return l.length ? [{ id: 'packstation', html: c._psHtml(l), size: 'w' }] : [];
 } });
 registerCard({ id: 'batt_all', label: 'Batterien Übersicht', icon: 'mdi:battery-heart-variant', size: 'w', items: (c) => {
   const l = c._batteries(true);

@@ -86,3 +86,25 @@ test('Kamera-Wahl: Klingel nimmt Standard-Kamera, Bewegung die Kamera im Raum', 
   assert.equal(c._doorCam('binary_sensor.bew_kind', 'motion'), 'camera.kind');
   assert.equal(fake({ 'camera.tuer': st('idle') }, {})._doorCam('', 'bell'), '');
 });
+
+test('Packstation: Sensoren werden pro Station gefunden und gezeichnet', () => {
+  const a = { address: 'Heimsheimer Str. 34, 70499 Stuttgart', source_timestamp: new Date().toISOString() };
+  const mk = (k, v, n) => [`sensor.dhl_packstation_aldi_markt_freie_facher_${k}`, st(v, { attributes: { ...a, friendly_name: `DHL Packstation ALDI Markt Freie Fächer ${n}` } })];
+  const states = Object.fromEntries([mk('gesamt', '115', 'gesamt'), mk('s', '30', 'S'), mk('m', '66', 'M'), mk('l', '0', 'L'), mk('xl', '1', 'XL')]);
+  const c = fake(states, {});
+  const l = c._psStations();
+  assert.equal(l.length, 1);
+  assert.equal(l[0].name, 'ALDI Markt');
+  assert.equal(l[0].total, 115);
+  const html = c._psHtml(l);
+  assert.match(html, /ALDI Markt/);
+  assert.match(html, /115 frei/);
+  assert.match(html, /class="lo"[^>]*data-id="sensor\.dhl_packstation_aldi_markt_freie_facher_l"/);
+  assert.match(html, /class="wn"[^>]*data-id="sensor\.dhl_packstation_aldi_markt_freie_facher_xl"/);
+});
+
+test('Packstation: ohne Sensoren oder nur "unavailable" bleibt die Karte leer', () => {
+  assert.equal(fake({}, {})._psStations().length, 0);
+  const s = { 'sensor.dhl_packstation_x_freie_facher_gesamt': st('unavailable') };
+  assert.equal(fake(s, {})._psStations().length, 0);
+});
