@@ -1093,6 +1093,7 @@ class LumoraCard extends HTMLElement {
     const ov = k.startsWith('e_') ? (c.energy && c.energy[k.slice(2)]) : ((c.extras && c.extras[k]) || (c.info && c.info[k]));
     if (ov) return ov;
     const ch = this._set.sources[k]; if (ch === '-') return null; if (ch) return ch;
+    if (this._pdv && k in this._pdv) return this._pdv[k];
     if (k.startsWith('printer_') && !['printer_status', 'printer_plug', 'printer_plugw', 'printer_boxt', 'printer_boxh', 'printer_time'].includes(k)) {
       const st = this._slot('printer_status'); const m = st && /^sensor\.(.+)_print_status$/.exec(st); if (!m) return null;
       const p = m[1]; const st0 = this._hass.states;
@@ -2590,7 +2591,7 @@ _more() {
       case 'pl-usage': this._plLog('set_usage', Number(k)); return true;
       case 'pl-bathclear': this._plLog('set_bath_plan', 0); return true;
       case 'pl-filter': this._plLog(k === 'clean' ? 'filter_clean' : 'filter_replace', 0); return false;
-      case 'pl-full': this._set.size.pool = 'f'; this._save(); return true;
+      case 'pl-full': this._set.size[this._plKey || 'pool'] = 'f'; this._save(); return true;
       case 'pl-info': this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId: t.dataset.id }, bubbles: true, composed: true })); return false;
       default: return false;
     }
@@ -2693,13 +2694,14 @@ _more() {
       <div class="pool-in">${`<label>Baden in (Stunden)<input type="number" inputmode="decimal" min="0.5" max="24" step="0.5" data-pk="bath" data-go="bath" placeholder="Stunden"></label>`}<button class="pool-ok" data-act="pl-go" data-k="bath">Setzen</button><button class="pool-btn alt" data-act="pl-bathclear">Zurücksetzen</button></div>
       <div class="pool-sp" style="margin-top:8px">${plan && Number.isFinite(ph) ? `Badeplan aktiv: in ${this._plHrs(ph)}h${a.bath_plan_until ? `, geplant für ${this._plTime(a.bath_plan_until)} Uhr` : ''}.` : 'Kein Badezeitpunkt geplant. Ohne Zeitangabe bleibt die Hauptdosierung für nach der Nutzung.'}</div>`);
   }
-  _poolHtml() {
+  _poolHtml(key = 'pool') {
+    this._plKey = key;
     const h = this._hass; const recId = this._xid('pool_rec'); const rec = recId && h.states[recId]; const L = this._plLz();
     const wi = this._xs('pool_winter');
     if (wi && wi.state === 'on') return this._edit ? '<div class="en nopt"><div class="hd"><div class="ib"><ha-icon icon="mdi:snowflake"></ha-icon></div><div><b>Pool</b><span>Winterschlaf aktiv · Karte ist ausgeblendet</span></div></div></div>' : '';
     const pt = this._xs('pool_temp');
     if (!rec && !L.any && !pt) return '';
-    const a = rec ? rec.attributes : {}; const size = this._set.size.pool || 'f';
+    const a = rec ? rec.attributes : {}; const size = this._set.size[key] || 'f';
     const tempV = rec && this._plKnown(a.temp_ist) ? this._plNum(a.temp_ist) : parseFloat((this._xs('lz_temp') || pt || {}).state);
     const tempId = (rec && this._plKnown(a.temp_ist) ? recId : (this._xs('lz_temp') ? this._xid('lz_temp') : pt && pt.entity_id)) || recId;
     const big = Number.isFinite(tempV) ? `<div class="big" data-act="pl-info" data-id="${tempId}">${this._plN(tempV, 1)}°</div>` : '';
@@ -3037,6 +3039,8 @@ registerCard({ id: 'printer', label: '3D-Drucker', icon: 'mdi:printer-3d-nozzle'
   return html ? [{ id: 'printer', html, size: 'f' }] : [];
 } });
 registerCard({ id: 'pool', label: 'Pool', icon: 'mdi:pool', items: (c) => {
+  if (c._dvAll().some((x) => x.type === 'pool')) return [];
+  c._pdv = null;
   const html = c._poolHtml();
   return html ? [{ id: 'pool', html, size: 'f' }] : [];
 } });
@@ -3169,6 +3173,35 @@ registerDevice({
     const strs = ['string1', 'string2'].map((k) => { const s2 = c._dvS(F[k]); const p = s2 ? c._dvPow(s2) : null; return p === null ? '' : `<div data-act="info" data-id="${s2.entity_id}"><b>${esc(DEVTPL.pv.fields[k].l)}</b><span>${c._w(p)}</span></div>`; }).join('');
     return `<div class="dvc"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="mdi:solar-power-variant"></ha-icon></div><div class="tt"><b>${esc(iv.title || st.attributes.friendly_name || id)}</b><span>${esc(sub)}</span></div><div class="big">${w === null ? '–' : esc(c._w(w))}</div></div>
       ${c._spark(c._hist(id, 24), 56, 'a')}${stats ? `<div class="dvs">${stats}</div>` : ''}${strs ? `<div class="dvm">${strs}</div>` : ''}</div>`;
+  },
+});
+/* Pool: Smart Pool Assistant (Empfehlung, Chlor, pH, Baden, Verlauf) und LayzSpa (Pumpe, Heizung, Blubber, Zieltemperatur).
+   Die Felder tragen die Namen der Pool-Slots, die Karte nutzt dieselbe Darstellung wie die feste Pool-Karte im Tab "Mehr". Es wird nur eine Pool-Gerätekarte gezeichnet. */
+const PLN = /pool|spa(?:[^a-z]|$)|spa_|layz/;
+const PLW = /pool|spa|layz/;
+registerDevice({
+  type: 'pool', label: 'Pool (Smart Pool Assistant)', icon: 'mdi:pool', desc: 'Chlor, pH, Badeempfehlung, PoolLab-Abruf, LayzSpa mit Pumpe, Heizung und Zieltemperatur', size: 'f',
+  main: { dom: 'sensor', platform: 'smart_pool_assistant', prefer: /pool.?empfehl|pool.?recommend|smart.?pool|pool_assistant/ },
+  fields: {
+    pool_winter: { l: 'Winterschlaf (blendet Karte aus)', dom: ['input_boolean', 'switch'], re: /winter/, wide: /pool.*winter|winter.*pool|whirlpool.*winter/ },
+    pool_fetch: { l: 'PoolLab-Abruf (Button)', dom: 'button', re: /poollab.*(?:abruf|fetch)|messwerte.?abrufen/, wide: /poollab|pool_lab|messwerte/ },
+    pool_temp: { l: 'Pooltemperatur', dom: 'sensor', unit: ['°C', '°F'], re: PLN, not: /garten|aussen|outdoor|luft|air|weather|max|ziel|target|soll/, wide: PLW },
+    pool_pump: { l: 'Pumpe', dom: 'switch', re: /(?:pool|spa|layz).*pump|pump.*(?:pool|spa|layz)/, wide: PLW },
+    pool_heat: { l: 'Heizung', dom: 'switch', re: /(?:pool|spa|layz).*(?:heat|heiz)|(?:heat|heiz).*(?:pool|spa|layz)/, wide: PLW },
+    lz_conn: { l: 'LayzSpa Verbindung', dom: 'binary_sensor', re: /layz.*(?:connect|verbind)|(?:connect|verbind).*layz/, wide: /layz/ },
+    lz_ip: { l: 'LayzSpa IP-Adresse', dom: 'sensor', re: /layz.*(?:^|[^a-z])ip(?:[^a-z]|$)/, wide: /layz/ },
+    lz_rssi: { l: 'LayzSpa WLAN-Signal', dom: 'sensor', re: /layz.*(?:rssi|wlan|wifi|signal)/, wide: /layz/ },
+    lz_bubbles: { l: 'LayzSpa Blubber', dom: 'switch', re: /layz.*(?:bubble|blubb|air)/, wide: /layz/ },
+    lz_temp: { l: 'LayzSpa Ist-Temperatur', dom: 'sensor', unit: ['°C', '°F'], re: /layz|(?:^|[^a-z])spa(?:[^a-z]|$)/, not: /target|ziel|soll|setpoint/, wide: /layz|spa/ },
+    lz_target: { l: 'LayzSpa Ziel-Temperatur (Anzeige)', dom: 'sensor', unit: ['°C', '°F'], re: /layz.*(?:target|ziel|soll)|(?:target|ziel|soll).*layz/, wide: /layz/ },
+    lz_ctl: { l: 'LayzSpa Zieltemperatur steuern', dom: ['climate', 'number'], re: /layz/, wide: /layz/ },
+    lz_error: { l: 'LayzSpa Fehlercode', dom: 'sensor', re: /layz.*(?:error|fehler)/, wide: /layz/ },
+  },
+  render: (c, iv, F) => {
+    const first = c._dvAll().find((x) => x.type === 'pool');
+    if (first && first.id !== iv.id) return c._edit ? '<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="mdi:pool"></ha-icon></div><div class="tt"><b>Pool</b><span>Es wird nur eine Pool-Karte gezeichnet. Diese hier bitte löschen.</span></div></div></div>' : '';
+    c._pdv = { ...F, pool_rec: iv.main };
+    return c._poolHtml(iv.id);
   },
 });
 /* Proxmox: Entitäten der Integration proxmoxve (deutsche und englische Namen). Pro Gerät (Node, LXC, VM) werden sie am selben Gerät gesucht. */

@@ -108,3 +108,41 @@ test('Packstation: ohne Sensoren oder nur "unavailable" bleibt die Karte leer', 
   const s = { 'sensor.dhl_packstation_x_freie_facher_gesamt': st('unavailable') };
   assert.equal(fake(s, {})._psStations().length, 0);
 });
+
+function poolCard(states, dev = {}) {
+  Object.keys(states).forEach((k) => { states[k].entity_id = k; });
+  const c = Object.create(L.card.prototype);
+  c._set = { devices: [{ id: 'dv1', type: 'pool', main: 'sensor.pool_empfehlung', map: {}, title: '', ...dev }], sources: {}, size: {}, hidden: [], place: {}, custom: [], pinned: [], quick: [] };
+  c._hass = { states, entities: {}, devices: {} };
+  c._cfg = {};
+  return c;
+}
+
+test('Pool-Gerätekarte: Vorlage ist registriert, Felder werden gefunden und belegen die Pool-Slots', () => {
+  assert.ok(L.win.LumoraDevices.list().some((x) => x.type === 'pool'));
+  const c = poolCard({
+    'sensor.pool_empfehlung': st('ok', { attributes: { temp_ist: 24.5, chlor_ist: 1, ph_ist: 7.2 } }),
+    'switch.layzspa_pump': st('on', { attributes: { friendly_name: 'Poolpumpe' } }),
+    'switch.layzspa_heat_regulation': st('off', { attributes: { friendly_name: 'Poolheizung' } }),
+    'sensor.layzspa_temp_c': st('24.5', { attributes: { friendly_name: 'Pooltemperatur', unit_of_measurement: '°C', device_class: 'temperature' } }),
+    'input_boolean.pool_winterschlaf': st('off', { attributes: { friendly_name: 'Pool Winterschlaf' } }),
+  });
+  const F = c._dvMap(c._set.devices[0]);
+  assert.equal(F.pool_pump, 'switch.layzspa_pump');
+  assert.equal(F.pool_heat, 'switch.layzspa_heat_regulation');
+  assert.equal(F.lz_temp, 'sensor.layzspa_temp_c');
+  assert.equal(F.pool_winter, 'input_boolean.pool_winterschlaf');
+  c._pdv = { ...F, pool_rec: 'sensor.pool_empfehlung' };
+  assert.equal(c._slot('pool_rec'), 'sensor.pool_empfehlung');
+  assert.equal(c._slot('pool_pump'), 'switch.layzspa_pump');
+});
+
+test('Pool-Gerätekarte: Winterschlaf blendet die Karte aus', () => {
+  const c = poolCard({
+    'sensor.pool_empfehlung': st('ok', { attributes: {} }),
+    'input_boolean.pool_winterschlaf': st('on', { attributes: { friendly_name: 'Pool Winterschlaf' } }),
+  });
+  c._edit = false;
+  c._pdv = { ...c._dvMap(c._set.devices[0]), pool_rec: 'sensor.pool_empfehlung' };
+  assert.equal(c._poolHtml('dv1'), '');
+});
