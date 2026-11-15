@@ -329,3 +329,22 @@ test('Smartdome-Gerätekarte: ältere Version ohne Statistik zeigt nur Status', 
   assert.match(html, /class="dvc run"/);
   assert.doesNotMatch(html, /Pause heute|sdh/);
 });
+
+test('PTZ: nur ONVIF-Kameras, gewählte Kamera mit Rückfall auf die erste', () => {
+  const c = Object.create(L.card.prototype);
+  const calls = [];
+  c._set = { ptz: { cam: 'camera.alt' } };
+  c._hass = {
+    services: { onvif: { ptz: {} } },
+    states: { 'camera.a': { entity_id: 'camera.a', state: 'idle', attributes: { friendly_name: 'C200C minorStream' } }, 'camera.b': { entity_id: 'camera.b', state: 'unavailable', attributes: {} }, 'camera.g': { entity_id: 'camera.g', state: 'idle', attributes: {} } },
+    entities: { 'camera.a': { platform: 'onvif' }, 'camera.b': { platform: 'onvif' }, 'camera.g': { platform: 'generic' } },
+    callService: (...a) => { calls.push(a); return Promise.resolve(); },
+  };
+  assert.deepEqual([...c._ptzCams().map((x) => x.entity_id)], ['camera.a']);
+  assert.equal(c._ptzCam(), 'camera.a');
+  c._ptzMove('LEFT'); c._ptzMove('UP');
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[0])), ['onvif', 'ptz', { move_mode: 'ContinuousMove', distance: 0.3, pan: 'LEFT' }, { entity_id: 'camera.a' }]);
+  assert.equal(calls[1][2].tilt, 'UP');
+  assert.match(c._ptzHtml(), /data-act="ptz" data-d="DOWN"/);
+  c._hass.services = {}; assert.equal(c._ptzHtml(), '');
+});

@@ -18,6 +18,7 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - Room-Climate-Meldungen: Schimmelrisiko, Fenster schließen, Jetzt lüften, Rollladen, Heizung; Bewegung als Chip mit Raumnamen
 - Chips frei wählbar: im Bearbeiten-Modus der Startseite Chips antippen
 - Automatische Erkennung von Sensoren (Energie, Zähler, Geräte, Pakete, Drucker, Pool, System, Warnungen, Fahrzeiten, Bahnverbindungen). Gefundenes ist vorausgefüllt, Fehlendes bleibt unsichtbar. Anpassen im Bearbeiten-Modus unter "Quellen" oder per YAML
+- PTZ-Steuerung in der Kameraübersicht: Für schwenkbare ONVIF-Kameras (z. B. Tapo C200C) erscheinen Pfeiltasten über dem Kamera-Raster (Dienst onvif.ptz). Bei mehreren ONVIF-Kameras wird die Kamera per Tippen gewählt und pro HA-Benutzer gespeichert; ohne ONVIF-Kamera bleibt der Bereich verborgen. Deaktivierte oder nicht verfügbare Kamera-Entitäten werden automatisch übersprungen
 - Kamera-Vorschau auf der Startseite: Kameras im Bearbeiten-Modus unter "Kameras" wählen; Bilder aktualisieren sich alle 10 Sekunden ohne Flackern. Angepinnte Kameras erscheinen ebenfalls als Vorschau
 - Im Bearbeiten-Modus wird nichts neu gezeichnet, damit sich Elemente in Ruhe verschieben lassen
 - Gemeinsames Layout für alle: als Administrator im Bearbeiten-Modus "Layout für alle speichern" (schreibt `layout:` in die Karte des Dashboards). Jeder Benutzer kann es für sich anpassen (wird pro Benutzer gespeichert) und über "Auf Gruppenlayout zurücksetzen" wieder übernehmen. Mit `shared: false` bleibt alles pro Benutzer

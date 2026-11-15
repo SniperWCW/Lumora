@@ -28,6 +28,7 @@ const DEF = {
   snooze: {},
   notify: { push: '', tts: '', min: 0 },
   door: { bell: [], motion: [], cam: '', secs: 30 },
+  ptz: { cam: '' },
 };
 const norm = (t) => String(t || '').toLowerCase().replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ß/g, 'ss');
 const PV = '(?:^|[^a-z])pv(?:[^a-z]|$)|solar|photovolt';
@@ -311,7 +312,7 @@ const embedConfig = (yaml) => {
 const merge = (v) => {
   v = v || {};
   const arr = (k) => [...(v[k] || DEF[k])];
-  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), embeds: JSON.parse(JSON.stringify(v.embeds || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify }, door: { ...DEF.door, ...v.door, bell: [...((v.door && v.door.bell) || [])], motion: [...((v.door && v.door.motion) || [])] } };
+  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), embeds: JSON.parse(JSON.stringify(v.embeds || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify }, ptz: { ...DEF.ptz, ...v.ptz }, door: { ...DEF.door, ...v.door, bell: [...((v.door && v.door.bell) || [])], motion: [...((v.door && v.door.motion) || [])] } };
 };
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -431,6 +432,9 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .tile.sens .ic{background:transparent}
 .cams.hc{grid-template-columns:repeat(2,minmax(0,1fr))}.cams.hc .cam:last-child:nth-child(odd){grid-column:1/-1}.grid .cam{grid-column:span 2}
 .cams{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.ptz{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--a);border-radius:16px;padding:10px 14px;margin-bottom:10px}.ptz .ptzh{display:flex;align-items:center;gap:8px}.ptz .ptzn{opacity:.7;font-size:14px}.ptz .pills{margin:0;flex:1}
+.ptz .pad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px);gap:6px;margin-left:auto}.ptz .pb{border:0;border-radius:12px;background:var(--selbg);color:var(--selfg);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}.ptz .pb:active{filter:brightness(.85)}
+.ptz .pb.UP{grid-column:2;grid-row:1}.ptz .pb.LEFT{grid-column:1;grid-row:2}.ptz .pb.DOWN{grid-column:2;grid-row:2}.ptz .pb.RIGHT{grid-column:3;grid-row:2}
 .cam{border-radius:18px;overflow:hidden;background:rgba(0,0,0,.3);position:relative;aspect-ratio:16/9;cursor:pointer}
 .cam img{width:100%;height:100%;object-fit:cover;display:block}
 .cam span.n{position:absolute;left:10px;bottom:8px;font-size:13px;background:rgba(0,0,0,.5);color:#fff;padding:3px 9px;border-radius:99px}
@@ -1046,7 +1050,7 @@ class LumoraCard extends HTMLElement {
   }
   _signature() {
     const h = this._hass;
-    if (this._view === 'cams') return ['cams', this._sheet, this._edit, this._set.hidden.join(), (this._set.order.cams || []).join(), Object.values(h.states).filter((x) => dom(x.entity_id) === 'camera').map((x) => x.entity_id + (x.state === 'unavailable' ? 'x' : '') + (x.attributes.entity_picture || '')).join()].join('|'); const parts = [this._view, this._floor, this._area, this._sheet, this._edit, Math.floor(Date.now() / 60000), this._set.pinned.length, this._set.hidden.length, this._set.hiddenAreas.length];
+    if (this._view === 'cams') return ['cams', this._sheet, this._edit, this._set.ptz.cam, this._ptzCam(), this._set.hidden.join(), (this._set.order.cams || []).join(), Object.values(h.states).filter((x) => dom(x.entity_id) === 'camera').map((x) => x.entity_id + (x.state === 'unavailable' ? 'x' : '') + (x.attributes.entity_picture || '')).join()].join('|'); const parts = [this._view, this._floor, this._area, this._sheet, this._edit, Math.floor(Date.now() / 60000), this._set.pinned.length, this._set.hidden.length, this._set.hiddenAreas.length];
     const cuSet = new Set(this._set.custom.map((x) => x.entity));
     const doms = ['weather', 'light', 'media_player', 'vacuum', 'person', 'alarm_control_panel', 'lock', 'binary_sensor', 'camera', 'switch', 'cover', 'climate', 'fan'];
     for (const id in h.states) {
@@ -2259,9 +2263,29 @@ _more() {
       const n = new Image(); n.onload = () => { img.src = u; }; n.src = u;
     });
   }
+  /* PTZ: nur ONVIF-Kameras (Plattform onvif) und nur, wenn der Dienst onvif.ptz existiert */
+  _ptzCams() {
+    const h = this._hass; if (!h || !h.services || !h.services.onvif || !h.services.onvif.ptz) return [];
+    return Object.values(h.states).filter((x) => dom(x.entity_id) === 'camera' && x.state !== 'unavailable' && h.entities && h.entities[x.entity_id] && h.entities[x.entity_id].platform === 'onvif');
+  }
+  _ptzCam() {
+    const l = this._ptzCams(); if (!l.length) return '';
+    const c = this._set.ptz.cam; return (l.find((x) => x.entity_id === c) || l[0]).entity_id;
+  }
+  _ptzHtml() {
+    const l = this._ptzCams(); if (!l.length) return '';
+    const cur = this._ptzCam(); const b = (d, i) => `<button class="pb ${d}" data-act="ptz" data-d="${d}" aria-label="${d}"><ha-icon icon="mdi:chevron-${i}"></ha-icon></button>`;
+    return `<div class="ptz"><div class="ptzh"><ha-icon icon="mdi:axis-arrow"></ha-icon><b>PTZ-Steuerung</b></div>${l.length > 1 ? `<div class="pills">${l.map((x) => `<button class="pill ${x.entity_id === cur ? 'sel' : ''}" data-act="ptzcam" data-id="${x.entity_id}">${esc(cleanName(x.attributes.friendly_name))}</button>`).join('')}</div>` : `<span class="ptzn">${esc(cleanName(l[0].attributes.friendly_name))}</span>`}<div class="pad">${b('UP', 'up')}${b('LEFT', 'left')}${b('RIGHT', 'right')}${b('DOWN', 'down')}</div></div>`;
+  }
+  _ptzMove(dir) {
+    const cam = this._ptzCam(); if (!cam) return;
+    const d = { move_mode: 'ContinuousMove', distance: 0.3 };
+    if (dir === 'UP' || dir === 'DOWN') d.tilt = dir; else d.pan = dir;
+    Promise.resolve(this._hass.callService('onvif', 'ptz', d, { entity_id: cam })).catch(() => {});
+  }
   _cams() {
     const cams = this._ord('cams', (this._byDomain().camera || []).filter((s) => s.state !== 'unavailable' && (this._edit || !this._set.hidden.includes(s.entity_id))), (s) => s.entity_id);
-    return `<div class="rh"><h2>Kameras</h2><div class="inf"><span>${cams.length}</span>${this._editBtn()}</div></div>${this._hint()}<div class="cams">${cams.map((s) => this._camHtml(s, 'cams')).join('') || '<div class="empty">Keine Kameras verfügbar.</div>'}</div>`;
+    return `<div class="rh"><h2>Kameras</h2><div class="inf"><span>${cams.length}</span>${this._editBtn()}</div></div>${this._hint()}${this._ptzHtml()}<div class="cams">${cams.map((s) => this._camHtml(s, 'cams')).join('') || '<div class="empty">Keine Kameras verfügbar.</div>'}</div>`;
   }
 
   /* ---------- Sheets ---------- */
@@ -3156,6 +3180,8 @@ _more() {
       case 'nav': this._view = t.dataset.v; this._sheet = null; this._edit = false; break;
       case 'floor': this._floor = id; this._area = null; break;
       case 'area': this._area = id; break;
+      case 'ptz': if (!this._edit) this._ptzMove(t.dataset.d); return;
+      case 'ptzcam': s.ptz.cam = id; this._save(); break;
       case 'info': this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId: id }, bubbles: true, composed: true })); return;
       case 'toggle': {
         const d = dom(id);
