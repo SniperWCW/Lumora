@@ -291,3 +291,41 @@ test('Kobra-X-Gerätekarte: Ziel-Tasten setzen number.set_value mit Grenzen und 
   assert.deepEqual(calls.map((x) => x[2].value), [205, 120, 0]);
   assert.ok(calls.every((x) => x[0] === 'number' && x[1] === 'set_value'));
 });
+
+function smartdomeCard(attrs, state = 'idle') {
+  const c = Object.create(L.card.prototype);
+  c._set = { devices: [{ id: 'dv7', type: 'smartdome', main: 'sensor.bad_status', map: {}, title: '' }], sources: {}, size: {}, hidden: [], place: {}, custom: [], pinned: [], quick: [] };
+  const states = { 'sensor.bad_status': st(state, { attributes: { friendly_name: 'Bad – Status', device_class: 'enum', ...attrs } }) };
+  states['sensor.bad_status'].entity_id = 'sensor.bad_status';
+  c._hass = { states, entities: { 'sensor.bad_status': { platform: 'smartdome_heat_control' } }, devices: {} };
+  c._cfg = {};
+  return c;
+}
+
+test('Smartdome-Gerätekarte: Fensterpause zeigt Status, Pausenzeit, Gas und Verlauf', () => {
+  assert.ok(L.win.LumoraDevices.list().some((x) => x.type === 'smartdome'));
+  const c = smartdomeCard({
+    control_reason: 'window_pause', window_open: true, window_pause_active: true, current_temperature: 20.4, target_temperature: 21,
+    window_pause_today_min: 95, gas_saved_today_m3: 0.12, gas_saved_month_m3: 1.5, gas_saved_year_m3: 12.25, gas_saved_total_m3: 12.25,
+    window_pause_history: [0, 10, 40, 95],
+  });
+  const iv = c._set.devices[0];
+  assert.deepEqual([...c._dvMains(L.DEVTPL.smartdome).map((x) => x.id)], ['sensor.bad_status']);
+  const html = L.DEVTPL.smartdome.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
+  assert.match(html, /<b>Bad<\/b>/);
+  assert.match(html, /Pausiert, Fenster offen/);
+  assert.match(html, /Fenster offen, Heizung pausiert/);
+  assert.match(html, /1 h 35 min/);
+  assert.match(html, /0,12 m³/);
+  assert.match(html, /20,4 °/);
+  assert.match(html, /class="sdh"/);
+});
+
+test('Smartdome-Gerätekarte: ältere Version ohne Statistik zeigt nur Status', () => {
+  const c = smartdomeCard({ control_reason: 'heating', current_temperature: 19, target_temperature: 21 }, 'heating');
+  const iv = c._set.devices[0];
+  const html = L.DEVTPL.smartdome.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
+  assert.match(html, /Heizt/);
+  assert.match(html, /class="dvc run"/);
+  assert.doesNotMatch(html, /Pause heute|sdh/);
+});
