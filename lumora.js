@@ -1405,14 +1405,18 @@ class LumoraCard extends HTMLElement {
 
   _doorMedia() {
     const v = this._dbEl && this._dbEl.querySelector('.dbv'); const st = this._db && this._hass.states[this._db.cam]; if (!v || !st) return;
-    if (customElements.get('ha-camera-stream')) {
+    /* Standbild immer als Grundlage (auch für Kameras ohne Stream wie Thumbnails/Snapshots oder bei Stream-Fehlern); Livestream nur zusätzlich darüber, wenn die Kamera Streams kann */
+    const base = st.attributes.entity_picture;
+    if (base) {
+      let img = v.querySelector('img'); if (!img) { img = document.createElement('img'); img.alt = ''; v.insertBefore(img, v.firstChild); }
+      img.src = `${base}${base.includes('?') ? '&' : '?'}_t=${Date.now()}`;
+    }
+    const canStream = (Number(st.attributes.supported_features) & 2) && customElements.get('ha-camera-stream');
+    if (canStream) {
       let s = v.querySelector('ha-camera-stream');
       if (!s) { s = document.createElement('ha-camera-stream'); s.muted = true; s.controls = false; s.setAttribute('muted', ''); v.appendChild(s); }
-      s.hass = this._hass; s.stateObj = st; return;
+      s.hass = this._hass; s.stateObj = st;
     }
-    const base = st.attributes.entity_picture; if (!base) return;
-    let img = v.querySelector('img'); if (!img) { img = document.createElement('img'); img.alt = ''; v.appendChild(img); }
-    img.src = `${base}${base.includes('?') ? '&' : '?'}_t=${Date.now()}`;
   }
 
   _doorHide(manual) {
