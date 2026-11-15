@@ -619,6 +619,8 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .px>ha-icon{--mdc-icon-size:22px}.px .t{min-width:0}.px .t b{display:block;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.px .t span{font-size:12px;color:var(--fg2)}
 .px>span{font-size:12.5px;text-align:right;white-space:nowrap}.px.off>ha-icon,.px.off .st{color:#c9694f}.px.na{opacity:.55}.px .st{grid-column:span 2;font-weight:600}
 .dvc.pxoff{opacity:.85}
+.kx .dvm b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kxc>.kxr{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:default}.kxr>div{display:flex;align-items:center;gap:6px}.kxr b{min-width:56px;text-align:center}
+.kxs{display:flex;gap:10px;flex-wrap:wrap}.kxs>div{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;min-width:44px}.kxs i{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);box-sizing:border-box;background:var(--line)}.kxs .on i{border-color:var(--b);box-shadow:0 0 0 2px var(--b)}.kxs small{font-size:11px;color:var(--fg2)}
 @media (max-width:480px){.px{grid-template-columns:auto minmax(0,1fr) 62px 62px;gap:4px 6px}.px>span{font-size:12px}}
 .ps{padding:10px 0 2px;border-top:1px solid var(--line);margin-top:10px;cursor:pointer}.ps:first-of-type{margin-top:12px}
 .ps .pt{display:flex;align-items:center;gap:10px;min-width:0}.ps .pt>ha-icon{--mdc-icon-size:22px;flex:none}.ps .pt .t{min-width:0;flex:1}
@@ -1056,7 +1058,7 @@ class LumoraCard extends HTMLElement {
       else if (this._auto().tracked.has(id)) parts.push(id + h.states[id].state);
       else if (cuSet.has(id) || this._set.pinned.some((p) => p.entity === id)) parts.push(id + h.states[id].state);
     }
-    for (const iv of this._dvAll()) { try { const m = this._dvMap(iv); parts.push(iv.main + (h.states[iv.main] ? h.states[iv.main].state + (h.states[iv.main].attributes.fan_speed || '') : '')); Object.values(m).forEach((x) => { if (x && h.states[x]) parts.push(x + h.states[x].state); }); } catch (_) { /* ignore */ } }
+    for (const iv of this._dvAll()) { try { const m = this._dvMap(iv); parts.push(iv.main + (h.states[iv.main] ? h.states[iv.main].state + (h.states[iv.main].attributes.fan_speed || '') : '')); Object.values(m).forEach((x) => { if (x && h.states[x]) parts.push(x + h.states[x].state + (h.states[x].attributes.color_hex || '')); }); } catch (_) { /* ignore */ } }
     if (['home', 'more', 'rooms'].includes(this._view)) { parts.push(this._plSig()); parts.push(this._prSig()); }
     if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
     parts.push(this._bd.s);
@@ -3142,7 +3144,7 @@ _more() {
     if (act === 'noop') return;
     e.stopPropagation();
     if (Date.now() - (this._dgAt || 0) < 450) return;
-    if (this._edit && ['info', 'toggle', 'vstart', 'vdock', 'vlocate', 'vfan', 'qrun'].includes(act)) return;
+    if (this._edit && ['info', 'toggle', 'vstart', 'vdock', 'vlocate', 'vfan', 'qrun', 'knum'].includes(act)) return;
     if (act.startsWith('pr-')) { if (this._edit) return; if (this._printClick(t, act)) { this._sig = ''; this._render(); } return; }
     if (act.startsWith('pl-')) { if (this._edit) return; if (this._poolClick(t, act)) { this._sig = ''; this._render(); } return; }
     switch (act) {
@@ -3179,6 +3181,14 @@ _more() {
         this._save(); this._sheet = null; break;
       }
       case 'vstart': h.callService('vacuum', h.states[id] && h.states[id].state === 'cleaning' ? 'pause' : 'start', { entity_id: id }); return;
+      case 'knum': {
+        const n = h.states[id]; if (!n) return;
+        const cur = parseFloat(n.state); const mn = Number(n.attributes.min); const mx = Number(n.attributes.max);
+        let v = t.dataset.v !== undefined ? Number(t.dataset.v) : (isNaN(cur) || cur <= 0 ? Number(t.dataset.s) || 0 : cur) + Number(t.dataset.d);
+        if (t.dataset.v === undefined && Number(t.dataset.d) < 0 && v < 0) v = 0;
+        v = Math.max(Number.isFinite(mn) ? mn : 0, Math.min(Number.isFinite(mx) ? mx : 300, v));
+        h.callService('number', 'set_value', { entity_id: id, value: v }); return;
+      }
       case 'vdock': h.callService('vacuum', 'return_to_base', { entity_id: id }); return;
       case 'rsens': this._sheet = 'rs'; this._rsArea = id; break;
       case 'rspick': { const r = s.roomSensors[this._rsArea] || (s.roomSensors[this._rsArea] = {}); if (id) r[t.dataset.k] = id; else delete r[t.dataset.k]; this._save(); break; }
@@ -3569,6 +3579,84 @@ registerDevice({
     const err = bp && bp.state === 'on' ? '<div class="dverr"><ha-icon icon="mdi:alert-circle"></ha-icon><div>Backup-Problem</div></div>' : '';
     return `<div class="dvc ${S.on ? 'run' : 'pxoff'}"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="${K.icon}"></ha-icon></div><div class="tt"><b>${esc(name)}</b><span>${esc(sub)}</span></div>${S.on && cpu !== null ? `<div class="big">${c._de(cpu, cpu < 10 ? 1 : 0)} %</div>` : ''}</div>${err}
       ${S.on && F.cpu ? c._spark(c._hist(F.cpu, 24), 40, 'a') : ''}${bars ? `<div class="dvm">${bars}</div>` : ''}${stats ? `<div class="dvs">${stats}</div>` : ''}</div>`;
+  },
+});
+/* Anycubic Kobra X (Integration grunna/ha-anycubic-kobra-x-lan, auch Kobra S1): Status, Fortschritt, Temperaturen mit Zielwert-Tasten,
+   Lüfter, Filament-Slots der Multi-Color-Box und Kamera-Licht. Die Integration startet keine Drucke, daher gibt es hier auch keine Start-/Stop-Tasten. */
+const KX_ST = { printing: 'Druckt', finished: 'Fertig', failed: 'Fehlgeschlagen', downloading: 'Lädt Datei', checking: 'Prüft', preheating: 'Heizt vor', slicing: 'Slicing', auto_leveling: 'Auto-Leveling', vibrating: 'Vibrationskalibrierung', flow_calibrating: 'Fluss-Kalibrierung', drying: 'Trocknet', paused: 'Pausiert', pausing: 'Pausiert', free: 'Bereit', idle: 'Bereit', ready: 'Bereit', busy: 'Beschäftigt', offline: 'Offline' };
+const KX_RUN = ['printing', 'downloading', 'checking', 'preheating', 'slicing', 'auto_leveling', 'vibrating', 'flow_calibrating', 'drying', 'paused', 'pausing'];
+const KX_SLOTS = {};
+[1, 2].forEach((b) => [1, 2, 3, 4].forEach((n) => { KX_SLOTS[`b${b}s${n}`] = { l: `Box ${b} Slot ${n}`, dom: 'sensor', re: new RegExp(`box[ _]?${b}[ _]?slot[ _]?${n}(?![0-9])`) }; }));
+const kxColor = (st) => {
+  const a = st.attributes; const h2 = a.color_hex;
+  if (typeof h2 === 'string' && /^#?[0-9a-f]{6}$/i.test(h2)) return h2[0] === '#' ? h2 : `#${h2}`;
+  if (Array.isArray(a.color) && a.color.length >= 3 && a.color.slice(0, 3).every((v) => Number.isFinite(Number(v)))) return `rgb(${a.color.slice(0, 3).map((v) => Math.max(0, Math.min(255, Math.round(Number(v))))).join(',')})`;
+  return '';
+};
+registerDevice({
+  type: 'kobrax', label: '3D-Drucker Anycubic Kobra X', icon: 'mdi:printer-3d-nozzle', desc: 'Status, Fortschritt, Temperaturen mit Zielwert, Lüfter, Filament-Slots und Kamera-Licht (Integration Anycubic Kobra X LAN)', size: 'w',
+  main: { dom: 'sensor', platform: 'anycubic_kobra_x_lan', prefer: /print.?status|printer.?state|kobra/ },
+  fields: {
+    status: { l: 'Druckstatus', dom: 'sensor', re: /print.?status/ },
+    state: { l: 'Druckerstatus', dom: 'sensor', re: /printer.?state/ },
+    task: { l: 'Druckauftrag', dom: 'sensor', re: /print.?task/ },
+    progress: { l: 'Fortschritt', dom: 'sensor', re: /print.?progress/ },
+    layer: { l: 'Aktuelle Schicht', dom: 'sensor', re: /current.?layer/ },
+    layers: { l: 'Schichten gesamt', dom: 'sensor', re: /total.?layers/ },
+    left: { l: 'Restzeit', dom: 'sensor', re: /remaining.?print.?time|restzeit/ },
+    ptime: { l: 'Druckzeit', dom: 'sensor', re: /print.?time/, not: /remain|rest/ },
+    filament: { l: 'Filament verbraucht', dom: 'sensor', re: /filament.?used/ },
+    nozzle: { l: 'Düse', dom: 'sensor', re: /nozzle/, not: /target/ },
+    bed: { l: 'Bett', dom: 'sensor', re: /bed/, not: /target/ },
+    nozt: { l: 'Düse Zieltemperatur', dom: 'number', re: /nozzle/ },
+    bedt: { l: 'Bett Zieltemperatur', dom: 'number', re: /bed/ },
+    fan: { l: 'Lüfter Modell', dom: 'sensor', re: /fan.?speed/, not: /aux|box/ },
+    aux: { l: 'Lüfter Aux', dom: 'sensor', re: /aux.?fan/ },
+    boxfan: { l: 'Lüfter Gehäuse', dom: 'number', re: /box.?fan/ },
+    light: { l: 'Kamera-Licht', dom: 'light', re: /camera|light|licht/ },
+    loaded: { l: 'Aktiver Slot', dom: 'sensor', re: /loaded.?slot/ },
+    ...KX_SLOTS,
+  },
+  render: (c, iv, F0, st) => {
+    /* Die Haupt-Entität wird bei der Suche übersprungen, kann aber selbst ein Feld sein (z. B. der Druckstatus) */
+    const F = { ...F0 }; const FD = DEVTPL.kobrax.fields;
+    Object.keys(FD).forEach((k) => { if (!F[k] && !(iv.map && iv.map[k] === '-') && c._dvMatch(iv.main, FD[k])) F[k] = iv.main; });
+    const S = (k) => c._dvS(F[k]);
+    const key = (s2) => (s2 ? norm(s2.state).trim().replace(/[\s-]+/g, '_') : '');
+    const pk = key(S('status')) || key(S('state'));
+    const run = KX_RUN.includes(pk); const paused = pk === 'paused' || pk === 'pausing';
+    const r0 = c._hass.entities && c._hass.entities[iv.main]; const dd = r0 && r0.device_id && c._hass.devices && c._hass.devices[r0.device_id];
+    const name = iv.title || (dd && (dd.name_by_user || dd.name)) || 'Kobra X';
+    const prog = c._num(F.progress); const left = c._num(F.left);
+    const sub = [KX_ST[pk] || (pk ? pk.replace(/_/g, ' ') : 'Unbekannt'), pk === 'printing' && left !== null && left > 0 ? `noch ${hmMin(Math.round(left))}` : ''].filter(Boolean).join(' · ');
+    const big = run && prog !== null ? `<div class="big">${c._de(prog, 0)} %</div>` : '';
+    const task = S('task'); const ly = c._num(F.layer); const lys = c._num(F.layers);
+    const bar = run && prog !== null ? `<div class="dvm"><div data-act="info" data-id="${F.progress}"><b>${task ? esc(c._state(task)) : 'Druck'}</b><span>${ly !== null ? `Schicht ${c._de(ly, 0)}${lys !== null ? ` von ${c._de(lys, 0)}` : ''}` : ''}</span><i><u style="width:${Math.max(1, Math.min(100, prog))}%"></u></i></div></div>` : '';
+    const err = pk === 'failed' ? '<div class="dverr"><ha-icon icon="mdi:alert-circle"></ha-icon><div>Druck fehlgeschlagen oder abgebrochen</div></div>' : '';
+    const temp = (l, cur, tgt) => {
+      if (!cur) return '';
+      const v = parseFloat(cur.state); if (isNaN(v)) return '';
+      return `<div data-act="info" data-id="${cur.entity_id}"><small>${l}</small><b>${c._de(v, 0)}${tgt !== null && tgt > 0 ? ` / ${c._de(tgt, 0)}` : ''} °C</b></div>`;
+    };
+    const dur = (l, s2) => { const v = s2 ? parseFloat(s2.state) : NaN; return isNaN(v) ? '' : `<div data-act="info" data-id="${s2.entity_id}"><small>${l}</small><b>${hmMin(Math.round(v))}</b></div>`; };
+    const stat = (l, s2, d) => dvStat(c, l, s2, d);
+    const stats = [temp('Düse', S('nozzle'), c._num(F.nozt)), temp('Bett', S('bed'), c._num(F.bedt)), run ? dur('Druckzeit', S('ptime')) : '', run ? stat('Filament', S('filament'), 1) : '', stat('Lüfter', S('fan'), 0), stat('Aux-Lüfter', S('aux'), 0), stat('Gehäuse-Lüfter', S('boxfan'), 0)].join('');
+    const ctl = (l, id, step, start) => {
+      const n = id && c._dvS(id); if (!n) return '';
+      const v = parseFloat(n.state);
+      return `<div class="kxr"><span>${l}</span><div><button class="pill" data-act="knum" data-id="${id}" data-d="${-step}" data-s="${start}">−${step}</button><b>${isNaN(v) ? '–' : `${c._de(v, 0)} °C`}</b><button class="pill" data-act="knum" data-id="${id}" data-d="${step}" data-s="${start}">+${step}</button><button class="pill" data-act="knum" data-id="${id}" data-v="0">Aus</button></div></div>`;
+    };
+    const ctls = [ctl('Düse soll', F.nozt, 5, 200), ctl('Bett soll', F.bedt, 5, 60)].join('');
+    const ld = c._num(F.loaded);
+    const slots = Object.keys(KX_SLOTS).map((k) => {
+      const sl = S(k); if (!sl) return '';
+      const col = kxColor(sl); const no = Number(k[3]);
+      return `<div class="${k[1] === '1' && ld === no ? 'on' : ''}" data-act="info" data-id="${sl.entity_id}"><i style="${col ? `background:${col}` : ''}"></i><small>${esc(c._state(sl))}</small></div>`;
+    }).join('');
+    const lg = S('light');
+    const pills = lg ? `<div class="dvf"><button class="pill ${lg.state === 'on' ? 'sel' : ''}" data-act="toggle" data-id="${lg.entity_id}"><ha-icon icon="mdi:lightbulb-outline"></ha-icon>Kamera-Licht</button></div>` : '';
+    return `<div class="dvc kx ${run && !paused ? 'run' : ''}"><div class="dvh" data-act="info" data-id="${iv.main}"><div class="ib"><ha-icon icon="mdi:printer-3d-nozzle"></ha-icon></div><div class="tt"><b>${esc(name)}</b><span>${esc(sub)}</span></div>${big}</div>
+      ${err}${bar}${stats ? `<div class="dvs">${stats}</div>` : ''}${ctls ? `<div class="dvm kxc">${ctls}</div>` : ''}${slots ? `<div class="kxs">${slots}</div>` : ''}${pills}</div>`;
   },
 });
 registerCard({ id: 'proxmox', label: 'Proxmox', icon: 'mdi:server', size: 'w', items: (c) => {

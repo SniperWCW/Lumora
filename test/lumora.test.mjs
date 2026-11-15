@@ -210,3 +210,84 @@ test('Fremdkarten: Kachel ist registriert, leere Karte versteckt, Fehler sichtba
   assert.ok(c._embHtml({ id: 'em1', yaml: 'foo: 1' }).includes('YAML fehlerhaft'));
   assert.ok(c._embHtml({ id: 'em1', yaml: 'type: gauge' }).includes('data-emb="em1"'));
 });
+
+function kobraCard(states) {
+  Object.keys(states).forEach((k) => { states[k].entity_id = k; });
+  const c = Object.create(L.card.prototype);
+  c._set = { devices: [{ id: 'dv9', type: 'kobrax', main: 'sensor.kobra_x_print_status', map: {}, title: '' }], sources: {}, size: {}, hidden: [], place: {}, custom: [], pinned: [], quick: [] };
+  const entities = {}; Object.keys(states).forEach((k) => { entities[k] = { device_id: 'dev1' }; });
+  c._hass = { states, entities, devices: { dev1: { name: 'Anycubic Kobra X' } } };
+  c._cfg = {};
+  return c;
+}
+const KOBRA = () => ({
+  'sensor.kobra_x_print_status': st('printing', { attributes: { friendly_name: 'Print status' } }),
+  'sensor.kobra_x_printer_state': st('busy', { attributes: { friendly_name: 'Printer state' } }),
+  'sensor.kobra_x_print_task': st('Benchy.gcode', { attributes: { friendly_name: 'Print task' } }),
+  'sensor.kobra_x_print_progress': st('77', { attributes: { friendly_name: 'Print progress', unit_of_measurement: '%' } }),
+  'sensor.kobra_x_current_layer': st('12', { attributes: { friendly_name: 'Current layer' } }),
+  'sensor.kobra_x_total_layers': st('16', { attributes: { friendly_name: 'Total layers' } }),
+  'sensor.kobra_x_remaining_print_time': st('95', { attributes: { friendly_name: 'Remaining print time', unit_of_measurement: 'min' } }),
+  'sensor.kobra_x_nozzle_temperature': st('221', { attributes: { friendly_name: 'Nozzle temperature', unit_of_measurement: '°C', device_class: 'temperature' } }),
+  'sensor.kobra_x_target_nozzle_temperature': st('220', { attributes: { friendly_name: 'Target nozzle temperature', unit_of_measurement: '°C', device_class: 'temperature' } }),
+  'sensor.kobra_x_bed_temperature': st('60', { attributes: { friendly_name: 'Bed temperature', unit_of_measurement: '°C', device_class: 'temperature' } }),
+  'number.kobra_x_target_nozzle_temperature': st('220', { attributes: { friendly_name: 'Target nozzle temperature', min: 0, max: 300, unit_of_measurement: '°C' } }),
+  'number.kobra_x_target_bed_temperature': st('60', { attributes: { friendly_name: 'Target bed temperature', min: 0, max: 120, unit_of_measurement: '°C' } }),
+  'sensor.kobra_x_fan_speed': st('100', { attributes: { friendly_name: 'Fan speed', unit_of_measurement: '%' } }),
+  'sensor.kobra_x_aux_fan_speed': st('50', { attributes: { friendly_name: 'Aux fan speed', unit_of_measurement: '%' } }),
+  'light.kobra_x_camera_light': st('off', { attributes: { friendly_name: 'Camera light' } }),
+  'sensor.kobra_x_loaded_slot': st('2', { attributes: { friendly_name: 'Loaded slot' } }),
+  'sensor.kobra_x_box_1_slot_1': st('PLA', { attributes: { friendly_name: 'Box 1 slot 1', color_hex: '#ff0000' } }),
+  'sensor.kobra_x_box_1_slot_2': st('PETG', { attributes: { friendly_name: 'Box 1 slot 2', color: [0, 128, 255] } }),
+});
+
+test('Kobra-X-Gerätekarte: Vorlage ist registriert und findet die Felder der Integration', () => {
+  assert.ok(L.win.LumoraDevices.list().some((x) => x.type === 'kobrax'));
+  const F = kobraCard(KOBRA())._dvMap({ id: 'dv9', type: 'kobrax', main: 'sensor.kobra_x_print_status', map: {} });
+  assert.equal(F.state, 'sensor.kobra_x_printer_state');
+  assert.equal(F.progress, 'sensor.kobra_x_print_progress');
+  assert.equal(F.left, 'sensor.kobra_x_remaining_print_time');
+  assert.equal(F.nozzle, 'sensor.kobra_x_nozzle_temperature');
+  assert.equal(F.nozt, 'number.kobra_x_target_nozzle_temperature');
+  assert.equal(F.bedt, 'number.kobra_x_target_bed_temperature');
+  assert.equal(F.fan, 'sensor.kobra_x_fan_speed');
+  assert.equal(F.aux, 'sensor.kobra_x_aux_fan_speed');
+  assert.equal(F.b1s2, 'sensor.kobra_x_box_1_slot_2');
+  assert.equal(F.light, 'light.kobra_x_camera_light');
+});
+
+test('Kobra-X-Gerätekarte: Druck läuft mit Fortschritt, Zieltemperaturen, aktivem Slot und Slot-Farben', () => {
+  const c = kobraCard(KOBRA());
+  const iv = c._set.devices[0];
+  const html = L.DEVTPL.kobrax.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
+  assert.match(html, /Druckt · noch 1 h 35 min/);
+  assert.match(html, /77 %/);
+  assert.match(html, /Schicht 12 von 16/);
+  assert.match(html, /221 \/ 220 °C/);
+  assert.match(html, /class="on"[^>]*data-id="sensor\.kobra_x_box_1_slot_2"/);
+  assert.match(html, /background:#ff0000/);
+  assert.match(html, /background:rgb\(0,128,255\)/);
+  assert.match(html, /data-act="knum"[^>]*data-id="number\.kobra_x_target_nozzle_temperature"/);
+});
+
+test('Kobra-X-Gerätekarte: Leerlauf ohne Druckdaten zeigt Bereit statt Fortschritt', () => {
+  const s = KOBRA();
+  s['sensor.kobra_x_print_status'] = st('unknown'); s['sensor.kobra_x_printer_state'] = st('free', { attributes: { friendly_name: 'Printer state' } });
+  const c = kobraCard(s); const iv = c._set.devices[0];
+  const html = L.DEVTPL.kobrax.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
+  assert.match(html, /Bereit/);
+  assert.doesNotMatch(html, /Schicht/);
+});
+
+test('Kobra-X-Gerätekarte: Ziel-Tasten setzen number.set_value mit Grenzen und Startwert', () => {
+  const calls = [];
+  const c = kobraCard({ 'number.kobra_x_target_nozzle_temperature': st('0', { attributes: { min: 0, max: 300 } }), 'number.b': st('118', { attributes: { min: 0, max: 120 } }) });
+  c._hass.callService = (d, s, data) => calls.push([d, s, data]);
+  c._edit = false; c._set.embeds = [];
+  const click = (id, ds) => c._click({ target: { closest: () => ({ dataset: { act: 'knum', id, ...ds } }) }, stopPropagation() {} });
+  click('number.kobra_x_target_nozzle_temperature', { d: '5', s: '200' });
+  click('number.b', { d: '5', s: '60' });
+  click('number.b', { v: '0' });
+  assert.deepEqual(calls.map((x) => x[2].value), [205, 120, 0]);
+  assert.ok(calls.every((x) => x[0] === 'number' && x[1] === 'set_value'));
+});
