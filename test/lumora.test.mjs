@@ -348,3 +348,103 @@ test('PTZ: nur ONVIF-Kameras, gewählte Kamera mit Rückfall auf die erste', () 
   assert.match(c._ptzHtml(), /data-act="ptz" data-d="DOWN"/);
   c._hass.services = {}; assert.equal(c._ptzHtml(), '');
 });
+
+/* ---------- Familienplaner ---------- */
+const { FP } = L;
+const iso = (d, h, m = 0) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).toISOString();
+const PERSONS = [{ id: 'papa', name: 'Papa', color: '#2F6FDE', initial: 'P' }, { id: 'mama', name: 'Mama', color: '#E8782B', initial: 'M' }];
+function fpCard(events, { now = new Date(), admin = false, ws } = {}) {
+  const c = Object.create(L.card.prototype);
+  const calls = [];
+  c._set = {};
+  c._view = 'home';
+  c._hass = {
+    states: { 'sensor.familienplaner_papa_termine_heute': { entity_id: 'sensor.familienplaner_papa_termine_heute', state: '1', last_updated: 'x', attributes: {} } },
+    entities: { 'sensor.familienplaner_papa_termine_heute': { platform: 'familienplaner' } },
+    user: { is_admin: admin },
+    callWS: (m) => { calls.push(m); return ws ? ws(m) : Promise.resolve({ persons: PERSONS, events }); },
+  };
+  c._render = () => { c.rendered = (c.rendered || 0) + 1; };
+  c.calls = calls;
+  return c;
+}
+const tick = () => new Promise((r) => setTimeout(r, 300));
+
+test('FP.norm: ganztägig bekommt exklusives Ende, Termine ohne Dauer 30 Minuten', () => {
+  const a = FP.norm({ all_day: true, start: '2026-11-16', end: '2026-11-17', persons: [] });
+  assert.equal(FP.key(a.s), '2026-11-16'); assert.equal(FP.key(a.e), '2026-11-18');
+  const b = FP.norm({ all_day: false, start: '2026-11-16T10:00:00+01:00', end: '2026-11-16T10:00:00+01:00', persons: [] });
+  assert.equal(b.e - b.s, 30 * 60000);
+});
+
+test('FP: Wochenstart, Kalenderwoche und Farben', () => {
+  assert.equal(FP.key(FP.monday(new Date(2026, 10, 15))), '2026-11-09'); // Sonntag
+  assert.equal(FP.key(FP.monday(new Date(2026, 10, 16))), '2026-11-16'); // Montag
+  assert.equal(FP.isoWeek(new Date(2026, 10, 16)), 47);
+  assert.equal(FP.color('javascript:x'), '#6B7280');
+  assert.equal(FP.rgba('#fff', 0.5), 'rgba(255,255,255,0.5)');
+  assert.match(FP.vars('#2F6FDE'), /--c:#2F6FDE;--cb:rgba\(47,111,222,0\.2\)/);
+});
+
+test('FP.cmp und FP.on: ganztägig zuerst, Mehrtagestermine zählen an jedem Tag', () => {
+  const d = new Date(2026, 10, 16);
+  const ev = [FP.norm({ id: 'a', summary: 'B', all_day: false, start: iso(d, 9), end: iso(d, 10), persons: [] }), FP.norm({ id: 'b', summary: 'A', all_day: true, start: '2026-11-16', end: '2026-11-17', persons: [] })];
+  assert.deepEqual(ev.slice().sort(FP.cmp).map((e) => e.id), ['b', 'a']);
+  assert.equal(FP.on(ev, new Date(2026, 10, 17)).length, 1);
+  assert.equal(FP.on(ev, new Date(2026, 10, 18)).length, 0);
+});
+
+test('Familienplaner-Karte: Datenabruf einmal, Neuzeichnen aus dem Zwischenspeicher', async () => {
+  const d = FP.day(new Date());
+  const ev = [{ id: 'e1', summary: 'Kita', location: '', all_day: false, start: iso(d, 23, 0), end: iso(d, 23, 30), persons: ['papa'] }, { id: 'e2', summary: 'Zahnarzt', all_day: true, start: FP.key(d), end: FP.key(d), persons: [] }];
+  const c = fpCard(ev);
+  assert.equal(c._fpOn(), true);
+  assert.equal(c._fpHtml(), ''); // bis zur ersten Antwort bleibt die Karte unsichtbar, kein Flackern
+  await tick();
+  assert.equal(c.calls.length, 1);
+  assert.equal(c.calls[0].type, 'familienplaner/events');
+  const h = c._fpHtml(); assert.equal(c.calls.length, 1); // gecacht, kein zweiter Abruf
+  assert.match(h, /data-act="fp-open"/); assert.match(h, /Kita/); assert.match(h, /1 Termin nicht zugeordnet/);
+  assert.ok(c.rendered >= 1);
+  const again = c._fpHtml(); assert.equal(again, h);
+  assert.doesNotMatch(h, /<script|onerror/i);
+});
+
+test('Familienplaner-Karte: ohne Integration keine Karte, Fehler lässt alte Daten stehen', async () => {
+  const off = fpCard([]); off._hass.entities = {}; off._hass.states = {};
+  assert.equal(off._fpOn(), false);
+  const calls = { n: 0 };
+  const c = fpCard([], { ws: () => (calls.n++ === 0 ? Promise.resolve({ persons: PERSONS, events: [] }) : Promise.reject(new Error('not_configured'))) });
+  c._fpHtml(); await tick();
+  const first = c._fpHtml();
+  const n = Object.values(c._fpc)[0]; n.at = 0; // abgelaufen
+  c._fpHtml(); await tick();
+  assert.equal(c._fpHtml(), first); // Daten bleiben trotz Fehler sichtbar
+  assert.equal(n.err, 'not_configured');
+});
+
+test('Familienplaner-Detailansicht: Tag, Woche, Zuordnung nur für Admins', async () => {
+  const d = FP.day(new Date());
+  const ev = [{ id: 'e1', summary: 'Sport <b>', location: 'Halle', all_day: false, start: iso(d, 18), end: iso(d, 19), persons: ['mama'] }, { id: 'e2', summary: 'Elternabend', all_day: false, start: iso(d, 20), end: iso(d, 21), persons: [] }];
+  const c = fpCard(ev, { admin: true });
+  c._fpClick({ dataset: {} }, 'fp-open'); assert.equal(c._sheet, 'fp');
+  c._fpSheet(); await tick();
+  let h = c._fpSheet();
+  assert.match(h, /Sport &lt;b&gt;/); assert.match(h, /Halle/); assert.match(h, /data-act="fp-assign" data-e="e2" data-p="papa"/);
+  c._hass.user.is_admin = false;
+  assert.doesNotMatch(c._fpSheet(), /fp-assign/);
+  c._fpClick({ dataset: { v: 'week' } }, 'fp-view'); c._fpSheet(); await tick();
+  h = c._fpSheet(); assert.match(h, /KW \d+/); assert.match(h, /data-act="fp-goto"/);
+  const week = c.calls.at(-1); assert.equal(new Date(week.end) - new Date(week.start) > 6 * 86400000, true);
+  c._fpClick({ dataset: {} }, 'fp-next'); assert.equal(FP.monday(c._fpD).getTime() > FP.monday(new Date()).getTime() - 1, true);
+});
+
+test('Familienplaner: Zuordnen legt eine Regel an und lädt danach neu', async () => {
+  const d = FP.day(new Date());
+  const ev = [{ id: 'e2', summary: 'Elternabend', all_day: false, start: iso(d, 23), end: iso(d, 23, 30), persons: [] }];
+  const c = fpCard(ev, { admin: true });
+  c._fpClick({ dataset: {} }, 'fp-open'); c._fpSheet(); await tick(); c._fpSheet();
+  c._fpAssign('e2', 'papa'); await tick();
+  const rule = c.calls.find((m) => m.type === 'familienplaner/add_rule');
+  assert.deepEqual({ ...rule, persons: [...rule.persons] }, { type: 'familienplaner/add_rule', field: 'summary', operator: 'equals', pattern: 'Elternabend', persons: ['papa'] });
+});

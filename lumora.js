@@ -635,6 +635,28 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .pz>div{background:var(--line);border-radius:14px;padding:8px 6px;text-align:center;min-width:0;cursor:pointer}.pz small{display:block;font-size:11px;color:var(--fg2)}.pz b{font-size:17px;font-weight:600}
 .pz>div.wn b{color:#b8862b}.pz>div.lo b{color:#c9694f}.pz>div.na{opacity:.5}
 @media (max-width:480px){.pz{gap:6px}.pz>div{border-radius:12px;padding:7px 4px}.pz b{font-size:16px}}
+.fpg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:12px}
+.fpp{display:flex;gap:10px;background:var(--a);border-radius:14px;padding:10px 12px;min-width:0}
+.fpa{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;background:var(--cb);border:2px solid var(--c)}
+.fpl{min-width:0;flex:1}.fpl>b{display:block;font-size:14px;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fpe{display:flex;gap:8px;font-size:13px;line-height:1.45;min-width:0}.fpe i{font-style:normal;font-weight:600;flex:none;min-width:40px;font-variant-numeric:tabular-nums}
+.fpe span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fpe.now i{color:var(--c)}.fpe.now span{font-weight:600}.fpe.tm{color:var(--fg2)}
+.fpn{font-size:12.5px;color:var(--fg2);line-height:1.45}
+.fpun{display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 12px;border-radius:12px;background:var(--warn);font-size:13px}.fpun ha-icon{--mdc-icon-size:18px}
+.fpnav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}.fpnav .pill{padding:8px 12px}.fpsp{flex:1}
+.fpt{font-weight:600;color:var(--fg)}
+.fps{margin-top:14px}.fph{display:flex;align-items:center;gap:10px;margin-bottom:4px}.fph b{font-size:15px;font-weight:600}.fph span{margin-left:auto;font-size:12.5px;color:var(--fg2)}
+.fpr{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}.fpr time{flex:none;width:100px;white-space:nowrap;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.fpr div{min-width:0;flex:1}.fpr b{display:block;font-size:14px;font-weight:500}.fpr div span{display:block;font-size:12.5px;color:var(--fg2)}
+.fps .fpr{border-left:3px solid var(--c);padding-left:10px}.fpr.now{background:var(--cb);border-radius:10px}.fpr.past{opacity:.55}
+.fpd{display:flex;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}.fpd.today .fpdh{background:var(--selbg);color:var(--selfg)}
+.fpdh{flex:none;width:48px;height:56px;border:0;border-radius:14px;background:var(--a);color:inherit;font:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer}
+.fpdh b{font-size:12px;font-weight:500;text-transform:uppercase}.fpdh span{font-size:17px;font-weight:600}
+.fpdl{flex:1;min-width:0}.fpdl .fpr:first-child{padding-top:0}.fpdl .fpr:last-child{border-bottom:0}.fpdl .fpr time{width:64px}
+.fpr b .fpdots{display:inline-flex;gap:3px;margin-right:6px;vertical-align:middle;font-size:inherit;color:inherit}.fpdot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--c)}
+.fpu{padding:8px 0;border-bottom:1px solid var(--line)}.fpu b{display:block;font-size:14px;font-weight:500}.fpu>span{font-size:12.5px;color:var(--fg2)}
+.fpbt{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.fpbt .pill{padding:6px 12px;font-size:13px;background:var(--cb)}.fpbt .pill .fpdot{margin-right:2px}
+@media (max-width:480px){.fpr time{width:92px;font-size:12.5px}.fpdl .fpr time{width:60px}.fpp{padding:9px 10px;gap:8px}}
 `;
 
 const SIZES = ['s', 'w', 'f'];
@@ -1028,7 +1050,7 @@ class LumoraCard extends HTMLElement {
       if (el && al.length > 1) { this._ai = (this._ai + 1) % al.length; el.textContent = al[this._ai].text; if (el.parentElement) el.parentElement.className = `note sv${al[this._ai].sev}`; }
     }, 5000);
   }
-  disconnectedCallback() { clearInterval(this._tick); this._doorHide(); Fx.detach(this); }
+  disconnectedCallback() { clearInterval(this._tick); clearTimeout(this._fpr); this._doorHide(); Fx.detach(this); }
 
   set hass(h) {
     const first = !this._hass;
@@ -1069,6 +1091,7 @@ class LumoraCard extends HTMLElement {
     parts.push(this._bd.s);
     parts.push('sn' + this._snoozed().length);
     for (const id of ['input_text.advent_geoffnet', 'input_text.advent_gefunden', 'input_boolean.advent_testmodus']) if (h.states[id]) parts.push(id + h.states[id].state);
+    parts.push(this._fpSig());
     return parts.join('|');
   }
 
@@ -1464,6 +1487,7 @@ class LumoraCard extends HTMLElement {
     const nav = [['home', 'mdi:home-outline', 'Zuhause'], ['rooms', 'mdi:view-grid-outline', 'Räume'], ['cams', 'mdi:cctv', 'Kameras'], ['more', 'mdi:view-dashboard-outline', 'Mehr']]
       .map(([v, i, l]) => `<button class="${this._view === v ? 'sel' : ''}" data-act="nav" data-v="${v}"><ha-icon icon="${i}"></ha-icon>${l}</button>`).join('');
     const scroll = this.shadowRoot.querySelector('.body'); const top = scroll ? scroll.scrollTop : 0;
+    const fsh = this._sheet === 'fp' && !this._fpReset ? this.shadowRoot.querySelector('.sheet') : null; const ftop = fsh ? fsh.scrollTop : 0; this._fpReset = false;
     const keep = {}; const qa = this.shadowRoot.querySelectorAll;
     const pk = {}; let fk = null;
     if (qa) {
@@ -1476,6 +1500,7 @@ class LumoraCard extends HTMLElement {
     if (this._dbEl) this.shadowRoot.appendChild(this._dbEl);
     if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((n) => { const o = (keep[n.dataset.b] || []).shift(); if (o && o !== n) n.replaceWith(o); });
     const nb = this.shadowRoot.querySelector('.body'); if (nb) nb.scrollTop = top;
+    if (ftop) { const ns = this.shadowRoot.querySelector('.sheet'); if (ns) ns.scrollTop = ftop; }
     if (qa) {
       Object.keys(pk).forEach((k) => { const i = this.shadowRoot.querySelector(`[data-pk="${k}"]`); if (i && !i.disabled) i.value = pk[k]; });
       if (fk) { const i = this.shadowRoot.querySelector(`[data-pk="${fk.k}"]`); if (i) { i.focus(); try { if (fk.s != null) i.setSelectionRange(fk.s, fk.e); } catch (_) { /* number-Felder */ } } }
@@ -1937,6 +1962,158 @@ _more() {
       return `<div class="ps"><div class="pt" data-act="info" data-id="${x.main}"><ha-icon icon="mdi:package-variant"></ha-icon><div class="t"><b>${esc(x.name)}</b><span>${esc(meta)}</span></div>${x.total !== null ? `<em>${this._de(x.total)} frei</em>` : ''}</div>${tiles ? `<div class="pz">${tiles}</div>` : ''}</div>`;
     }).join('');
     return `<div class="en nopt"><div class="hd"><div class="ib"><ha-icon icon="mdi:package-variant"></ha-icon></div><div><b>Packstation</b><span>${esc(`${sub} · freie Fächer`)}</span></div><div class="big">${this._de(all)}</div></div>${rows}</div>`;
+  }
+  /* ---------- Familienplaner (Integration familienplaner, Termine per WebSocket familienplaner/events) ----------
+     Die Karte hält ihre Daten selbst im Speicher (stale-while-revalidate, 5 Minuten) und zeichnet nur bei echten Änderungen neu.
+     Es wird kein Fremdelement eingebettet, deshalb gibt es kein Neuladen oder Flackern beim Neuzeichnen von Lumora. */
+  _fpOn() {
+    const h = this._hass; if (!h) return false;
+    const c = this._fpOnC; if (c && Date.now() - c.t < 60000) return c.v;
+    const ids = [];
+    if (h.entities) for (const id in h.entities) if (h.entities[id].platform === 'familienplaner') ids.push(id);
+    if (!ids.length) for (const id in h.states) if (id.startsWith('sensor.familienplaner_')) ids.push(id);
+    this._fpIds = ids; this._fpOnC = { t: Date.now(), v: ids.length > 0 };
+    return ids.length > 0;
+  }
+  _fpSensorSig() {
+    const h = this._hass; return (this._fpIds || []).map((id) => { const s = h.states[id]; return s ? s.state + s.last_updated : ''; }).join(',');
+  }
+  _fpSig() {
+    if (!this._fpOn() || !(['home', 'more', 'rooms'].includes(this._view) || this._sheet === 'fp')) return '';
+    return `fp${Math.floor(Date.now() / 60000)}${this._fpSensorSig()}`;
+  }
+  /* Liefert den Cache-Eintrag für den Zeitraum und stößt bei Bedarf einen Abruf an. Alte Daten bleiben bis zur Antwort sichtbar. */
+  _fpGet(a, b) {
+    const fc = this._fpc || (this._fpc = {}); const k = `${a.getTime()}|${b.getTime()}`;
+    let n = fc[k]; const sig = this._fpSensorSig(); const now = Date.now();
+    if (n && n.busy) return n;
+    if (n && now - n.at < 300000 && (n.sig === sig || now - n.at < 15000)) return n;
+    if (!n) {
+      const keys = Object.keys(fc);
+      if (keys.length >= 10) { keys.sort((x, y) => fc[x].at - fc[y].at); delete fc[keys[0]]; }
+      n = fc[k] = { at: 0, persons: null, events: [], err: '', sig, h: '', busy: false };
+    }
+    n.busy = true; n.sig = sig;
+    Promise.resolve(this._hass.callWS({ type: 'familienplaner/events', start: a.toISOString(), end: b.toISOString() })).then((r) => {
+      const persons = (r && r.persons) || []; const events = ((r && r.events) || []).map(FP.norm);
+      const hh = JSON.stringify([persons, events.map((e) => [e.id, e.summary, e.location, e.start, e.end, e.persons])]);
+      const changed = hh !== n.h || n.err;
+      n.persons = persons; n.events = events; n.h = hh; n.err = ''; n.at = Date.now(); n.busy = false;
+      if (changed) this._fpDone();
+    }).catch((x) => {
+      n.busy = false; n.at = Date.now() - 240000; /* nach rund einer Minute erneut versuchen */
+      const m = (x && x.message) || 'Familienplaner nicht erreichbar';
+      if (n.err !== m) { n.err = m; if (!n.persons) this._fpDone(); }
+    });
+    return n;
+  }
+  _fpDone() {
+    clearTimeout(this._fpr);
+    this._fpr = setTimeout(() => {
+      if (this._edit || this._dg || this._drag || (this._sheet && this._sheet !== 'fp') || this._plFocus()) return;
+      this._render();
+    }, 250);
+  }
+  _fpInval() { Object.values(this._fpc || {}).forEach((n) => { n.at = 0; n.busy = false; }); this._render(); }
+  _fpHome() { const t0 = FP.day(new Date()); return this._fpGet(t0, FP.add(t0, 3)); }
+  _fpHtml() {
+    const now = new Date(); const t0 = FP.day(now); const d = this._fpHome();
+    const head = (sub, big) => `<div class="hd"><div class="ib"><ha-icon icon="mdi:calendar-account"></ha-icon></div><div><b>Familienplaner</b><span>${esc(sub)}</span></div>${big !== undefined ? `<div class="big">${big}</div>` : ''}</div>`;
+    if (!d.persons) return this._edit || d.err ? `<div class="en nopt fp">${head(d.err || 'Lädt …')}</div>` : '';
+    if (!d.persons.length) return `<div class="en fp" data-act="fp-open">${head('Noch keine Personen angelegt')}</div>`;
+    const today = FP.on(d.events, t0).filter((e) => e.persons.length);
+    const left = today.filter((e) => e.all_day || e.e > now);
+    const nxt = left.filter((e) => !e.all_day && e.s > now).sort(FP.cmp)[0];
+    const sub = nxt ? `Als Nächstes ${FP.hm(nxt.s)} · ${nxt.summary}` : today.length ? 'Heute ist alles erledigt' : 'Heute keine Termine';
+    const tom = FP.on(d.events, FP.add(t0, 1)).filter((e) => e.persons.length).sort(FP.cmp);
+    const blocks = d.persons.map((p) => {
+      const mine = left.filter((e) => e.persons.includes(p.id)).sort(FP.cmp);
+      const ln = mine.slice(0, 3).map((e) => {
+        const run = !e.all_day && e.s <= now && e.e > now;
+        return `<div class="fpe ${run ? 'now' : ''}"><i>${e.all_day ? 'ganztags' : FP.hm(e.s)}</i><span>${esc(e.summary)}</span></div>`;
+      }).join('');
+      const more = mine.length > 3 ? `<div class="fpn">+ ${mine.length - 3} weitere</div>` : '';
+      let empty = '';
+      if (!mine.length) {
+        const nt = tom.find((e) => e.persons.includes(p.id));
+        empty = `<div class="fpn">${today.some((e) => e.persons.includes(p.id)) ? 'Heute nichts mehr' : 'Heute keine Termine'}</div>${nt ? `<div class="fpe tm"><i>Morgen ${nt.all_day ? '' : FP.hm(nt.s)}</i><span>${esc(nt.summary)}</span></div>` : ''}`;
+      }
+      return `<div class="fpp" style="${FP.vars(p.color)}"><div class="fpa">${esc(p.initial || p.name[0] || '?')}</div><div class="fpl"><b>${esc(p.name)}</b>${ln}${more}${empty}</div></div>`;
+    }).join('');
+    const un = FP.unassigned(d.events, now);
+    const unHtml = un.length ? `<div class="fpun"><ha-icon icon="mdi:calendar-question"></ha-icon>${un.length === 1 ? '1 Termin' : `${un.length} Termine`} nicht zugeordnet</div>` : '';
+    return `<div class="en fp" data-act="fp-open">${head(sub, left.length)}<div class="fpg">${blocks}</div>${unHtml}</div>`;
+  }
+  _fpRange() {
+    const d = FP.day(this._fpD || new Date());
+    if (this._fpV === 'week') { const m = FP.monday(d); return [m, FP.add(m, 7)]; }
+    return [d, FP.add(d, 2)];
+  }
+  _fpRow(e, day, now, dots) {
+    const run = !e.all_day && e.s <= now && e.e > now; const past = !e.all_day && e.e <= now;
+    const tm = e.all_day ? 'Ganztägig' : `${FP.hm(e.s)}–${FP.hm(e.e)}`;
+    return `<div class="fpr ${run ? 'now' : ''} ${past ? 'past' : ''}"><time>${tm}</time><div><b>${esc(e.summary)}</b>${dots || e.location ? `<span>${dots ? esc(dots) : ''}${dots && e.location ? ' · ' : ''}${esc(e.location)}</span>` : ''}</div></div>`;
+  }
+  _fpSheet() {
+    const now = new Date(); const week = this._fpV === 'week'; const day = FP.day(this._fpD || now);
+    const [a, b] = this._fpRange(); const d = this._fpGet(a, b);
+    const title = week ? `KW ${FP.isoWeek(a)} · ${a.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })} bis ${FP.add(a, 6).toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: 'numeric' })}`
+      : day.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const nav = `<div class="fpnav"><button class="pill" data-act="fp-prev" aria-label="${week ? 'Vorherige Woche' : 'Vorheriger Tag'}"><ha-icon icon="mdi:chevron-left"></ha-icon></button><button class="pill" data-act="fp-today">Heute</button><button class="pill" data-act="fp-next" aria-label="${week ? 'Nächste Woche' : 'Nächster Tag'}"><ha-icon icon="mdi:chevron-right"></ha-icon></button><span class="fpsp"></span><button class="pill ${week ? '' : 'sel'}" data-act="fp-view" data-v="day">Tag</button><button class="pill ${week ? 'sel' : ''}" data-act="fp-view" data-v="week">Woche</button></div>`;
+    const head = `<h2>Familienplaner</h2><div class="hint fpt">${esc(title)}</div>${nav}`;
+    if (!d.persons) return `${head}<div class="hint">${esc(d.err || 'Lädt …')}</div>`;
+    if (!d.persons.length) return `${head}<div class="hint">Noch keine Personen angelegt. Einstellungen, Geräte &amp; Dienste, Familienplaner, Konfigurieren, Personen.</div>`;
+    const byId = {}; d.persons.forEach((p) => { byId[p.id] = p; });
+    let body = '';
+    if (!week) {
+      const evs = FP.on(d.events, day);
+      body = d.persons.map((p) => {
+        const mine = evs.filter((e) => e.persons.includes(p.id)).sort(FP.cmp);
+        return `<div class="fps" style="${FP.vars(p.color)}"><div class="fph"><div class="fpa">${esc(p.initial || p.name[0] || '?')}</div><b>${esc(p.name)}</b><span>${mine.length === 1 ? '1 Termin' : `${mine.length} Termine`}</span></div>${mine.map((e) => this._fpRow(e, day, now)).join('') || '<div class="fpn">Keine Termine</div>'}</div>`;
+      }).join('');
+    } else {
+      body = Array.from({ length: 7 }, (_, i) => FP.add(a, i)).map((dd) => {
+        const list = FP.on(d.events, dd).filter((e) => e.persons.length).sort(FP.cmp);
+        const isT = FP.same(dd, now);
+        const rows = list.map((e) => {
+          const dots = e.persons.map((id) => `<i class="fpdot" style="background:${FP.color((byId[id] || {}).color)}"></i>`).join('');
+          const names = e.persons.map((id) => (byId[id] || {}).name).filter(Boolean).join(', ');
+          return `<div class="fpr ${!e.all_day && e.e <= now ? 'past' : ''}"><time>${e.all_day ? 'ganztags' : FP.hm(e.s)}</time><div><b><span class="fpdots">${dots}</span>${esc(e.summary)}</b><span>${esc(names)}${e.location ? ` · ${esc(e.location)}` : ''}</span></div></div>`;
+        }).join('');
+        return `<div class="fpd ${isT ? 'today' : ''}"><button class="fpdh" data-act="fp-goto" data-d="${FP.key(dd)}"><b>${dd.toLocaleDateString('de-DE', { weekday: 'short' })}</b><span>${dd.getDate()}.</span></button><div class="fpdl">${rows || '<div class="fpn">Keine Termine</div>'}</div></div>`;
+      }).join('');
+    }
+    const un = FP.unassigned(d.events, now).slice(0, 6);
+    const admin = !!(this._hass.user && this._hass.user.is_admin);
+    const unHtml = un.length ? `<h4>Nicht zugeordnet</h4>${un.map((e) => {
+      const when = `${e.s.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })} · ${e.all_day ? 'ganztägig' : FP.hm(e.s)}`;
+      const btns = admin ? `<div class="fpbt">${d.persons.map((p) => `<button class="pill" style="${FP.vars(p.color)}" data-act="fp-assign" data-e="${esc(e.id)}" data-p="${esc(p.id)}"><i class="fpdot"></i>${esc(p.name)}</button>`).join('')}</div>` : '';
+      return `<div class="fpu"><b>${esc(e.summary)}</b><span>${esc(when)}${e.location ? ` · ${esc(e.location)}` : ''}</span>${btns}</div>`;
+    }).join('')}${admin ? '<div class="fpn">Zuordnen legt eine Regel für diesen Titel an.</div>' : ''}` : '';
+    const msg = this._fpMsg ? `<div class="hint">${esc(this._fpMsg)}</div>` : '';
+    return `${head}${msg}${body}${unHtml}`;
+  }
+  _fpClick(t, act) {
+    const today = FP.day(new Date()); this._fpMsg = '';
+    switch (act) {
+      case 'fp-open': this._fpV = 'day'; this._fpD = today; this._fpReset = true; this._sheet = 'fp'; return true;
+      case 'fp-prev': case 'fp-next': this._fpD = FP.add(FP.day(this._fpD || today), (this._fpV === 'week' ? 7 : 1) * (act === 'fp-next' ? 1 : -1)); this._fpReset = true; return true;
+      case 'fp-today': this._fpD = today; this._fpReset = true; return true;
+      case 'fp-view': this._fpV = t.dataset.v === 'week' ? 'week' : 'day'; this._fpReset = true; return true;
+      case 'fp-goto': this._fpD = FP.dateOnly(t.dataset.d); this._fpV = 'day'; this._fpReset = true; return true;
+      case 'fp-assign': this._fpAssign(t.dataset.e, t.dataset.p); return false;
+      default: return false;
+    }
+  }
+  _fpAssign(eid, pid) {
+    const [a, b] = this._fpRange(); const d = this._fpGet(a, b); const ev = d.events.find((e) => e.id === eid);
+    if (!ev || !pid || this._fpBusy) return;
+    this._fpBusy = true;
+    Promise.resolve(this._hass.callWS({ type: 'familienplaner/add_rule', field: 'summary', operator: 'equals', pattern: ev.summary, persons: [pid] })).then(() => {
+      this._fpBusy = false;
+      /* Die Integration lädt sich nach der neuen Regel neu, deshalb mehrfach nachladen */
+      [1500, 4000, 9000].forEach((ms) => setTimeout(() => { if (this._hass) this._fpInval(); }, ms));
+    }).catch((x) => { this._fpBusy = false; this._fpMsg = (x && x.message) || 'Zuordnung fehlgeschlagen'; this._render(); });
   }
   _offline() {
     const h = this._hass; const ig = this._set.ignore; const dev = {};
@@ -2405,6 +2582,8 @@ _more() {
       c = this._advSheet();
     } else if (this._sheet === 'quick') {
       c = `<h2>Schnellaktionen</h2><div class="hint">Szenen, Skripte und Tasten mit einem Tipp auslösen. Mehrfachauswahl möglich.</div><input class="srch" placeholder="Suchen" value="${esc(this._q)}"><div class="list"></div>`;
+    } else if (this._sheet === 'fp') {
+      c = this._fpSheet();
     } else if (this._sheet === 'emb') {
       c = this._embSheet();
     } else if (this._sheet === 'cc') {
@@ -3176,6 +3355,7 @@ _more() {
     if (this._edit && ['info', 'toggle', 'vstart', 'vdock', 'vlocate', 'vfan', 'qrun', 'knum'].includes(act)) return;
     if (act.startsWith('pr-')) { if (this._edit) return; if (this._printClick(t, act)) { this._sig = ''; this._render(); } return; }
     if (act.startsWith('pl-')) { if (this._edit) return; if (this._poolClick(t, act)) { this._sig = ''; this._render(); } return; }
+    if (act.startsWith('fp-')) { if (this._edit) return; if (this._fpClick(t, act)) { this._sig = ''; this._render(); } return; }
     switch (act) {
       case 'nav': this._view = t.dataset.v; this._sheet = null; this._edit = false; break;
       case 'floor': this._floor = id; this._area = null; break;
@@ -3573,6 +3753,37 @@ const PXF = {
   backupdur: { l: 'Backup-Dauer (Node)', dom: 'sensor', re: /backup.?dauer|backup.?duration/ },
 };
 const PS_RE = /^sensor\.(dhl_packstation_.+?)_freie_facher_(gesamt|s|m|l|xl)$/;
+/* Familienplaner: reine Hilfsfunktionen. Termine kommen als { id, summary, location, all_day, start, end, persons[] },
+   ganztägige mit Datum (Ende inklusive), alle anderen als ISO-Zeitstempel. */
+const FP = {
+  pad: (n) => String(n).padStart(2, '0'),
+  day: (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()),
+  add: (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n),
+  same: (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(),
+  dateOnly: (s) => { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); },
+  key: (d) => `${d.getFullYear()}-${FP.pad(d.getMonth() + 1)}-${FP.pad(d.getDate())}`,
+  hm: (d) => `${FP.pad(d.getHours())}:${FP.pad(d.getMinutes())}`,
+  monday: (d) => FP.add(FP.day(d), -((d.getDay() + 6) % 7)),
+  isoWeek: (d) => {
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+    return Math.ceil(((t - new Date(Date.UTC(t.getUTCFullYear(), 0, 1))) / 86400000 + 1) / 7);
+  },
+  color: (c) => (/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(c || '') ? c : '#6B7280'),
+  rgba: (c, a) => {
+    let h = FP.color(c).slice(1); if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+  },
+  vars: (c) => `--c:${FP.color(c)};--cb:${FP.rgba(c, 0.2)}`,
+  norm: (e) => {
+    if (e.all_day) return { ...e, s: FP.dateOnly(e.start), e: FP.add(FP.dateOnly(e.end), 1) };
+    const s = new Date(e.start); let en = new Date(e.end);
+    if (!(en > s)) en = new Date(s.getTime() + 30 * 60000);
+    return { ...e, s, e: en };
+  },
+  on: (events, day) => { const a = FP.day(day); const b = FP.add(a, 1); return events.filter((e) => e.s < b && e.e > a); },
+  cmp: (x, y) => (x.all_day === y.all_day ? (x.s - y.s) || String(x.summary).localeCompare(String(y.summary), 'de') : x.all_day ? -1 : 1),
+  unassigned: (events, now) => events.filter((e) => !e.persons.length && e.e > now).sort((x, y) => x.s - y.s),
+};
 const PS_SIZES = [['s', 'S'], ['m', 'M'], ['l', 'L'], ['xl', 'XL']];
 const PX_KIND = { node: { l: 'Node', icon: 'mdi:server' }, lxc: { l: 'LXC', icon: 'mdi:cube-outline' }, vm: { l: 'VM', icon: 'mdi:monitor' } };
 const PX_ST = { running: 'Läuft', stopped: 'Gestoppt', suspended: 'Pausiert', online: 'Online', offline: 'Offline', unknown: 'Unbekannt' };
@@ -3729,6 +3940,12 @@ registerCard({ id: 'proxmox', label: 'Proxmox', icon: 'mdi:server', size: 'w', i
 registerCard({ id: 'packstation', label: 'Packstation', icon: 'mdi:package-variant', size: 'w', items: (c) => {
   const l = c._psStations();
   return l.length ? [{ id: 'packstation', html: c._psHtml(l), size: 'w' }] : [];
+} });
+/* Familienplaner: Integration familienplaner (SniperWCW/Familienkalender). Erscheint nur, wenn die Integration vorhanden ist. */
+registerCard({ id: 'family', label: 'Familienplaner', icon: 'mdi:calendar-account', home: true, size: 'w', items: (c) => {
+  if (!c._fpOn()) return [];
+  const h = c._fpHtml();
+  return h ? [{ id: 'family', html: h, size: 'w' }] : [];
 } });
 registerCard({ id: 'batt_all', label: 'Batterien Übersicht', icon: 'mdi:battery-heart-variant', size: 'w', items: (c) => {
   const l = c._batteries(true);
