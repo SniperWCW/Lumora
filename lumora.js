@@ -1500,20 +1500,47 @@ class LumoraCard extends HTMLElement {
     i.style.animation = 'none'; void i.offsetWidth; i.style.animation = '';
   }
 
+  /* Läuft in einem (verschachtelten) Shadow-DOM wirklich ein Video? */
+  _deepPlaying(root, depth = 0) {
+    if (!root || depth > 8) return false;
+    const vids = root.querySelectorAll ? root.querySelectorAll('video') : [];
+    for (const v of vids) if (v.videoWidth > 0 && v.readyState >= 2 && !v.paused) return true;
+    const all = root.querySelectorAll ? root.querySelectorAll('*') : [];
+    for (const el of all) if (el.shadowRoot && this._deepPlaying(el.shadowRoot, depth + 1)) return true;
+    return false;
+  }
+
   _doorMedia() {
     const v = this._dbEl && this._dbEl.querySelector('.dbv'); const st = this._db && this._hass.states[this._db.cam]; if (!v || !st) return;
-    /* Standbild immer als Grundlage (auch für Kameras ohne Stream wie Thumbnails/Snapshots oder bei Stream-Fehlern); Livestream nur zusätzlich darüber, wenn die Kamera Streams kann */
+    /* Standbild immer als Grundlage (auch für Kameras ohne Stream oder bei Stream-Fehlern); der Livestream liegt unsichtbar darüber und wird erst eingeblendet, wenn wirklich Video läuft */
+    const live = this._db.live;
     const base = st.attributes.entity_picture;
-    if (base) {
-      let img = v.querySelector('img'); if (!img) { img = document.createElement('img'); img.alt = ''; v.insertBefore(img, v.firstChild); }
-      img.src = `${base}${base.includes('?') ? '&' : '?'}_t=${Date.now()}`;
+    let img = v.querySelector('img');
+    if (!img) {
+      img = document.createElement('img'); img.alt = ''; v.insertBefore(img, v.firstChild);
+      img.addEventListener('load', () => { img._busy = false; img._fail = 0; });
+      img.addEventListener('error', () => { img._busy = false; img._fail = (img._fail || 0) + 1; });
+    }
+    if (base && !live && !img._busy) {
+      /* nach wiederholten Fehlern auf ein anderes Standbild (z. B. Viseron-Snapshot) in diesem Bereich ausweichen */
+      let src = base; const alts = this._doorAlts(this._db.cam);
+      if ((img._fail || 0) >= 2 && alts.length) { const a = this._hass.states[alts[(img._fail - 2) % alts.length]]; if (a && a.attributes.entity_picture) src = a.attributes.entity_picture; }
+      img._busy = true; img.src = `${src}${src.includes('?') ? '&' : '?'}_t=${Date.now()}`;
     }
     const canStream = (Number(st.attributes.supported_features) & 2) && customElements.get('ha-camera-stream');
     if (canStream) {
       let s = v.querySelector('ha-camera-stream');
-      if (!s) { s = document.createElement('ha-camera-stream'); s.muted = true; s.controls = false; s.setAttribute('muted', ''); v.appendChild(s); }
-      s.hass = this._hass; s.stateObj = st;
+      if (!s) { s = document.createElement('ha-camera-stream'); s.muted = true; s.controls = false; s.setAttribute('muted', ''); s.style.opacity = '0'; s.style.pointerEvents = 'none'; v.appendChild(s); }
+      if (s.stateObj !== st || !s.hass) { s.hass = this._hass; s.stateObj = st; }
+      const ok = this._deepPlaying(s.shadowRoot);
+      this._db.live = ok;
+      s.style.opacity = ok ? '1' : '0'; s.style.pointerEvents = ok ? '' : 'none';
     }
+  }
+
+  _doorAlts(cam) {
+    const h = this._hass; const area = this._areaOf(cam); if (!area) return [];
+    return Object.values(h.states).filter((x) => dom(x.entity_id) === 'camera' && x.entity_id !== cam && x.state !== 'unavailable' && this._areaOf(x.entity_id) === area && x.attributes.entity_picture).map((x) => x.entity_id);
   }
 
   _doorHide(manual) {
