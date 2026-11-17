@@ -619,3 +619,24 @@ test('Karten-Liste: Gerätekarten tragen Typ und Gerätename, damit sie untersch
   const it = c._allReg().find((x) => x.id === 'dv9');
   assert.equal(it.name, '3D-Drucker Anycubic Kobra X: Anycubic Kobra X');
 });
+
+test('Kobra-X-Gerätekarte findet auch die Entitäten von Anycubic Cloud & LAN (deutsche Namen, ACE als eigenes Gerät)', () => {
+  const c = acyCard(ACY()); c._dvP = null; c._dvR = null;
+  const iv = { id: 'dvA', type: 'kobrax', main: `sensor.${AP}aktueller_status`, map: {}, title: '' };
+  c._set.devices = [iv];
+  const F = c._dvMap(iv);
+  assert.equal(F.status, `sensor.${AP}druckstatus`);
+  assert.equal(F.task, `sensor.${AP}druckauftrag`);
+  assert.equal(F.progress, `sensor.${AP}druckfortschritt`);
+  assert.equal(F.layer, `sensor.${AP}aktuelle_schicht`); assert.equal(F.layers, `sensor.${AP}schichten_gesamt`);
+  assert.equal(F.left, `sensor.${AP}restzeit`); assert.equal(F.ptime, `sensor.${AP}verstrichene_zeit`);
+  assert.equal(F.filament, `sensor.${AP}verbrauchtes_filament`);
+  assert.equal(F.nozzle, `sensor.${AP}dusentemperatur`); assert.equal(F.bed, `sensor.${AP}betttemperatur`);
+  assert.equal(F.nozt, `number.${AP}dusentemperatur_einstellen`); assert.equal(F.bedt, `number.${AP}betttemperatur_einstellen`);
+  assert.equal(F.light, `light.${AP}druckerbeleuchtung`);
+  assert.equal(F.loaded, `sensor.${AP}feeder_geladenes_ace_fach`);
+  assert.equal(F.b1s1, `sensor.${AP}feeder_ace_fach_1`); assert.equal(F.b1s2, `sensor.${AP}feeder_ace_fach_2`);
+  assert.equal(c._dvMains(L.DEVTPL.kobrax)[0].id, `sensor.${AP}druckstatus`);
+  const html = L.DEVTPL.kobrax.render(c, iv, F, c._hass.states[iv.main]);
+  assert.match(html, /Druckt/); assert.match(html, /32 %/); assert.match(html, /background:#75787B/i);
+});

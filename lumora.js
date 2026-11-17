@@ -2724,12 +2724,12 @@ _more() {
   _placeNew(id) { if (this._view === 'more') this._set.place[id] = 'more'; else if (this._view === 'rooms' && this._area) this._set.place[id] = `area:${this._area}`; }
   _dvAll() { return this._set.devices.filter((x) => DEVTPL[x.type]); }
   _dvMains(tp) {
-    const sp = tp.main; const reg0 = this._hass.entities || {};
-    const usePl = sp.platform && Object.values(reg0).some((r) => r && r.platform === sp.platform);
+    const sp = tp.main; const reg0 = this._hass.entities || {}; const pls = [].concat(sp.platform || []);
+    const usePl = pls.length && Object.values(reg0).some((r) => r && pls.includes(r.platform));
     const out = Object.values(this._hass.states).filter((x) => {
       const id = x.entity_id; const a = x.attributes;
       if (![].concat(sp.dom).includes(dom(id))) return false;
-      if (usePl && !(reg0[id] && reg0[id].platform === sp.platform)) return false;
+      if (usePl && !(reg0[id] && pls.includes(reg0[id].platform))) return false;
       if (sp.dc && a.device_class !== sp.dc) return false;
       if (sp.unit && !sp.unit.includes(a.unit_of_measurement)) return false;
       const r = this._hass.entities && this._hass.entities[id]; return !(r && r.hidden);
@@ -3995,10 +3995,10 @@ registerDevice({
 });
 /* Anycubic Kobra X (Integration grunna/ha-anycubic-kobra-x-lan, auch Kobra S1): Status, Fortschritt, Temperaturen mit Zielwert-Tasten,
    Lüfter, Filament-Slots der Multi-Color-Box und Kamera-Licht. Die Integration startet keine Drucke, daher gibt es hier auch keine Start-/Stop-Tasten. */
-const KX_ST = { printing: 'Druckt', finished: 'Fertig', failed: 'Fehlgeschlagen', downloading: 'Lädt Datei', checking: 'Prüft', preheating: 'Heizt vor', slicing: 'Slicing', auto_leveling: 'Auto-Leveling', vibrating: 'Vibrationskalibrierung', flow_calibrating: 'Fluss-Kalibrierung', drying: 'Trocknet', paused: 'Pausiert', pausing: 'Pausiert', free: 'Bereit', idle: 'Bereit', ready: 'Bereit', busy: 'Beschäftigt', offline: 'Offline' };
-const KX_RUN = ['printing', 'downloading', 'checking', 'preheating', 'slicing', 'auto_leveling', 'vibrating', 'flow_calibrating', 'drying', 'paused', 'pausing'];
+const KX_ST = { printing: 'Druckt', finished: 'Fertig', complete: 'Fertig', completed: 'Fertig', stopped: 'Abgebrochen', canceled: 'Abgebrochen', cancelled: 'Abgebrochen', leveling: 'Auto-Leveling', failed: 'Fehlgeschlagen', downloading: 'Lädt Datei', checking: 'Prüft', preheating: 'Heizt vor', slicing: 'Slicing', auto_leveling: 'Auto-Leveling', vibrating: 'Vibrationskalibrierung', flow_calibrating: 'Fluss-Kalibrierung', drying: 'Trocknet', paused: 'Pausiert', pausing: 'Pausiert', free: 'Bereit', idle: 'Bereit', ready: 'Bereit', busy: 'Beschäftigt', offline: 'Offline' };
+const KX_RUN = ['leveling', 'printing', 'downloading', 'checking', 'preheating', 'slicing', 'auto_leveling', 'vibrating', 'flow_calibrating', 'drying', 'paused', 'pausing'];
 const KX_SLOTS = {};
-[1, 2].forEach((b) => [1, 2, 3, 4].forEach((n) => { KX_SLOTS[`b${b}s${n}`] = { l: `Box ${b} Slot ${n}`, dom: 'sensor', re: new RegExp(`box[ _]?${b}[ _]?slot[ _]?${n}(?![0-9])`) }; }));
+[1, 2].forEach((b) => [1, 2, 3, 4].forEach((n) => { KX_SLOTS[`b${b}s${n}`] = { l: `Box ${b} Slot ${n}`, dom: 'sensor', wide: /anycubic|kobra|ace/, re: new RegExp(`box[ _]?${b}[ _]?slot[ _]?${n}(?![0-9])${b === 1 ? `|(?:ace.?fach|ace.?slot)[ _]?${n}(?![0-9])` : ''}`), not: /remain|verbleib|feed(?!er)|preis|price|gewicht|weight|%/ }; }));
 const kxColor = (st) => {
   const a = st.attributes; const h2 = a.color_hex;
   if (typeof h2 === 'string' && /^#?[0-9a-f]{6}$/i.test(h2)) return h2[0] === '#' ? h2 : `#${h2}`;
@@ -4006,27 +4006,27 @@ const kxColor = (st) => {
   return '';
 };
 registerDevice({
-  type: 'kobrax', label: '3D-Drucker Anycubic Kobra X', icon: 'mdi:printer-3d-nozzle', desc: 'Status, Fortschritt, Temperaturen mit Zielwert, Lüfter, Filament-Slots und Kamera-Licht (Integration Anycubic Kobra X LAN)', size: 'w',
-  main: { dom: 'sensor', platform: 'anycubic_kobra_x_lan', prefer: /print.?status|printer.?state|kobra/ },
+  type: 'kobrax', label: '3D-Drucker Anycubic Kobra X', icon: 'mdi:printer-3d-nozzle', desc: 'Status, Fortschritt, Temperaturen mit Zielwert, Lüfter, Filament-Slots und Kamera-Licht (Integration Anycubic Kobra X LAN oder Anycubic Cloud & LAN)', size: 'w',
+  main: { dom: 'sensor', platform: ['anycubic_kobra_x_lan', 'anycubic_cloud'], prefer: /print.?status|druckstatus|printer.?state/ },
   fields: {
-    status: { l: 'Druckstatus', dom: 'sensor', re: /print.?status/ },
-    state: { l: 'Druckerstatus', dom: 'sensor', re: /printer.?state/ },
-    task: { l: 'Druckauftrag', dom: 'sensor', re: /print.?task/ },
-    progress: { l: 'Fortschritt', dom: 'sensor', re: /print.?progress/ },
-    layer: { l: 'Aktuelle Schicht', dom: 'sensor', re: /current.?layer/ },
-    layers: { l: 'Schichten gesamt', dom: 'sensor', re: /total.?layers/ },
+    status: { l: 'Druckstatus', dom: 'sensor', re: /print.?status|druckstatus/ },
+    state: { l: 'Druckerstatus', dom: 'sensor', re: /printer.?state|aktueller.?status/ },
+    task: { l: 'Druckauftrag', dom: 'sensor', re: /print.?task|druckauftrag/ },
+    progress: { l: 'Fortschritt', dom: 'sensor', re: /print.?progress|druckfortschritt/ },
+    layer: { l: 'Aktuelle Schicht', dom: 'sensor', re: /current.?layer|aktuelle.?schicht/ },
+    layers: { l: 'Schichten gesamt', dom: 'sensor', re: /total.?layers|schichten.?gesamt/ },
     left: { l: 'Restzeit', dom: 'sensor', re: /remaining.?print.?time|restzeit/ },
-    ptime: { l: 'Druckzeit', dom: 'sensor', re: /print.?time/, not: /remain|rest/ },
-    filament: { l: 'Filament verbraucht', dom: 'sensor', re: /filament.?used/ },
-    nozzle: { l: 'Düse', dom: 'sensor', re: /nozzle/, not: /target/ },
-    bed: { l: 'Bett', dom: 'sensor', re: /bed/, not: /target/ },
-    nozt: { l: 'Düse Zieltemperatur', dom: 'number', re: /nozzle/ },
-    bedt: { l: 'Bett Zieltemperatur', dom: 'number', re: /bed/ },
-    fan: { l: 'Lüfter Modell', dom: 'sensor', re: /fan.?speed/, not: /aux|box/ },
-    aux: { l: 'Lüfter Aux', dom: 'sensor', re: /aux.?fan/ },
-    boxfan: { l: 'Lüfter Gehäuse', dom: 'number', re: /box.?fan/ },
-    light: { l: 'Kamera-Licht', dom: 'light', re: /camera|light|licht/ },
-    loaded: { l: 'Aktiver Slot', dom: 'sensor', re: /loaded.?slot/ },
+    ptime: { l: 'Druckzeit', dom: 'sensor', re: /print.?time|verstrichene.?zeit/, not: /remain|rest|total|gesamt/ },
+    filament: { l: 'Filament verbraucht', dom: 'sensor', re: /filament.?used|verbrauchtes.?filament/ },
+    nozzle: { l: 'Düse', dom: 'sensor', re: /nozzle|dusentemperatur/, not: /target|soll|einstellen/ },
+    bed: { l: 'Bett', dom: 'sensor', re: /bed|betttemperatur/, not: /target|soll|einstellen/ },
+    nozt: { l: 'Düse Zieltemperatur', dom: 'number', re: /nozzle|dusentemperatur/ },
+    bedt: { l: 'Bett Zieltemperatur', dom: 'number', re: /bed|betttemperatur/ },
+    fan: { l: 'Lüfter Modell', dom: 'sensor', re: /fan.?speed|lufter.?geschwindigkeit/, not: /aux|box|hilfs|zusatz|kammer|einstellen/ },
+    aux: { l: 'Lüfter Aux', dom: 'sensor', re: /aux.?fan|zusatzlufter/ },
+    boxfan: { l: 'Lüfter Gehäuse', dom: 'number', re: /box.?fan|kammerlufterstufe/ },
+    light: { l: 'Kamera-Licht', dom: 'light', re: /camera|light|licht|beleuchtung/ },
+    loaded: { l: 'Aktiver Slot', dom: 'sensor', wide: /anycubic|kobra|ace/, re: /loaded.?slot|geladenes.?ace/ },
     ...KX_SLOTS,
   },
   render: (c, iv, F0, st) => {
