@@ -2608,7 +2608,7 @@ _more() {
         <div class="row"><div class="t"><b>Gerätekarte</b><span>z. B. Heizung (Smartdome), Staubsauger, Pool</span></div><button data-act="adddv">Wählen</button></div>
         <div class="row"><div class="t"><b>Fremdkarte einbetten</b><span>Beliebige Karte (HACS, Mushroom, ApexCharts …) per YAML</span></div><button data-act="addemb">Einfügen</button></div>
         <div class="row"><div class="t"><b>Eigene Karte</b><span>Wert, Verlauf oder Schalter einer Entität</span></div><button data-act="addcustroom">Wählen</button></div>
-        <h2>Vorhandene Karte hierher holen</h2>${this._allReg().filter((x) => !x.def.fixed).map((x) => `<div class="row"><ha-icon icon="${x.def.icon}"></ha-icon><div class="t"><b>${esc(x.def.label)}</b></div><button class="${x.pl === here ? 'sel' : ''}" data-act="regset" data-id="${esc(x.id)}">${x.pl === here ? 'Hier' : 'Holen'}</button></div>`).join('') || '<div class="empty">Keine Karten verfügbar.</div>'}`;
+        <h2>Vorhandene Karte hierher holen</h2>${this._allReg().filter((x) => !x.def.fixed).map((x) => `<div class="row"><ha-icon icon="${x.def.icon}"></ha-icon><div class="t"><b>${esc(x.name || x.def.label)}</b></div><button class="${x.pl === here ? 'sel' : ''}" data-act="regset" data-id="${esc(x.id)}">${x.pl === here ? 'Hier' : 'Holen'}</button></div>`).join('') || '<div class="empty">Keine Karten verfügbar.</div>'}`;
     } else if (this._sheet === 'dvadd') {
       c = `<h2>Gerätekarte hinzufügen</h2><div class="hint">Wähle den Gerätetyp. Passende Entitäten werden automatisch gefunden und lassen sich danach einzeln ändern.</div>${Object.values(DEVTPL).map((tp) => `<div class="row" data-act="dvtype" data-k="${tp.type}"><ha-icon icon="${tp.icon}"></ha-icon><div class="t"><b>${esc(tp.label)}</b><span>${esc(tp.desc || '')}</span></div></div>`).join('')}`;
     } else if (this._sheet === 'dvmain') {
@@ -4143,7 +4143,9 @@ registerCard({ id: 'batt_all', label: 'Batterien Übersicht', icon: 'mdi:battery
 registerCard({ id: 'dev', label: 'Gerätekarten', icon: 'mdi:view-grid-plus-outline', home: true, size: 'w', items: (c) => c._dvAll().map((iv) => {
   const tp = DEVTPL[iv.type]; const st = c._hass.states[iv.main];
   if (!st) return c._edit ? { id: iv.id, html: `<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="${tp.icon}"></ha-icon></div><div class="tt"><b>${esc(iv.title || tp.label)}</b><span>${esc(iv.main)} nicht gefunden</span></div></div></div>`, size: tp.size, cfg: true } : null;
-  return { id: iv.id, html: tp.render(c, iv, c._dvMap(iv), st), size: tp.size, cfg: true };
+  const r0 = c._hass.entities && c._hass.entities[iv.main]; const dd = r0 && r0.device_id && c._hass.devices && c._hass.devices[r0.device_id];
+  const nm = iv.title || (dd && (dd.name_by_user || dd.name)) || String(st.attributes.friendly_name || iv.main).replace(/\s*[–-]\s*Status$/i, '');
+  return { id: iv.id, html: tp.render(c, iv, c._dvMap(iv), st), size: tp.size, cfg: true, name: `${tp.label}: ${nm}` };
 }).filter(Boolean) });
 
 registerCard({ id: 'advent', label: 'Adventskalender', icon: 'mdi:gift-outline', size: 'w', items: (c) => {

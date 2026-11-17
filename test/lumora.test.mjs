@@ -613,3 +613,9 @@ test('Anycubic-Karte: ausgeschaltete Steckdose und Offline-Zustand', () => {
   c = acyCard(ACY({ [`binary_sensor.${AP}drucker_online`]: ['off', { friendly_name: 'Anycubic Kobra X Drucker online' }, 'printer_online'] }));
   const h = c._printerHtml(); assert.match(h, /Offline/); assert.doesNotMatch(h, /data-k="pause"/);
 });
+
+test('Karten-Liste: Gerätekarten tragen Typ und Gerätename, damit sie unterscheidbar sind', () => {
+  const c = kobraCard(KOBRA());
+  const it = c._allReg().find((x) => x.id === 'dv9');
+  assert.equal(it.name, '3D-Drucker Anycubic Kobra X: Anycubic Kobra X');
+});
