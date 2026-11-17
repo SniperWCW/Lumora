@@ -330,6 +330,23 @@ test('Smartdome-Gerätekarte: ältere Version ohne Statistik zeigt nur Status', 
   assert.doesNotMatch(html, /Pause heute|sdh/);
 });
 
+test('Smartdome-Gerätekarte: Thermostat wird gefunden und lässt sich steuern', () => {
+  const c = smartdomeCard({ control_reason: 'normal_idle', current_temperature: 21.9, target_temperature: 21 });
+  c._hass.states['climate.bad_heizung'] = { entity_id: 'climate.bad_heizung', state: 'heat', attributes: { friendly_name: 'Bad – Heizung', temperature: 21, target_temp_step: 0.5, min_temp: 5, max_temp: 30, current_temperature: 21.9 } };
+  c._hass.entities['climate.bad_heizung'] = { platform: 'smartdome_heat_control' };
+  const iv = c._set.devices[0];
+  const F = c._dvMap(iv);
+  assert.equal(c._hass.states['climate.bad_heizung'].entity_id, 'climate.bad_heizung');
+  const html = L.DEVTPL.smartdome.render(c, iv, F, c._hass.states[iv.main]);
+  assert.match(html, /data-act="sdt" data-id="climate.bad_heizung" data-d="0.5"/);
+  assert.match(html, /<b>21 °C<\/b>/);
+  assert.doesNotMatch(html, /<small>Soll<\/small>/);
+  assert.match(html, /Ausschalten/);
+  const off = { ...c._hass.states['climate.bad_heizung'], state: 'off' };
+  c._hass.states['climate.bad_heizung'] = off;
+  assert.match(L.DEVTPL.smartdome.render(c, iv, F, c._hass.states[iv.main]), /Einschalten/);
+});
+
 test('PTZ: nur ONVIF-Kameras, gewählte Kamera mit Rückfall auf die erste', () => {
   const c = Object.create(L.card.prototype);
   const calls = [];

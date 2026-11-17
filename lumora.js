@@ -623,6 +623,7 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .px>ha-icon{--mdc-icon-size:22px}.px .t{min-width:0}.px .t b{display:block;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.px .t span{font-size:12px;color:var(--fg2)}
 .px>span{font-size:12.5px;text-align:right;white-space:nowrap}.px.off>ha-icon,.px.off .st{color:#c9694f}.px.na{opacity:.55}.px .st{grid-column:span 2;font-weight:600}
 .dvc.pxoff{opacity:.85}
+.sdc{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;flex-wrap:wrap}.sdc>div{display:flex;align-items:center;gap:6px}.sdc b{min-width:64px;text-align:center}.sdc .pill{display:inline-flex;align-items:center;gap:4px}.sdc .pill ha-icon{--mdc-icon-size:16px}
 .sdm small{display:block;font-size:11px;color:var(--fg2);margin-bottom:4px}.sdh{display:flex;align-items:flex-end;gap:3px;height:36px}.sdh i{flex:1;min-width:0;background:var(--b);border-radius:2px 2px 0 0;opacity:.85}
 .kx .dvm b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kxc>.kxr{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:default}.kxr>div{display:flex;align-items:center;gap:6px}.kxr b{min-width:56px;text-align:center}
 .kxs{display:flex;gap:10px;flex-wrap:wrap}.kxs>div{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;min-width:44px}.kxs i{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);box-sizing:border-box;background:var(--line)}.kxs .on i{border-color:var(--b);box-shadow:0 0 0 2px var(--b)}.kxs small{font-size:11px;color:var(--fg2)}
@@ -2352,6 +2353,7 @@ _more() {
     if (hu) info.push(`${Math.round(parseFloat(hu.state))}%`);
     const cams = this._ord('rcams:' + a.id, ents.filter((s) => dom(s.entity_id) === 'camera' && s.state !== 'unavailable'), (s) => s.entity_id);
     const used = new Set(ents.filter((s) => dom(s.entity_id) === 'switch').map((s) => this._plugPower(s.entity_id)).filter(Boolean));
+    this._dvAll().filter((x) => x.type === 'smartdome' && this._set.place[x.id] === `area:${a.id}`).forEach((x) => { try { const cid = sdClimate(this, x); if (cid && this._hass.states[x.main]) used.add(cid); } catch (_) { /* ignore */ } });
     const tileEnts = this._ord('tiles:' + a.id, ents.filter((s) => dom(s.entity_id) !== 'camera' && !used.has(s.entity_id) && !['temperature', 'humidity'].includes(s.attributes.device_class))
       .sort((x, y) => ROOM_DOMAINS.indexOf(dom(x.entity_id)) - ROOM_DOMAINS.indexOf(dom(y.entity_id))), (s) => s.entity_id);
     const isAct = (x) => { const d = dom(x.entity_id); return d !== 'sensor' && (d === 'binary_sensor' ? x.state === 'on' : !INACTIVE.includes(x.state)); };
@@ -3406,6 +3408,15 @@ _more() {
         v = Math.max(Number.isFinite(mn) ? mn : 0, Math.min(Number.isFinite(mx) ? mx : 300, v));
         h.callService('number', 'set_value', { entity_id: id, value: v }); return;
       }
+      case 'sdt': {
+        const n = h.states[id]; if (!n) return; const a = n.attributes;
+        const mn = Number.isFinite(Number(a.min_temp)) ? Number(a.min_temp) : 5; const mx = Number.isFinite(Number(a.max_temp)) ? Number(a.max_temp) : 30;
+        const cur = Number(a.temperature); const base = Number.isFinite(cur) ? cur : Number(a.current_temperature);
+        if (!Number.isFinite(base)) return;
+        const v = Math.round(Math.max(mn, Math.min(mx, base + Number(t.dataset.d))) * 10) / 10;
+        h.callService('climate', 'set_temperature', { entity_id: id, temperature: v }); return;
+      }
+      case 'sdm': { const n = h.states[id]; if (!n) return; h.callService('climate', 'set_hvac_mode', { entity_id: id, hvac_mode: n.state === 'off' ? 'heat' : 'off' }); return; }
       case 'vdock': h.callService('vacuum', 'return_to_base', { entity_id: id }); return;
       case 'rsens': this._sheet = 'rs'; this._rsArea = id; break;
       case 'rspick': { const r = s.roomSensors[this._rsArea] || (s.roomSensors[this._rsArea] = {}); if (id) r[t.dataset.k] = id; else delete r[t.dataset.k]; this._save(); break; }
@@ -3909,11 +3920,24 @@ registerDevice({
 });
 /* Heizung (Smartdome Heat Control): Raumstatus, Fensterpause und Gas-Ersparnis. Alle Werte stammen aus den Attributen des Status-Sensors
    (Smartdome ab 3.7.0), es ist keine weitere Zuordnung nötig. Ältere Versionen zeigen nur Status und Temperaturen. */
+/* Zugehöriges Thermostat: Status-Sensor und climate der Integration haben kein gemeinsames Gerät, aber denselben Raumnamen vor „ – “ */
+const sdClimate = (c, iv) => {
+  const m = iv.map && iv.map.climate; if (m === '-') return null; if (m && c._hass.states[m]) return m;
+  const base = (st) => String((st && st.attributes && st.attributes.friendly_name) || '').split(/\s+[–-]\s+/)[0].trim().toLowerCase();
+  const room = base(c._hass.states[iv.main]); const stem = iv.main.split('.')[1].replace(/_status$/, '');
+  let hit = null;
+  for (const id in c._hass.states) {
+    if (dom(id) !== 'climate') continue; const r = c._hass.entities && c._hass.entities[id];
+    if (!r || r.platform !== 'smartdome_heat_control') continue;
+    if (id.split('.')[1].startsWith(`${stem}_`) || (room && base(c._hass.states[id]) === room)) { hit = id; break; }
+  }
+  return hit;
+};
 const SD_REASON = { heating: 'Heizt', normal_idle: 'Bereit', window_pause: 'Pausiert, Fenster offen', disabled: 'Aus', sensor_fault: 'Sensorfehler', comfort_override: 'Komfort-Anforderung', outdoor_cutoff: 'Außentemperatur-Abschaltung', minimum_temperature_heating: 'Mindesttemperatur' };
 registerDevice({
   type: 'smartdome', label: 'Heizung (Smartdome)', icon: 'mdi:radiator', desc: 'Raumstatus, Fensterpause, Pausenzeit und gesparte Gas-Menge (Integration Smartdome Heat Control)', size: 'w',
   main: { dom: 'sensor', dc: 'enum', platform: 'smartdome_heat_control', prefer: /status/ },
-  fields: {},
+  fields: { climate: { l: 'Thermostat (Steuerung)', dom: 'climate', platform: 'smartdome_heat_control' } },
   render: (c, iv, F, st) => {
     const a = st.attributes; const id = iv.main;
     const name = iv.title || String(a.friendly_name || id).replace(/\s*[–-]\s*Status$/i, '');
@@ -3924,18 +3948,24 @@ registerDevice({
     const tgt = typeof a.target_temperature === 'number' ? a.target_temperature : parseFloat(a.target_temperature);
     const big = Number.isFinite(cur) ? `<div class="big">${c._de(cur, 1)} °</div>` : '';
     const warn = a.window_open === true ? `<div class="dverr"><ha-icon icon="mdi:window-open-variant"></ha-icon><div>${pause ? 'Fenster offen, Heizung pausiert' : 'Fenster offen'}</div></div>` : '';
+    const CID = sdClimate(c, iv); const cl = CID && c._hass.states[CID]; const clOk = cl && cl.state !== 'unavailable';
+    const ctl = clOk ? (() => {
+      const ca = cl.attributes; const ctgt = Number(ca.temperature); const off = cl.state === 'off';
+      const stp = Number(ca.target_temp_step) > 0 ? Number(ca.target_temp_step) : 0.5;
+      return `<div class="kxr sdc"><div><button class="pill" data-act="sdt" data-id="${CID}" data-d="${-stp}" aria-label="Kälter">−</button><b>${Number.isFinite(ctgt) && !off ? `${c._de(ctgt, 1)} °C` : 'Aus'}</b><button class="pill" data-act="sdt" data-id="${CID}" data-d="${stp}" aria-label="Wärmer">+</button></div><button class="pill ${off ? '' : 'sel'}" data-act="sdm" data-id="${CID}"><ha-icon icon="mdi:power"></ha-icon>${off ? 'Einschalten' : 'Ausschalten'}</button></div>`;
+    })() : '';
     const tile = (l, v) => `<div data-act="info" data-id="${id}"><small>${l}</small><b>${v}</b></div>`;
     const min = (k) => { const v = Number(a[k]); return Number.isFinite(v) ? hmMin(Math.round(v)) : null; };
     const gas = (k) => { const v = Number(a[k]); return Number.isFinite(v) ? `${c._de(v, v < 10 ? 2 : 1)} m³` : null; };
     const has = a.window_pause_today_min !== undefined;
-    const tiles = [Number.isFinite(tgt) ? tile('Soll', `${c._de(tgt, 1)} °C`) : '']
+    const tiles = [Number.isFinite(tgt) && !ctl ? tile('Soll', `${c._de(tgt, 1)} °C`) : '']
       .concat(has ? [tile('Pause heute', min('window_pause_today_min')), tile('Gas heute', gas('gas_saved_today_m3')), tile('Gas Monat', gas('gas_saved_month_m3')), tile('Gas Jahr', gas('gas_saved_year_m3')), tile('Gas gesamt', gas('gas_saved_total_m3'))] : []).join('');
     const hist = Array.isArray(a.window_pause_history) ? a.window_pause_history.map(Number).filter(Number.isFinite) : [];
     const mx = Math.max(1, ...hist);
     const bars = hist.length && hist.some((v) => v > 0)
       ? `<div class="sdm"><small>Pause pro Tag, letzte ${hist.length} Tage</small><div class="sdh">${hist.map((v) => `<i title="${hmMin(Math.round(v))}" style="height:${Math.max(4, Math.round((v / mx) * 100))}%"></i>`).join('')}</div></div>` : '';
     return `<div class="dvc ${run ? 'run' : ''}"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="${pause ? 'mdi:window-open-variant' : run ? 'mdi:radiator' : 'mdi:radiator-off'}"></ha-icon></div><div class="tt"><b>${esc(name)}</b><span>${esc(sub)}</span></div>${big}</div>
-      ${warn}${tiles ? `<div class="dvs">${tiles}</div>` : ''}${bars}</div>`;
+      ${warn}${ctl}${tiles ? `<div class="dvs">${tiles}</div>` : ''}${bars}</div>`;
   },
 });
 registerCard({ id: 'proxmox', label: 'Proxmox', icon: 'mdi:server', size: 'w', items: (c) => {
