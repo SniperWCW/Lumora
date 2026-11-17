@@ -2534,7 +2534,11 @@ _more() {
       c = `<h2>Karte platzieren</h2>${b('home', 'Zuhause (Startseite)', 'mdi:home-outline')}${b('more', 'Mehr', 'mdi:view-dashboard-outline')}${this._roomData().map((f) => `<h4>${esc(f.name)}</h4>${f.areas.map((ar) => b(`area:${ar.id}`, ar.name, 'mdi:door')).join('')}`).join('')}`;
     } else if (this._sheet === 'regpick') {
       const here = `area:${this._area}`;
-      c = `<h2>Karte in diesen Raum holen</h2>${this._allReg().filter((x) => !x.def.fixed).map((x) => `<div class="row"><ha-icon icon="${x.def.icon}"></ha-icon><div class="t"><b>${esc(x.def.label)}</b></div><button class="${x.pl === here ? 'sel' : ''}" data-act="regset" data-id="${esc(x.id)}">${x.pl === here ? 'Hier' : 'Holen'}</button></div>`).join('') || '<div class="empty">Keine Karten verfügbar.</div>'}`;
+      c = `<h2>Neue Karte in diesem Raum</h2>
+        <div class="row"><div class="t"><b>Gerätekarte</b><span>z. B. Heizung (Smartdome), Staubsauger, Pool</span></div><button data-act="adddv">Wählen</button></div>
+        <div class="row"><div class="t"><b>Fremdkarte einbetten</b><span>Beliebige Karte (HACS, Mushroom, ApexCharts …) per YAML</span></div><button data-act="addemb">Einfügen</button></div>
+        <div class="row"><div class="t"><b>Eigene Karte</b><span>Wert, Verlauf oder Schalter einer Entität</span></div><button data-act="addcustroom">Wählen</button></div>
+        <h2>Vorhandene Karte hierher holen</h2>${this._allReg().filter((x) => !x.def.fixed).map((x) => `<div class="row"><ha-icon icon="${x.def.icon}"></ha-icon><div class="t"><b>${esc(x.def.label)}</b></div><button class="${x.pl === here ? 'sel' : ''}" data-act="regset" data-id="${esc(x.id)}">${x.pl === here ? 'Hier' : 'Holen'}</button></div>`).join('') || '<div class="empty">Keine Karten verfügbar.</div>'}`;
     } else if (this._sheet === 'dvadd') {
       c = `<h2>Gerätekarte hinzufügen</h2><div class="hint">Wähle den Gerätetyp. Passende Entitäten werden automatisch gefunden und lassen sich danach einzeln ändern.</div>${Object.values(DEVTPL).map((tp) => `<div class="row" data-act="dvtype" data-k="${tp.type}"><ha-icon icon="${tp.icon}"></ha-icon><div class="t"><b>${esc(tp.label)}</b><span>${esc(tp.desc || '')}</span></div></div>`).join('')}`;
     } else if (this._sheet === 'dvmain') {
@@ -2647,6 +2651,7 @@ _more() {
   }
 
   /* ---------- Gerätekarten: Vorlagen mit automatischer Zuordnung ---------- */
+  _placeNew(id) { if (this._view === 'more') this._set.place[id] = 'more'; else if (this._view === 'rooms' && this._area) this._set.place[id] = `area:${this._area}`; }
   _dvAll() { return this._set.devices.filter((x) => DEVTPL[x.type]); }
   _dvMains(tp) {
     const sp = tp.main; const reg0 = this._hass.entities || {};
@@ -3374,10 +3379,11 @@ _more() {
       case 'vlocate': h.callService('vacuum', 'locate', { entity_id: id }); return;
       case 'vfan': h.callService('vacuum', 'set_fan_speed', { entity_id: id, fan_speed: t.dataset.v }); return;
       case 'adddv': this._sheet = 'dvadd'; break;
+      case 'addcustroom': this._sheet = 'add'; this._q = ''; this._flt = 'all'; this._cust = true; break;
       case 'dvtype': this._dvT = t.dataset.k; this._sheet = 'dvmain'; this._q = ''; break;
       case 'dvnew': {
         const iv = { id: `dv${Date.now().toString(36)}`, type: this._dvT, main: id, map: {}, title: '' };
-        s.devices.push(iv); if (this._view === 'more') s.place[iv.id] = 'more';
+        s.devices.push(iv); this._placeNew(iv.id);
         this._dvId = iv.id; this._sheet = 'dv'; this._save(); break;
       }
       case 'dvpick': this._sheet = 'dvpick'; this._dvK = t.dataset.k; this._q = ''; break;
@@ -3472,7 +3478,7 @@ _more() {
       case 'addemb': {
         const eid = `em${Date.now().toString(36)}`;
         s.embeds.push({ id: eid, yaml: '' });
-        if (this._view === 'more') s.place[eid] = 'more';
+        this._placeNew(eid);
         this._sheet = 'emb'; this._embId = eid; this._save(); break;
       }
       case 'embsize': s.size[this._embId] = t.dataset.k; this._save(); break;
@@ -3483,11 +3489,11 @@ _more() {
       case 'flt': this._flt = t.dataset.k; this._render(); return;
       case 'onlyact': this._only = !this._only; this._render(); return;
       case 'pick': {
-        if (this._cust) {
+        if (this._cust || this._view === 'rooms') {
           const st = h.states[id]; const d = dom(id); const num = st && !isNaN(parseFloat(st.state));
           const cid = `cu${Date.now().toString(36)}`;
           s.custom.push({ id: cid, entity: id, kind: ['light', 'switch', 'fan', 'input_boolean', 'humidifier', 'cover'].includes(d) ? 'toggle' : num ? 'spark' : 'value', hours: 24, title: '' });
-          if (this._view === 'more') s.place[cid] = 'more';
+          this._placeNew(cid);
           this._sheet = 'cc'; this._ccId = cid; this._cust = false; this._save(); break;
         }
         if (!s.pinned.some((p) => p.entity === id)) s.pinned.push({ entity: id, only: this._only });
