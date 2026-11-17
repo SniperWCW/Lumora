@@ -465,3 +465,151 @@ test('Familienplaner: Zuordnen legt eine Regel an und lädt danach neu', async (
   const rule = c.calls.find((m) => m.type === 'familienplaner/add_rule');
   assert.deepEqual({ ...rule, persons: [...rule.persons] }, { type: 'familienplaner/add_rule', field: 'summary', operator: 'equals', pattern: 'Elternabend', persons: ['papa'] });
 });
+
+/* ---------- Anycubic Cloud & LAN (Nino6689/hass-anycubic): Entitäten wie in einer echten deutschen Installation ---------- */
+const same = (a, b) => assert.equal(JSON.stringify(a), JSON.stringify(b));
+const AP = 'keller_ug_anycubic_kobra_x_';
+const ACY = (over = {}) => {
+  const s = {
+    [`sensor.${AP}druckstatus`]: ['printing', { friendly_name: 'Anycubic Kobra X Druckstatus' }, 'job_state'],
+    [`sensor.${AP}aktueller_status`]: ['busy', { friendly_name: 'Anycubic Kobra X Aktueller Status' }, 'current_status'],
+    [`binary_sensor.${AP}drucker_online`]: ['on', { friendly_name: 'Anycubic Kobra X Drucker online' }, 'printer_online'],
+    [`binary_sensor.${AP}druck_fehlgeschlagen`]: ['off', { friendly_name: 'Anycubic Kobra X Druck fehlgeschlagen' }, 'job_failed'],
+    [`binary_sensor.${AP}filament_reicht_nicht_fur_auftrag`]: ['off', { friendly_name: 'Anycubic Kobra X Filament reicht nicht für Auftrag' }, 'job_filament_insufficient'],
+    [`sensor.${AP}druckauftrag`]: ['1117-1319-Kobra X_plate(01)_PETG_0.2_2h9m42s', { friendly_name: 'Anycubic Kobra X Druckauftrag' }, 'job_name'],
+    [`sensor.${AP}druckfortschritt`]: ['32', { friendly_name: 'Anycubic Kobra X Druckfortschritt %', unit_of_measurement: '%' }, 'job_progress'],
+    [`sensor.${AP}restzeit`]: ['78', { friendly_name: 'Anycubic Kobra X Restzeit', unit_of_measurement: 'min', device_class: 'duration' }, 'job_time_remaining'],
+    [`sensor.${AP}verstrichene_zeit`]: ['38', { friendly_name: 'Anycubic Kobra X Verstrichene Zeit', unit_of_measurement: 'min', device_class: 'duration' }, 'job_time_elapsed'],
+    [`sensor.${AP}voraussichtliches_ende`]: [new Date(Date.now() + 78 * 60000).toISOString(), { friendly_name: 'Anycubic Kobra X Voraussichtliches Ende', device_class: 'timestamp' }, 'job_eta'],
+    [`sensor.${AP}aktuelle_schicht`]: ['38', { friendly_name: 'Anycubic Kobra X Aktuelle Schicht' }, 'job_current_layer'],
+    [`sensor.${AP}schichten_gesamt`]: ['214', { friendly_name: 'Anycubic Kobra X Schichten gesamt' }, 'job_total_layers'],
+    [`sensor.${AP}verbrauchtes_filament`]: ['5876', { friendly_name: 'Anycubic Kobra X Verbrauchtes Filament', unit_of_measurement: 'mm' }, 'job_filament_used'],
+    [`sensor.${AP}dusentemperatur`]: ['230.0', { friendly_name: 'Anycubic Kobra X Düsentemperatur', unit_of_measurement: '°C', device_class: 'temperature' }, 'curr_nozzle_temp'],
+    [`sensor.${AP}betttemperatur`]: ['75.0', { friendly_name: 'Anycubic Kobra X Betttemperatur', unit_of_measurement: '°C', device_class: 'temperature' }, 'curr_hotbed_temp'],
+    [`sensor.${AP}solltemperatur_duse`]: ['230.0', { friendly_name: 'Anycubic Kobra X Solltemperatur Düse', unit_of_measurement: '°C', device_class: 'temperature' }, 'target_nozzle_temp'],
+    [`number.${AP}dusentemperatur_einstellen`]: ['230.0', { friendly_name: 'Anycubic Kobra X Düsentemperatur einstellen', min: 0, max: 320, step: 1, unit_of_measurement: '°C' }, 'set_target_nozzle_temp'],
+    [`number.${AP}betttemperatur_einstellen`]: ['75.0', { friendly_name: 'Anycubic Kobra X Betttemperatur einstellen', min: 0, max: 120, step: 1, unit_of_measurement: '°C' }, 'set_target_hotbed_temp'],
+    [`number.${AP}luftergeschwindigkeit_einstellen`]: ['29.0', { friendly_name: 'Anycubic Kobra X Lüftergeschwindigkeit einstellen', min: 0, max: 100, step: 1, unit_of_measurement: '%' }, 'set_fan_speed_pct'],
+    [`number.${AP}hilfslufter_einstellen`]: ['100.0', { friendly_name: 'Anycubic Kobra X Hilfslüfter einstellen', min: 0, max: 100, step: 1, unit_of_measurement: '%' }, 'set_aux_fan_speed_pct'],
+    [`select.${AP}druckgeschwindigkeitsmodus`]: ['Sport', { friendly_name: 'Anycubic Kobra X Druckgeschwindigkeitsmodus', options: ['Silent', 'Standard', 'Sport'] }, 'set_speed_mode'],
+    [`select.${AP}schrittweite_achsen`]: ['1 mm', { friendly_name: 'Anycubic Kobra X Schrittweite Achsen', options: ['1 mm', '15 mm', '50 mm'] }, 'axis_step'],
+    [`light.${AP}druckerbeleuchtung`]: ['off', { friendly_name: 'Anycubic Kobra X Druckerbeleuchtung' }, 'printer_light'],
+    [`button.${AP}druck_pausieren`]: ['unknown', { friendly_name: 'Anycubic Kobra X Druck pausieren' }, 'pause_print'],
+    [`button.${AP}druck_fortsetzen`]: ['unknown', { friendly_name: 'Anycubic Kobra X Druck fortsetzen' }, 'resume_print'],
+    [`button.${AP}druck_abbrechen`]: ['unknown', { friendly_name: 'Anycubic Kobra X Druck abbrechen' }, 'cancel_print'],
+    [`button.${AP}alle_achsen_referenzieren`]: ['unknown', { friendly_name: 'Anycubic Kobra X Alle Achsen referenzieren' }, 'axis_home_all'],
+    [`button.${AP}x_plus_bewegen`]: ['unknown', { friendly_name: 'Anycubic Kobra X X plus bewegen' }, 'axis_move_x_plus'],
+    [`button.${AP}feeder_trocknung_starten`]: ['unknown', { friendly_name: 'Anycubic Kobra X Feeder Trocknung starten' }, 'drying_start'],
+    [`button.${AP}feeder_trocknen_stoppen`]: ['unknown', { friendly_name: 'Anycubic Kobra X Feeder Trocknen stoppen' }, 'drying_stop'],
+    [`binary_sensor.${AP}feeder_trocknen_aktiv`]: ['off', { friendly_name: 'Anycubic Kobra X Feeder Trocknen aktiv' }, 'dry_status_is_drying'],
+    [`number.${AP}feeder_trocknungsdauer`]: ['360.0', { friendly_name: 'Anycubic Kobra X Feeder Trocknungsdauer', min: 1, max: 720, step: 1, unit_of_measurement: 'min' }, 'drying_set_duration'],
+    [`number.${AP}feeder_trocknungstemperatur`]: ['65.0', { friendly_name: 'Anycubic Kobra X Feeder Trocknungstemperatur', min: 35, max: 70, step: 1, unit_of_measurement: '°C' }, 'drying_set_temperature'],
+    [`sensor.${AP}feeder_geladenes_ace_fach`]: ['1', { friendly_name: 'Anycubic Kobra X Feeder Geladenes ACE-Fach' }, 'ace_loaded_slot'],
+    [`sensor.${AP}feeder_ace_fach_1`]: ['PETG', { friendly_name: 'Anycubic Kobra X Feeder ACE-Fach 1', color_hex: '#75787B' }, 'ace_slot_1'],
+    [`sensor.${AP}feeder_ace_fach_2`]: ['PLA', { friendly_name: 'Anycubic Kobra X Feeder ACE-Fach 2', color_hex: '#ff0000' }, 'ace_slot_2'],
+    [`sensor.${AP}feeder_ace_fach_4`]: ['unavailable', { friendly_name: 'Anycubic Kobra X Feeder ACE-Fach 4' }, 'ace_slot_4'],
+    [`sensor.${AP}feeder_ace_fach_1_filament_verbleibend`]: ['64', { friendly_name: 'Anycubic Kobra X Feeder ACE Slot 1 Filament verbleibend %', unit_of_measurement: '%' }, 'ace_slot_1_filament_remaining_percent'],
+    [`switch.${AP}ki_fehlererkennung`]: ['off', { friendly_name: 'Anycubic Kobra X KI-Fehlererkennung' }, 'ai_detection_enabled'],
+    [`update.keller_ug_anycubic_kobra_x_drucker_firmware`]: ['on', { friendly_name: 'Anycubic Kobra X Drucker-Firmware' }, 'fw_version'],
+    [`sensor.${AP}kosten_letzter_auftrag`]: ['1.42', { friendly_name: 'Anycubic Kobra X Kosten letzter Auftrag', unit_of_measurement: 'EUR' }, 'last_job_cost'],
+    [`sensor.${AP}dusenverschleiss`]: ['3.0', { friendly_name: 'Anycubic Kobra X Düsenverschleiß', unit_of_measurement: '%' }, 'nozzle_wear_percent'],
+    'switch.keller_ug_anycubic': ['on', { friendly_name: 'Anycubic', device_class: 'outlet' }, null],
+    'button.keller_ug_anycubic_identifizieren': ['unknown', { friendly_name: 'Anycubic Identifizieren' }, null],
+    ...over,
+  };
+  return s;
+};
+function acyCard(raw, { tk = true, set = {} } = {}) {
+  const states = {}; const entities = {};
+  Object.keys(raw).forEach((id) => {
+    const [state, attributes, key] = raw[id]; states[id] = { entity_id: id, state, last_changed: new Date().toISOString(), attributes };
+    entities[id] = { platform: raw[id][2] === null && id.includes('_kobra_x_') === false ? 'zha' : 'anycubic_cloud', device_id: key === null ? 'plug' : id.includes('feeder') ? 'ace' : 'prn', translation_key: tk ? key || undefined : undefined };
+  });
+  const c = Object.create(L.card.prototype);
+  c._set = { sources: {}, size: { printer: 'f', ...set.size }, hidden: [], place: {}, custom: [], pinned: [], quick: [], devices: [], chips: {} };
+  c._hass = { states, entities, devices: { prn: { name: 'Anycubic Kobra X' }, ace: { name: 'ACE', via_device_id: 'prn' }, plug: { name: 'Anycubic' } }, callService(d, s, data) { c.svc.push([d, s, data]); } };
+  c._cfg = {}; c.svc = []; c._save = () => {}; c._render = () => {}; c.dispatchEvent = () => {};
+  return c;
+}
+
+test('Anycubic: Entitäten werden über translation_key gefunden, auch das ACE-Kinder-Gerät', () => {
+  const c = acyCard(ACY());
+  const A = c._acx();
+  assert.equal(A.status, `sensor.${AP}druckstatus`);
+  assert.equal(A.progress, `sensor.${AP}druckfortschritt`);
+  assert.equal(A.nozt, `number.${AP}dusentemperatur_einstellen`);
+  assert.equal(A.nozzle, `sensor.${AP}dusentemperatur`);
+  assert.equal(A.speed, `select.${AP}druckgeschwindigkeitsmodus`);
+  assert.equal(A.ace1, `sensor.${AP}feeder_ace_fach_1`);
+  assert.equal(A.acep1, `sensor.${AP}feeder_ace_fach_1_filament_verbleibend`);
+  assert.equal(c._xid('printer_progress'), `sensor.${AP}druckfortschritt`);
+  assert.equal(c._xid('printer_nozt'), `number.${AP}dusentemperatur_einstellen`);
+  assert.equal(c._xid('printer_plug'), 'switch.keller_ug_anycubic'); // Steckdose, nicht die KI-Erkennung
+});
+
+test('Anycubic: ohne translation_key greift die Namens-Zuordnung (deutsch)', () => {
+  const A = acyCard(ACY(), { tk: false })._acx();
+  assert.equal(A.progress, `sensor.${AP}druckfortschritt`);
+  assert.equal(A.nozzle, `sensor.${AP}dusentemperatur`);
+  assert.equal(A.nozt, `number.${AP}dusentemperatur_einstellen`);
+  assert.equal(A.bedt, `number.${AP}betttemperatur_einstellen`);
+  assert.equal(A.fan, `number.${AP}luftergeschwindigkeit_einstellen`);
+  assert.equal(A.ace2, `sensor.${AP}feeder_ace_fach_2`);
+  assert.equal(A.drystart, `button.${AP}feeder_trocknung_starten`);
+  assert.equal(A.pause, `button.${AP}druck_pausieren`);
+});
+
+test('Anycubic-Karte: laufender Druck zeigt Auftrag, Fortschritt, Ende, Geschwindigkeit, ACE mit Farbe und Restmenge', () => {
+  const c = acyCard(ACY());
+  const html = c._printerHtml();
+  assert.match(html, /Druckt/); assert.match(html, /32 %/); assert.match(html, /Layer 38 \/ 214/);
+  assert.match(html, /1117-1319-Kobra X_plate/); assert.match(html, /noch 1 h 18 min/); assert.match(html, /seit 38 min/);
+  assert.match(html, /data-act="pr-btn" data-k="pause"/); assert.match(html, /data-k="stop"/); assert.match(html, /data-k="light"/);
+  assert.match(html, /data-act="pr-sel"[^>]*data-v="Standard"/); assert.match(html, />Leise</);
+  assert.match(html, /background:#75787B/i); assert.match(html, /~64 %/); assert.match(html, /class="on"[^>]*data-id="sensor\.keller_ug_anycubic_kobra_x_feeder_ace_fach_1"/);
+  assert.match(html, /Lüfter/); assert.match(html, /Zusatzlüfter/); assert.match(html, /Update verfügbar/); assert.match(html, /Düsenverschleiß/);
+  assert.doesNotMatch(html, /Achsen und Referenzfahrt/); // keine Achsen während des Drucks
+  assert.doesNotMatch(html, /Trocknung starten/);
+});
+
+test('Anycubic-Karte: Stopp braucht Bestätigung, Pause und Geschwindigkeit rufen die richtigen Dienste auf', () => {
+  const c = acyCard(ACY());
+  c._printClick({ dataset: { k: 'pause' } }, 'pr-btn');
+  same(c.svc.pop(), ['button', 'press', { entity_id: `button.${AP}druck_pausieren` }]);
+  c._printClick({ dataset: { k: 'stop' } }, 'pr-btn'); assert.equal(c.svc.length, 0);
+  c._printClick({ dataset: { k: 'stop' } }, 'pr-btn');
+  same(c.svc.pop(), ['button', 'press', { entity_id: `button.${AP}druck_abbrechen` }]);
+  c._printClick({ dataset: { id: `select.${AP}druckgeschwindigkeitsmodus`, v: 'Standard' } }, 'pr-sel');
+  same(c.svc.pop(), ['select', 'select_option', { entity_id: `select.${AP}druckgeschwindigkeitsmodus`, option: 'Standard' }]);
+  c._printClick({ dataset: { id: `number.${AP}luftergeschwindigkeit_einstellen`, d: '1', st: '0' } }, 'pr-adj');
+  same(c.svc.pop(), ['number', 'set_value', { entity_id: `number.${AP}luftergeschwindigkeit_einstellen`, value: 34 }]);
+  c._printClick({ dataset: { k: 'light' } }, 'pr-btn');
+  same(c.svc.pop(), ['light', 'toggle', { entity_id: `light.${AP}druckerbeleuchtung` }]);
+  c._printClick({ dataset: { k: 'home_all' } }, 'pr-btn'); c._printClick({ dataset: { k: 'jx_p' } }, 'pr-btn');
+  assert.equal(c.svc.length, 0); // Achsen bewegen sich nicht während eines Drucks
+});
+
+test('Anycubic-Karte: im Stillstand Achsen hinter Schalter, Trocknen mit Start, Fehlerbanner bei fehlgeschlagen', () => {
+  const c = acyCard(ACY({
+    [`sensor.${AP}druckstatus`]: ['free', { friendly_name: 'Anycubic Kobra X Druckstatus' }, 'job_state'],
+    [`binary_sensor.${AP}druck_fehlgeschlagen`]: ['on', { friendly_name: 'Anycubic Kobra X Druck fehlgeschlagen' }, 'job_failed'],
+    [`select.${AP}druckgeschwindigkeitsmodus`]: ['unavailable', { friendly_name: 'Anycubic Kobra X Druckgeschwindigkeitsmodus' }, 'set_speed_mode'],
+  }));
+  let html = c._printerHtml();
+  assert.match(html, /Bereit/); assert.match(html, /Druck fehlgeschlagen/); assert.match(html, /Achsen und Referenzfahrt/); assert.doesNotMatch(html, /data-k="jx_p"/);
+  assert.match(html, /Trocknung starten/); assert.match(html, /6 h/); assert.doesNotMatch(html, /data-act="pr-sel"[^>]*Standard/);
+  assert.equal(c._printClick({ dataset: {} }, 'pr-axes'), true);
+  html = c._printerHtml();
+  assert.match(html, /data-k="jx_p"/); assert.match(html, /Erst referenzieren/); assert.match(html, /data-v="15 mm"/);
+  c._printClick({ dataset: { k: 'home_all' } }, 'pr-btn');
+  same(c.svc.pop(), ['button', 'press', { entity_id: `button.${AP}alle_achsen_referenzieren` }]);
+  c._printClick({ dataset: { k: 'drystart' } }, 'pr-btn');
+  same(c.svc.pop(), ['button', 'press', { entity_id: `button.${AP}feeder_trocknung_starten` }]);
+});
+
+test('Anycubic-Karte: ausgeschaltete Steckdose und Offline-Zustand', () => {
+  let c = acyCard(ACY({ 'switch.keller_ug_anycubic': ['off', { friendly_name: 'Anycubic', device_class: 'outlet' }, null] }));
+  assert.match(c._printerHtml(), /Ausgeschaltet/);
+  c = acyCard(ACY({ [`binary_sensor.${AP}drucker_online`]: ['off', { friendly_name: 'Anycubic Kobra X Drucker online' }, 'printer_online'] }));
+  const h = c._printerHtml(); assert.match(h, /Offline/); assert.doesNotMatch(h, /data-k="pause"/);
+});

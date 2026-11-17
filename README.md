@@ -11,7 +11,7 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - Steckdosen-Karten: Ein/Aus, aktuelle Leistung in Watt und Tagesspitze mit Uhrzeit (Leistungssensor am selben Gerät wird automatisch zugeordnet)
 - Räume je Etage und Area, Kameraübersicht; Temperatur und Luftfeuchte im Raumkopf automatisch aus der Area (abgeleitete Werte wie Taupunkt werden ignoriert), pro Raum wählbar unter Bearbeiten, Sensoren
 - Pool-Karte (Smart Pool Assistant + LayzSpa): Status, Badeampel, PoolLab-Abruf, Chlor-/pH-/CYA-Empfehlung mit Eintragen von Zugaben und Wasserwechsel, Berechnungsdetails, Wetter, Stabilität, Messwerte, LayzSpa (Pumpe, Heizung, Blubber, Zieltemperatur, Heizzeit-Prognose, Fehlercodes), Aktivitäten, Filterwartung, Abdeckung, Nutzung und Badeplan. Winterschlaf blendet sie aus. Ohne Integration bleibt die LayzSpa-Steuerung
-- 3D-Drucker-Karte: Status, Fortschritt mit Layer und Fertig-Uhrzeit, Kamera, Düsen- und Betttemperatur, Pause/Fortsetzen/Stopp (Stopp und Ausschalten während des Drucks mit Rückfrage), Steckdose mit Verbrauch, Soll-Temperaturen und Geschwindigkeit per +/-, Material, Gehäuse-Klima, Druckzeit und Vorschaubild. Wird frei platziert wie alle Karten
+- 3D-Drucker-Karte (erkennt Anycubic Cloud & LAN mit ACE, Trocknen, Geschwindigkeit, Lüftern und Achsen): Status, Fortschritt mit Layer und Fertig-Uhrzeit, Kamera, Düsen- und Betttemperatur, Pause/Fortsetzen/Stopp (Stopp und Ausschalten während des Drucks mit Rückfrage), Steckdose mit Verbrauch, Soll-Temperaturen und Geschwindigkeit per +/-, Material, Gehäuse-Klima, Druckzeit und Vorschaubild. Wird frei platziert wie alle Karten
 - Tab "Mehr": Haushaltsgeräte (Waschmaschine, Trockner, Spülmaschine mit Programm, Fortschritt, Restzeit), Pakete, Energie, Zähler (Strom, Gas, Wasser, Ersparnis), 3D-Drucker, Pool, Wetter, Tankzeit, HA-Health, Pi-hole, Lage Deutschland. Karten ohne verfügbare Daten bleiben ausgeblendet
 - Warn-Chips neben "x Lampen an" und in der Meldungszeile: DWD-Wetterwarnungen (automatisch erkannt), NINA-Warnungen, Eiswarnung, Fahrrad-Hinweis, Pollen (nur bei Belastung) und Fahrzeiten (Waze, Bahn); Details per Tipp. Ein- und ausschaltbar unter Meldungen
 - Lüftungszeile unter Temperatur und Luftfeuchte (Room Climate): Empfehlung, Dauer, erste Räume, nächstes Lüftungsfenster
@@ -85,7 +85,20 @@ color_to: "#d6c5a8"
 
 ## 3D-Drucker-Karte
 
-Ohne Konfiguration: Aus dem Sensor `sensor.<name>_print_status` werden Fortschritt, Restzeit, Temperaturen, Pause/Fortsetzen/Stopp, Soll-Werte, Layer, Material, Kamera und Vorschau abgeleitet. Steckdose, Verbrauch und Gehäuse-Klima werden über ihre Namen gefunden. Abweichendes lässt sich überschreiben:
+### Anycubic Cloud & LAN (Nino6689/hass-anycubic)
+
+Die Integration `anycubic_cloud` wird automatisch erkannt, sobald der Druckstatus-Sensor von ihr stammt. Die Entitäten werden über ihren `translation_key` gefunden (unabhängig von der Sprache), mit Namens-Fallback. Auch das ACE als Kindgerät ist dabei. Die Karte zeigt und steuert:
+
+- Status inklusive Offline, Auftragsname, Fortschritt, Layer, Restzeit, Fertig-Uhrzeit (aus dem ETA-Sensor) und verstrichene Zeit
+- Düse, Bett und Kammer; Soll-Temperaturen sowie Lüfter, Zusatzlüfter und Kammerlüfter per +/-
+- Geschwindigkeitsmodus (Leise, Standard, Sport), Druckerlicht, Pause, Fortsetzen und Stopp (mit Rückfrage), Kamera und Vorschaubild
+- Hinweise bei fehlgeschlagenem Druck (mit letztem Fehler) und wenn das Filament für den Auftrag nicht reicht
+- ACE: Fächer mit Farbe (auch mehrfarbig), Material, geschätzter Restmenge und geladenem Fach, Temperatur und Feuchte, Trocknen (Temperatur und Dauer einstellen, starten, stoppen), Filament zurückziehen, Nachfüllen bei leerer Spule und KI-Fehlererkennung als Schalter
+- Achsen und Referenzfahrt hinter einem Schalter und nur im Stillstand (Referenzieren, Schrittweite, X/Y/Z bewegen, Motoren freigeben)
+- Kosten des letzten Auftrags, Filamentkosten, Düsenverschleiß, Drucke und Druckzeit gesamt, Filamentbestand und Hinweis auf Firmware-Updates
+- Die Steckdose des Druckers (Schalter mit Gerät-Klasse Steckdose und "Anycubic" im Namen) wird mit Strom und Verbrauch erkannt
+
+Ohne Anycubic-Integration: Aus dem Sensor `sensor.<name>_print_status` werden Fortschritt, Restzeit, Temperaturen, Pause/Fortsetzen/Stopp, Soll-Werte, Layer, Material, Kamera und Vorschau abgeleitet. Steckdose, Verbrauch und Gehäuse-Klima werden über ihre Namen gefunden. Abweichendes lässt sich überschreiben:
 
 ```yaml
 extras:
