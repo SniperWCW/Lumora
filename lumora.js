@@ -37,10 +37,10 @@ const LOOK_DEF = {
   title: 'Zuhause', sub: 'Willkommen daheim ♡', greet: 'Schön, dass du da bist!', greetImg: '', statusOk: 'Alles in Ordnung', statusSub: '',
   showClock: true, showWeather: true, roomImg: true, roomMax: 4, rooms: [], kpis: ['lights', 'heat', 'temp'], cals: [], evMax: 3,
 };
-const LOOK_V = 2;
+const LOOK_V = 3;
 /* id, Name, Standardbreite (von 12 Spalten), Standard an */
 const BLOCK_DEF = [
-  ['head', 'Kopfzeile', 12, 1], ['alerts', 'Meldungen und Chips', 12, 1], ['kpis', 'Kennzahlen', 12, 1], ['rooms', 'Räume', 12, 1],
+  ['head', 'Kopfzeile', 12, 1], ['chips', 'Chips', 12, 1], ['alerts', 'Hinweise und Meldungen', 12, 1], ['kpis', 'Kennzahlen', 12, 1], ['rooms', 'Räume', 12, 1],
   ['termine', 'Termine', 4, 1], ['status', 'Hausstatus', 4, 1], ['greeting', 'Grußkachel', 4, 1],
   ['reg', 'Karten (Energie, Familie …)', 12, 1], ['active', 'Aktiv jetzt', 12, 1], ['cams', 'Kameras', 12, 0],
 ];
@@ -1810,7 +1810,6 @@ class LumoraCard extends HTMLElement {
       this._chipOn('outdoor') && !(isTiles && Lk.showWeather) ? wpill : '',
       this._infoPills(al),
       al.length && this._chipOn('count') && !isTiles ? `<button class="pill ${al.some((a) => a.sev === 0) ? 'bad' : 'warn'}" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>${al.length} Meldung${al.length > 1 ? 'en' : ''}</button>` : '',
-      this._edit ? '<button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips</button><button class="pill" data-act="src"><ha-icon icon="mdi:link-variant"></ha-icon>Quellen</button><button class="pill" data-act="hc"><ha-icon icon="mdi:cctv"></ha-icon>Kameras</button><button class="pill" data-act="door"><ha-icon icon="mdi:bell-ring"></ha-icon>Klingel</button><button class="pill" data-act="fx"><ha-icon icon="mdi:weather-night"></ha-icon>Effekte</button>' : '',
     ].join('');
     const cards = [];
     if (lights.length && !kLights) {
@@ -1847,7 +1846,7 @@ class LumoraCard extends HTMLElement {
   /* ---------- Kachel-Startseite: frei ordnbare Blöcke (Ziehen, Breite, Ein/Aus, Einstellungen je Block) ---------- */
   _homeTiles(f) {
     const L = this._set.look; const ed = this._edit;
-    const R = { head: () => this._bHead(f), alerts: () => this._bAlerts(f), kpis: () => this._bKpis(f), rooms: () => this._bRooms(f), termine: () => this._bTermine(), status: () => this._bStatus(f), greeting: () => this._bGreeting(f), reg: () => (f.regCells ? `<div class="grid reg">${f.regCells}</div>` : ''), active: () => (f.nCards ? `<h3>Aktiv jetzt</h3>${f.cardsHtml}` : ''), cams: () => this._homeCams() };
+    const R = { head: () => this._bHead(f), chips: () => this._bChips(f), alerts: () => this._bAlerts(f), kpis: () => this._bKpis(f), rooms: () => this._bRooms(f), termine: () => this._bTermine(), status: () => this._bStatus(f), greeting: () => this._bGreeting(f), reg: () => (f.regCells ? `<div class="grid reg">${f.regCells}</div>` : ''), active: () => (f.nCards ? `<h3>Aktiv jetzt</h3>${f.cardsHtml}` : ''), cams: () => this._homeCams() };
     const out = this._ord('lookb', L.blocks, (b) => b.id).map((b) => {
       if (!R[b.id] || (!b.on && !ed)) return '';
       let html = ''; try { html = R[b.id](); } catch (_) { html = ''; }
@@ -1867,11 +1866,10 @@ class LumoraCard extends HTMLElement {
     return `<div class="hd2"><div class="lg"><ha-icon icon="mdi:home-variant-outline"></ha-icon></div><div class="tx"><h1>${esc(L.title)}</h1>${L.sub ? `<div class="sub">${esc(L.sub)}</div>` : ''}</div>${clk}
       <div class="tb">${f.apill}<button class="rb ${this._edit ? 'sel' : ''}" data-act="edit" aria-label="Bearbeiten"><ha-icon icon="mdi:pencil"></ha-icon></button><button class="rb" data-act="look" aria-label="Design"><ha-icon icon="mdi:palette-outline"></ha-icon></button></div></div>`;
   }
-  /* Meldungen und Chips: nur sichtbar, wenn es etwas zu melden gibt (kein "Alles in Ordnung", das zeigt der Hausstatus) */
-  _bAlerts(f) {
-    const pl = String(f.pills).replace(/\s/g, '') ? `<div class="pills">${f.pills}</div>` : '';
-    return `${this._vent()}${f.al.length ? f.note : ''}${pl}`;
-  }
+  /* Chips: frei setzbarer Block, leer ausgeblendet */
+  _bChips(f) { return String(f.pills).replace(/\s/g, '') ? `<div class="pills" style="margin:0">${f.pills}</div>` : ''; }
+  /* Hinweise (Lüften) und Meldungen: nur sichtbar, wenn es etwas zu melden gibt ("Alles in Ordnung" zeigt der Hausstatus) */
+  _bAlerts(f) { return `${this._vent()}${f.al.length ? f.note : ''}`; }
   _kpiName(x) {
     if (x.title) return x.title;
     if (x.k === 'entity') { const st = x.id && this._hass.states[x.id]; return st ? (st.attributes.friendly_name || x.id) : 'Eigene Kennzahl'; }
@@ -3069,6 +3067,7 @@ _more() {
       <div class="lkl">Kartenstil</div>${this._lkSeg('cards', [['', 'Passend zum Thema'], ['flat', 'Flach'], ['soft', 'Weich'], ['glass', 'Glas']], L.cards)}
       <div class="lkl">Abstand</div>${this._lkSeg('gap', [['', 'Standard'], ['s', 'Eng'], ['m', 'Normal'], ['l', 'Weit']], L.gap)}
       <div class="lkl">Schrift</div>${this._lkSeg('font', [['', 'Standard'], ['round', 'Rund'], ['serif', 'Serif']], L.font)}
+      <h4>Weitere Einstellungen</h4><div class="lkc"><button class="pill" data-act="fx"><ha-icon icon="mdi:weather-night"></ha-icon>Effekte</button><button class="pill" data-act="door"><ha-icon icon="mdi:bell-ring"></ha-icon>Klingel</button><button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips</button><button class="pill" data-act="src"><ha-icon icon="mdi:link-variant"></ha-icon>Quellen</button><button class="pill" data-act="hc"><ha-icon icon="mdi:cctv"></ha-icon>Kameras</button><button class="pill" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>Meldungen</button></div>
       <h4>Blöcke der Kachel-Startseite</h4>${blocks}<div class="hint" style="margin-top:8px">Pfeile verschieben, die Breite wird in zwölf Spalten gerechnet (¼, ⅓, ½, ⅔, voll), das Zahnrad öffnet die Einstellungen des Blocks. Direkt auf der Startseite geht es auch im Bearbeiten-Modus: Blöcke ziehen, Breite, Zahnrad und Auge.</div>
       <div class="row" style="border:0;margin-top:10px"><button data-act="lkreset">Zurücksetzen</button><button class="sel" data-act="close">Fertig</button></div>`;
   }
@@ -3076,7 +3075,8 @@ _more() {
     const id = this._lkb; const L = this._set.look; const s = this._set; const d = BLOCK_DEF.find((x) => x[0] === id); if (!d) return '';
     let c = '';
     if (id === 'head') c = `${this._lkInp('title', 'Titel', 'Zuhause')}${this._lkInp('sub', 'Untertitel', 'Willkommen daheim ♡')}<div class="row"><div class="t"><b>Datum und Uhrzeit</b></div>${this._lkTg('showClock')}</div><div class="row"><div class="t"><b>Wetter</b></div>${this._lkTg('showWeather')}</div>`;
-    else if (id === 'alerts') c = `<div class="hint">Dieser Block erscheint nur, wenn es etwas zu melden gibt oder Chips angezeigt werden. Chips für Lichter und Außentemperatur entfallen, wenn Kennzahl oder Kopfzeile sie schon zeigen. „Alles in Ordnung“ zeigt der Hausstatus.</div><div class="lkc"><button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips wählen</button><button class="pill" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>Meldungen</button></div>`;
+    else if (id === 'chips') c = `<div class="hint">Kleine Schnellinfos (Außentemperatur, Fahrzeiten, Pollen …). Der Block lässt sich frei platzieren und verschwindet, wenn keine Chips da sind. Chips für Lichter und Außentemperatur entfallen, wenn Kennzahl oder Kopfzeile sie schon zeigen.</div><div class="lkc"><button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips wählen</button><button class="pill" data-act="src"><ha-icon icon="mdi:link-variant"></ha-icon>Quellen</button></div>`;
+    else if (id === 'alerts') c = `<div class="hint">Zeigt Lüftungshinweise und die aktuelle Meldung, nur wenn es etwas zu melden gibt. „Alles in Ordnung“ zeigt der Hausstatus.</div><div class="lkc"><button class="pill" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>Meldungen</button></div>`;
     else if (id === 'kpis') {
       const rows = L.kpis.map((x, i) => { const src = ['heat', 'temp', 'hum', 'power', 'entity'].includes(x.k); const st = x.id && this._hass.states[x.id]; const sub = src ? (st ? (st.attributes.friendly_name || x.id) : (x.k === 'entity' ? 'Entität wählen' : 'Automatisch')) : '';
         return `<div class="row"><div class="t"><b>${esc(KPI_DEF[x.k][0])}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div><div class="lkb"><button data-act="kpimv" data-i="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Nach oben"><ha-icon icon="mdi:arrow-up"></ha-icon></button><button data-act="kpimv" data-i="${i}" data-d="1" ${i === L.kpis.length - 1 ? 'disabled' : ''} aria-label="Nach unten"><ha-icon icon="mdi:arrow-down"></ha-icon></button>${src ? `<button data-act="kpisrc" data-i="${i}">Quelle</button>` : ''}<button data-act="kpidel" data-i="${i}" aria-label="Entfernen"><ha-icon icon="mdi:close"></ha-icon></button></div></div><input class="lkin" data-i="${i}" placeholder="Eigener Name (optional)" value="${esc(x.title)}">`; }).join('');

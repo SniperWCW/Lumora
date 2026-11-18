@@ -724,7 +724,7 @@ test('Design: mergeLook ergänzt fehlende Blöcke und verwirft Ungültiges', () 
   assert.equal(d.blocks.map((b) => b.id).join(), L.BLOCK_DEF.map((b) => b[0]).join());
   assert.equal(d.layout, 'classic');
   assert.equal(d.blocks.find((b) => b.id === 'reg').on, true);
-  const m = L.mergeLook({ v: 2, blocks: [{ id: 'greeting', w: 6, on: true }, { id: 'unbekannt', w: 4 }, { id: 'head', w: 99, on: false }], kpis: ['temp', 'quatsch', { k: 'entity', id: 'sensor.x', title: 'X' }], roomMax: 99, evMax: 0 });
+  const m = L.mergeLook({ v: 3, blocks: [{ id: 'greeting', w: 6, on: true }, { id: 'unbekannt', w: 4 }, { id: 'head', w: 99, on: false }], kpis: ['temp', 'quatsch', { k: 'entity', id: 'sensor.x', title: 'X' }], roomMax: 99, evMax: 0 });
   assert.equal(JSON.stringify(m.blocks.slice(0, 2).map((b) => [b.id, b.w, b.on])), JSON.stringify([['greeting', 6, true], ['head', 12, false]]));
   assert.equal(m.blocks.length, L.BLOCK_DEF.length);
   assert.equal(JSON.stringify(m.kpis), JSON.stringify([{ k: 'temp', id: '', title: '' }, { k: 'entity', id: 'sensor.x', title: 'X' }]));
@@ -831,6 +831,8 @@ test('Kachel-Startseite: Bearbeiten zeigt Werkzeuge an jedem Block, auch an ausg
   assert.match(html, /data-s="lookb" data-id="head"/);
   assert.match(html, /class="b w12 ed hid"/);
   assert.match(html, /data-act="lkblk" data-id="kpis"/);
+  assert.ok(!html.includes('data-act="fx"') && !html.includes('data-act="door"'), 'Effekte und Klingel liegen im Design-Dialog');
+  assert.match(c._lookSheet(), /data-act="fx"[\s\S]*data-act="door"/);
   c._edit = false;
   assert.ok(!c._home().includes('data-act="blkw"'));
 });
