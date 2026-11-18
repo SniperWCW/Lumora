@@ -70,8 +70,8 @@ const mergeLook = (v) => {
   o.evMax = Math.max(1, Math.min(8, parseInt(v.evMax, 10) || LOOK_DEF.evMax));
   const out = [];
   ((v.v || 0) >= LOOK_V && Array.isArray(v.blocks) ? v.blocks : []).forEach((b) => {
-    const d = BLOCK_DEF.find((x) => x[0] === (b && b.id));
-    if (d && !out.some((x) => x.id === d[0])) out.push({ id: d[0], w: BLOCK_W.some((x) => x[0] === b.w) ? b.w : d[2], on: b.on !== false });
+    const id = b && b.id; const d = BLOCK_DEF.find((x) => x[0] === id); const card = typeof id === 'string' && /^c:.{1,120}$/.test(id);
+    if ((d || card) && !out.some((x) => x.id === id)) out.push({ id, w: BLOCK_W.some((x) => x[0] === b.w) ? b.w : (d ? d[2] : 6), on: b.on !== false });
   });
   BLOCK_DEF.forEach((d) => { if (!out.some((x) => x.id === d[0])) out.push({ id: d[0], w: d[2], on: !!d[3] }); });
   o.blocks = out;
@@ -1254,7 +1254,7 @@ class LumoraCard extends HTMLElement {
     if (first) this._load();
     if (this._loaded) this._notifyAlerts();
     if (this._loaded) this._doorCheck();
-    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'emb', 'dv', 'dvadd', 'dvmain', 'dvpick', 'dbpick', 'look', 'lkblk', 'lkpick'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
+    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'emb', 'dv', 'dvadd', 'dvmain', 'dvpick', 'dbpick', 'look', 'lkblk', 'lkpick', 'lkcards'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
     if (this._down && this._edit) { this._pend = true; return; }
     if (this._plFocus()) return;
     this._fxUpdate();
@@ -1739,7 +1739,7 @@ class LumoraCard extends HTMLElement {
     const nav = [['home', 'mdi:home-outline', 'Zuhause'], ['rooms', 'mdi:view-grid-outline', 'Räume'], ['cams', 'mdi:cctv', 'Kameras'], ['more', 'mdi:view-dashboard-outline', 'Mehr']]
       .map(([v, i, l]) => `<button class="${this._view === v ? 'sel' : ''}" data-act="nav" data-v="${v}"><ha-icon icon="${i}"></ha-icon>${l}</button>`).join('');
     const scroll = this.shadowRoot.querySelector('.body'); const top = scroll ? scroll.scrollTop : 0;
-    const fsh = (this._sheet === 'fp' || this._sheet === 'look' || this._sheet === 'lkblk') && !this._fpReset ? this.shadowRoot.querySelector('.sheet') : null; const ftop = fsh ? fsh.scrollTop : 0; this._fpReset = false;
+    const fsh = (this._sheet === 'fp' || this._sheet === 'look' || this._sheet === 'lkblk' || this._sheet === 'lkcards') && !this._fpReset ? this.shadowRoot.querySelector('.sheet') : null; const ftop = fsh ? fsh.scrollTop : 0; this._fpReset = false;
     const keep = {}; const qa = this.shadowRoot.querySelectorAll;
     const pk = {}; let fk = null;
     if (qa) {
@@ -1829,8 +1829,9 @@ class LumoraCard extends HTMLElement {
     });
     if (!isTiles || this._edit) cards.push(`<div class="card add" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</div>`);
     const en = this._energy();
-    const regItems = this._regItems('home');
-    if (en) regItems.push({ id: 'energyhome', html: `<div class="enw">${en}</div>`, size: this._set.size.energyhome || 'f', def: { fixed: true } });
+    const placed = new Set(isTiles ? Lk.blocks.filter((b) => b.id.startsWith('c:')).map((b) => b.id.slice(2)) : []);
+    const regItems = this._regItems('home').filter((x) => !placed.has(x.id));
+    if (en && !placed.has('energyhome')) regItems.push({ id: 'energyhome', html: `<div class="enw">${en}</div>`, size: this._set.size.energyhome || 'f', def: { fixed: true } });
     const regCells = this._ord('homereg', regItems, (x) => x.id).map((x) => this._cell(x, 'homereg')).filter(Boolean).join('');
     const dsg = '<button class="pill" style="padding:5px 10px;font-size:12px" data-act="look"><ha-icon icon="mdi:palette-outline"></ha-icon>Design</button>';
     if (this._set.look.layout === 'tiles') return this._homeTiles({ D, al, persons, home, wx, temp, hum, me, nm, greet, lights, apill, note, pills, regCells, nCards: cards.length, cardsHtml: `<div class="grid">${cards.join('')}</div>` });
@@ -1847,15 +1848,48 @@ class LumoraCard extends HTMLElement {
   _homeTiles(f) {
     const L = this._set.look; const ed = this._edit;
     const R = { head: () => this._bHead(f), chips: () => this._bChips(f), alerts: () => this._bAlerts(f), kpis: () => this._bKpis(f), rooms: () => this._bRooms(f), termine: () => this._bTermine(), status: () => this._bStatus(f), greeting: () => this._bGreeting(f), reg: () => (f.regCells ? `<div class="grid reg">${f.regCells}</div>` : ''), active: () => (f.nCards ? `<h3>Aktiv jetzt</h3>${f.cardsHtml}` : ''), cams: () => this._homeCams() };
+    const cat = this._cardCat(); const byId = {}; cat.forEach((x) => { byId[x.id] = x; }); const names = this._cardNames(cat);
     const out = this._ord('lookb', L.blocks, (b) => b.id).map((b) => {
-      if (!R[b.id] || (!b.on && !ed)) return '';
-      let html = ''; try { html = R[b.id](); } catch (_) { html = ''; }
+      const isC = b.id.startsWith('c:'); const it = isC ? byId[b.id.slice(2)] : null;
+      if ((!isC && !R[b.id]) || (!b.on && !ed)) return '';
+      let html = ''; try { html = isC ? (it ? it.html : '') : R[b.id](); } catch (_) { html = ''; }
       if (!ed) return html ? `<div class="b w${b.w}">${html}</div>` : '';
-      const nm = BLOCK_DEF.find((d) => d[0] === b.id)[1]; const wl = (BLOCK_W.find((x) => x[0] === b.w) || [0, 'Voll'])[1];
-      const tools = `<span class="tools"><span class="mini t" data-act="blkw" data-id="${b.id}">${wl}</span><span class="mini" data-act="lkblk" data-id="${b.id}"><ha-icon icon="mdi:cog-outline"></ha-icon></span><span class="mini" data-act="blkon" data-id="${b.id}"><ha-icon icon="${b.on ? 'mdi:eye-off' : 'mdi:eye'}"></ha-icon></span></span>`;
-      return `<div class="b w${b.w} ed ${b.on ? '' : 'hid'}"><span class="bn">${esc(nm)}</span>${tools}${html || '<div class="tl"><div class="ev none">Gerade nichts anzuzeigen</div></div>'}<i class="dg" data-s="lookb" data-id="${b.id}" style="display:none"></i></div>`;
+      const nm = isC ? (it ? names[it.id] : 'Karte nicht verfügbar') : BLOCK_DEF.find((d) => d[0] === b.id)[1]; const wl = (BLOCK_W.find((x) => x[0] === b.w) || [0, 'Voll'])[1];
+      const tools = `<span class="tools"><span class="mini t" data-act="blkw" data-id="${esc(b.id)}">${wl}</span><span class="mini" data-act="lkblk" data-id="${esc(b.id)}"><ha-icon icon="mdi:cog-outline"></ha-icon></span><span class="mini" data-act="blkon" data-id="${esc(b.id)}"><ha-icon icon="${b.on ? 'mdi:eye-off' : 'mdi:eye'}"></ha-icon></span>${isC ? `<span class="mini" data-act="lkcdel" data-id="${esc(b.id)}"><ha-icon icon="mdi:close"></ha-icon></span>` : ''}</span>`;
+      return `<div class="b w${b.w} ed ${b.on ? '' : 'hid'}"><span class="bn">${esc(nm)}</span>${tools}${html || '<div class="tl"><div class="ev none">Gerade nichts anzuzeigen</div></div>'}<i class="dg" data-s="lookb" data-id="${esc(b.id)}" style="display:none"></i></div>`;
     }).join('');
-    return `${ed ? this._hint('Bearbeiten: Blöcke gedrückt halten und ziehen zum Verschieben. Am Block: Breite, Zahnrad für die Einstellungen des Blocks, Auge zum Ein- oder Ausblenden. Karten in „Karten“ und „Aktiv jetzt“ haben eigene Symbole.') : ''}<div class="bl">${out || '<div class="b"><div class="tl">Alle Blöcke sind ausgeblendet. Über „Design“ lassen sie sich wieder einschalten.</div></div>'}</div>`;
+    const add = ed ? '<div class="b w12"><button class="pill" data-act="lkcards"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</button></div>' : '';
+    return `${ed ? this._hint('Bearbeiten: Blöcke gedrückt halten und ziehen zum Verschieben. Am Block: Breite, Zahnrad für die Einstellungen, Auge zum Ein- oder Ausblenden, Kreuz entfernt eine Karte aus dem Layout. Unten lassen sich weitere Karten hinzufügen.') : ''}<div class="bl">${out || '<div class="b"><div class="tl">Alle Blöcke sind ausgeblendet. Über „Design“ lassen sie sich wieder einschalten.</div></div>'}${add}</div>`;
+  }
+  /* Karten-Katalog: alle Register-Karten plus Energie; jede lässt sich als eigener Block ins Layout setzen */
+  _cardCat() {
+    const out = this._allReg().filter((x) => !x.def.fixed); const en = this._energy();
+    if (en) out.unshift({ id: 'energyhome', html: `<div class="enw">${en}</div>`, size: this._set.size.energyhome || 'f', name: 'Energie', def: { id: 'energyhome', label: 'Energie', icon: 'mdi:lightning-bolt', fixed: true } });
+    return out;
+  }
+  _cardNames(cat) {
+    const cnt = {}; cat.forEach((x) => { cnt[x.def.id] = (cnt[x.def.id] || 0) + 1; }); const seen = {}; const res = {};
+    cat.forEach((x) => { seen[x.def.id] = (seen[x.def.id] || 0) + 1; res[x.id] = x.name || (cnt[x.def.id] > 1 ? `${x.def.label} ${seen[x.def.id]}` : x.def.label); });
+    return res;
+  }
+  _lkAddCard(id) {
+    const L = this._set.look; if (L.blocks.some((b) => b.id === `c:${id}`)) return;
+    const it = this._cardCat().find((x) => x.id === id); const w = { s: 4, w: 6, f: 12 }[it ? it.size : 'w'] || 6;
+    L.blocks.push({ id: `c:${id}`, w, on: true });
+  }
+  _cardsSheet() {
+    const L = this._set.look; const have = new Set(L.blocks.filter((b) => b.id.startsWith('c:')).map((b) => b.id.slice(2)));
+    const cat = this._cardCat(); const names = this._cardNames(cat);
+    const rows = cat.map((x) => { const on = have.has(x.id); return `<div class="row"><ha-icon icon="${x.def.icon}"></ha-icon><div class="t"><b>${esc(names[x.id])}</b><span>${esc(x.def.label)}</span></div><button class="${on ? 'sel' : ''}" data-act="${on ? 'lkcdel' : 'lkcadd'}" data-id="${esc(on ? `c:${x.id}` : x.id)}">${on ? 'Im Layout' : 'Hinzufügen'}</button></div>`; }).join('');
+    return `<div class="lkc" style="margin-bottom:6px"><button class="pill" data-act="look"><ha-icon icon="mdi:chevron-left"></ha-icon>Design</button></div><h2>Karte hinzufügen</h2>
+      <h4>Neu anlegen</h4>
+      <div class="row"><div class="t"><b>Gerätekarte</b><span>z. B. Heizung (Smartdome), Staubsauger, Pool</span></div><button data-act="adddv">Wählen</button></div>
+      <div class="row"><div class="t"><b>Fremdkarte einbetten</b><span>Beliebige Karte (HACS, Mushroom, ApexCharts …) per YAML</span></div><button data-act="addemb">Einfügen</button></div>
+      <div class="row"><div class="t"><b>Eigene Karte</b><span>Wert, Verlauf oder Schalter einer Entität</span></div><button data-act="addcustroom">Wählen</button></div>
+      <div class="row"><div class="t"><b>Entität anheften</b><span>Erscheint unter „Aktiv jetzt“</span></div><button data-act="add">Wählen</button></div>
+      <h4>Vorhandene Karten</h4>${rows || '<div class="hint">Keine Karten verfügbar.</div>'}
+      <div class="hint" style="margin-top:8px">Jede hinzugefügte Karte ist ein eigener Block. Sie lässt sich überall zwischen die anderen Blöcke ziehen und in der Breite ändern.</div>
+      <div class="row" style="border:0"><span></span><button class="sel" data-act="close">Fertig</button></div>`;
   }
   _bHead(f) {
     const L = this._set.look; const h = this._hass; const lang = (h.locale && h.locale.language) || 'de'; const now = new Date();
@@ -3027,6 +3061,8 @@ _more() {
       c = this._lookSheet();
     } else if (this._sheet === 'lkblk') {
       c = this._blkSheet();
+    } else if (this._sheet === 'lkcards') {
+      c = this._cardsSheet();
     } else if (this._sheet === 'lkpick') {
       c = `<h2>Quelle wählen</h2><input class="srch" placeholder="Suchen …" value="${esc(this._q)}"><div class="list"></div>`;
     } else if (this._sheet === 'heat') {
@@ -3055,8 +3091,9 @@ _more() {
   _lookSheet() {
     const L = this._set.look;
     const col = (k, def, lbl) => `<div class="row"><div class="t"><b>${lbl}</b></div><div class="lkc"><input type="color" class="lkin" data-k="${k}" value="${/^#[0-9a-f]{6}$/i.test(L[k]) ? L[k] : def}"><button data-act="lkclr" data-k="${k}">Standard</button></div></div>`;
-    const blocks = this._ord('lookb', L.blocks, (b) => b.id).map((b, i, a) => { const d = BLOCK_DEF.find((x) => x[0] === b.id); const wl = (BLOCK_W.find((x) => x[0] === b.w) || [0, 'Voll'])[1];
-      return `<div class="row"><div class="t"><b>${d[1]}</b></div><div class="lkb"><button data-act="mv" data-s="lookb" data-id="${b.id}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Nach oben"><ha-icon icon="mdi:arrow-up"></ha-icon></button><button data-act="mv" data-s="lookb" data-id="${b.id}" data-d="1" ${i === a.length - 1 ? 'disabled' : ''} aria-label="Nach unten"><ha-icon icon="mdi:arrow-down"></ha-icon></button><button data-act="blkw" data-id="${b.id}" aria-label="Breite">${wl}</button><button data-act="lkblk" data-id="${b.id}" aria-label="Einstellungen"><ha-icon icon="mdi:cog-outline"></ha-icon></button><button class="${b.on ? 'sel' : ''}" data-act="blkon" data-id="${b.id}">${b.on ? 'An' : 'Aus'}</button></div></div>`; }).join('');
+    const cat = this._cardCat(); const cnames = this._cardNames(cat);
+    const blocks = this._ord('lookb', L.blocks, (b) => b.id).map((b, i, a) => { const isC = b.id.startsWith('c:'); const d = [b.id, isC ? (cnames[b.id.slice(2)] || 'Karte nicht verfügbar') : (BLOCK_DEF.find((x) => x[0] === b.id) || [0, b.id])[1]]; const wl = (BLOCK_W.find((x) => x[0] === b.w) || [0, 'Voll'])[1];
+      return `<div class="row"><div class="t"><b>${d[1]}</b></div><div class="lkb"><button data-act="mv" data-s="lookb" data-id="${esc(b.id)}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Nach oben"><ha-icon icon="mdi:arrow-up"></ha-icon></button><button data-act="mv" data-s="lookb" data-id="${esc(b.id)}" data-d="1" ${i === a.length - 1 ? 'disabled' : ''} aria-label="Nach unten"><ha-icon icon="mdi:arrow-down"></ha-icon></button><button data-act="blkw" data-id="${esc(b.id)}" aria-label="Breite">${wl}</button><button data-act="lkblk" data-id="${esc(b.id)}" aria-label="Einstellungen"><ha-icon icon="mdi:cog-outline"></ha-icon></button><button class="${b.on ? 'sel' : ''}" data-act="blkon" data-id="${esc(b.id)}">${b.on ? 'An' : 'Aus'}</button>${isC ? `<button data-act="lkcdel" data-id="${esc(b.id)}" aria-label="Entfernen"><ha-icon icon="mdi:close"></ha-icon></button>` : ''}</div></div>`; }).join('');
     return `<h2>Design</h2>
       <h4>Vorlagen</h4><div class="lkc">${[['sand', 'Sand'], ['forest', 'Wald'], ['sage', 'Salbei (Kacheln)']].map(([k, l]) => `<button class="pill" data-act="lkpre" data-k="${k}">${l}</button>`).join('')}</div>
       <div class="hint" style="margin-top:8px">Eine Vorlage setzt Startseite, Farbthema, Rundung, Kartenstil und Schrift auf einmal. Danach lässt sich alles einzeln anpassen.</div>
@@ -3068,11 +3105,20 @@ _more() {
       <div class="lkl">Abstand</div>${this._lkSeg('gap', [['', 'Standard'], ['s', 'Eng'], ['m', 'Normal'], ['l', 'Weit']], L.gap)}
       <div class="lkl">Schrift</div>${this._lkSeg('font', [['', 'Standard'], ['round', 'Rund'], ['serif', 'Serif']], L.font)}
       <h4>Weitere Einstellungen</h4><div class="lkc"><button class="pill" data-act="fx"><ha-icon icon="mdi:weather-night"></ha-icon>Effekte</button><button class="pill" data-act="door"><ha-icon icon="mdi:bell-ring"></ha-icon>Klingel</button><button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips</button><button class="pill" data-act="src"><ha-icon icon="mdi:link-variant"></ha-icon>Quellen</button><button class="pill" data-act="hc"><ha-icon icon="mdi:cctv"></ha-icon>Kameras</button><button class="pill" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>Meldungen</button></div>
-      <h4>Blöcke der Kachel-Startseite</h4>${blocks}<div class="hint" style="margin-top:8px">Pfeile verschieben, die Breite wird in zwölf Spalten gerechnet (¼, ⅓, ½, ⅔, voll), das Zahnrad öffnet die Einstellungen des Blocks. Direkt auf der Startseite geht es auch im Bearbeiten-Modus: Blöcke ziehen, Breite, Zahnrad und Auge.</div>
+      <h4>Blöcke der Kachel-Startseite</h4>${blocks}<div class="lkc" style="margin-top:8px"><button class="pill" data-act="lkcards"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</button></div><div class="hint" style="margin-top:8px">Pfeile verschieben, die Breite wird in zwölf Spalten gerechnet (¼, ⅓, ½, ⅔, voll), das Zahnrad öffnet die Einstellungen des Blocks. Direkt auf der Startseite geht es auch im Bearbeiten-Modus: Blöcke ziehen, Breite, Zahnrad und Auge.</div>
       <div class="row" style="border:0;margin-top:10px"><button data-act="lkreset">Zurücksetzen</button><button class="sel" data-act="close">Fertig</button></div>`;
   }
   _blkSheet() {
-    const id = this._lkb; const L = this._set.look; const s = this._set; const d = BLOCK_DEF.find((x) => x[0] === id); if (!d) return '';
+    const id = this._lkb; const L = this._set.look; const s = this._set;
+    if (String(id).startsWith('c:')) {
+      const cat = this._cardCat(); const it = cat.find((x) => x.id === id.slice(2)); const nm = it ? this._cardNames(cat)[it.id] : 'Karte nicht verfügbar';
+      return `<div class="lkc" style="margin-bottom:6px"><button class="pill" data-act="look"><ha-icon icon="mdi:chevron-left"></ha-icon>Design</button></div><h2>${esc(nm)}</h2>
+        ${it ? '' : '<div class="hint">Diese Karte gibt es gerade nicht (gelöscht oder keine passenden Daten). Sie lässt sich aus dem Layout entfernen.</div>'}
+        <div class="lkc">${it && it.cfg ? `<button class="pill" data-act="cc" data-id="${esc(it.id)}"><ha-icon icon="mdi:cog-outline"></ha-icon>Karte konfigurieren</button>` : ''}${it && it.id !== 'energyhome' ? `<button class="pill" data-act="placeopen" data-id="${esc(it.id)}"><ha-icon icon="mdi:folder-move-outline"></ha-icon>Ort ändern</button>` : ''}<button class="pill" data-act="lkcdel" data-id="${esc(id)}"><ha-icon icon="mdi:close"></ha-icon>Aus dem Layout entfernen</button></div>
+        <div class="hint" style="margin-top:8px">Breite und Ein/Aus stehen im Design-Dialog oder direkt am Block im Bearbeiten-Modus. Die Karte bleibt erhalten, wenn du sie nur aus dem Layout entfernst.</div>
+        <div class="row" style="border:0;margin-top:10px"><span></span><button class="sel" data-act="close">Fertig</button></div>`;
+    }
+    const d = BLOCK_DEF.find((x) => x[0] === id); if (!d) return '';
     let c = '';
     if (id === 'head') c = `${this._lkInp('title', 'Titel', 'Zuhause')}${this._lkInp('sub', 'Untertitel', 'Willkommen daheim ♡')}<div class="row"><div class="t"><b>Datum und Uhrzeit</b></div>${this._lkTg('showClock')}</div><div class="row"><div class="t"><b>Wetter</b></div>${this._lkTg('showWeather')}</div>`;
     else if (id === 'chips') c = `<div class="hint">Kleine Schnellinfos (Außentemperatur, Fahrzeiten, Pollen …). Der Block lässt sich frei platzieren und verschwindet, wenn keine Chips da sind. Chips für Lichter und Außentemperatur entfallen, wenn Kennzahl oder Kopfzeile sie schon zeigen.</div><div class="lkc"><button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips wählen</button><button class="pill" data-act="src"><ha-icon icon="mdi:link-variant"></ha-icon>Quellen</button></div>`;
@@ -3158,7 +3204,7 @@ _more() {
   }
 
   /* ---------- Gerätekarten: Vorlagen mit automatischer Zuordnung ---------- */
-  _placeNew(id) { if (this._view === 'more') this._set.place[id] = 'more'; else if (this._view === 'rooms' && this._area) this._set.place[id] = `area:${this._area}`; }
+  _placeNew(id) { if (this._view === 'home' && this._set.look.layout === 'tiles') this._lkAddCard(id); else if (this._view === 'more') this._set.place[id] = 'more'; else if (this._view === 'rooms' && this._area) this._set.place[id] = `area:${this._area}`; }
   _dvAll() { return this._set.devices.filter((x) => DEVTPL[x.type]); }
   _dvMains(tp) {
     const sp = tp.main; const reg0 = this._hass.entities || {}; const pls = [].concat(sp.platform || []);
@@ -4142,6 +4188,9 @@ _more() {
       case 'lkclr': { const k = t.dataset.k; if (['accent', 'bg1', 'bg2'].includes(k)) { s.look[k] = ''; this._save(); } break; }
       case 'lkn': { const k = t.dataset.k; const mx = k === 'roomMax' ? 12 : k === 'evMax' ? 8 : 0; if (mx) { s.look[k] = Math.max(1, Math.min(mx, s.look[k] + Number(t.dataset.d))); this._save(); } break; }
       case 'lkblk': this._sheet = 'lkblk'; this._lkb = id; break;
+      case 'lkcards': this._sheet = 'lkcards'; break;
+      case 'lkcadd': this._lkAddCard(id); this._save(); break;
+      case 'lkcdel': s.look.blocks = s.look.blocks.filter((b) => b.id !== id); if (s.order.lookb) s.order.lookb = s.order.lookb.filter((x) => x !== id); this._save(); if (this._sheet === 'lkblk') this._sheet = 'look'; break;
       case 'heatall': this._sheet = 'heat'; break;
       case 'kpiadd': { const k = t.dataset.k; if (KPI_DEF[k] && s.look.kpis.length < 8) { s.look.kpis.push({ k, id: '', title: '' }); this._save(); if (k === 'entity') { this._lkp = { i: s.look.kpis.length - 1 }; this._sheet = 'lkpick'; this._q = ''; } } break; }
       case 'kpidel': s.look.kpis.splice(Number(t.dataset.i), 1); this._save(); break;

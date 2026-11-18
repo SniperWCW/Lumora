@@ -442,7 +442,7 @@ test('Familienplaner-Karte: ohne Integration keine Karte, Fehler lässt alte Dat
 
 test('Familienplaner-Detailansicht: Tag, Woche, Zuordnung nur für Admins', async () => {
   const d = FP.day(new Date());
-  const ev = [{ id: 'e1', summary: 'Sport <b>', location: 'Halle', all_day: false, start: iso(d, 18), end: iso(d, 19), persons: ['mama'] }, { id: 'e2', summary: 'Elternabend', all_day: false, start: iso(d, 20), end: iso(d, 21), persons: [] }];
+  const ev = [{ id: 'e1', summary: 'Sport <b>', location: 'Halle', all_day: false, start: iso(d, 18), end: iso(d, 19), persons: ['mama'] }, { id: 'e2', summary: 'Elternabend', all_day: false, start: iso(d, 23, 30), end: iso(d, 23, 59), persons: [] }];
   const c = fpCard(ev, { admin: true });
   c._fpClick({ dataset: {} }, 'fp-open'); assert.equal(c._sheet, 'fp');
   c._fpSheet(); await tick();
@@ -841,4 +841,40 @@ test('Design: Block-Dialoge lassen sich erzeugen', () => {
   const c = tilesCard();
   for (const d of L.BLOCK_DEF) { c._lkb = d[0]; assert.ok(c._blkSheet().includes(d[1]), d[0]); }
   assert.match(c._lookSheet(), /data-s="lookb"/);
+});
+
+test('Karten als eigene Blöcke: hinzufügen, platzieren, keine Doppelung, entfernen', () => {
+  const c = tilesCard({ 'sensor.pv': { entity_id: 'sensor.pv', state: '1500', attributes: { friendly_name: 'PV Leistung', device_class: 'power', unit_of_measurement: 'W' } }, 'sensor.last': { entity_id: 'sensor.last', state: '700', attributes: { friendly_name: 'Hausverbrauch', device_class: 'power', unit_of_measurement: 'W' } } });
+  c._set.custom.push({ id: 'cu1', entity: 'sensor.x', title: 'Mein Wert', kind: 'value' });
+  const cat = c._cardCat(); const it = cat.find((x) => x.id === 'cu1'); assert.ok(it, 'eigene Karte im Katalog');
+  /* vor dem Hinzufügen: in der Sammel-Gruppe */
+  assert.match(c._home(), /class="grid reg"/);
+  c._lkAddCard('cu1'); c._lkAddCard('cu1');
+  assert.equal(c._set.look.blocks.filter((b) => b.id === 'c:cu1').length, 1, 'nur einmal');
+  c._set.order.lookb = ['c:cu1', 'head'];
+  const html = c._home();
+  assert.ok(html.indexOf('Mein Wert') < html.indexOf('class="hd2"'), 'Karte steht per Ordnung vor der Kopfzeile');
+  assert.equal((html.match(/Mein Wert/g) || []).length, 1, 'nicht doppelt in der Sammel-Gruppe');
+  /* Bearbeiten: Kreuz zum Entfernen, Hinzufügen-Knopf */
+  c._edit = true;
+  const ed = c._home();
+  assert.match(ed, /data-act="lkcdel" data-id="c:cu1"/);
+  assert.match(ed, /data-act="lkcards"/);
+  /* Dialoge */
+  assert.match(c._cardsSheet(), /Im Layout/);
+  assert.match(c._cardsSheet(), /data-act="adddv"[\s\S]*data-act="addemb"[\s\S]*data-act="addcustroom"/);
+  c._lkb = 'c:cu1'; assert.match(c._blkSheet(), /Aus dem Layout entfernen/);
+  assert.match(c._lookSheet(), /data-act="lkcdel" data-id="c:cu1"/);
+  /* Neue Karte aus der Startseite wird automatisch Block */
+  c._edit = false; c._view = 'home'; c._placeNew('em99');
+  assert.ok(c._set.look.blocks.some((b) => b.id === 'c:em99'));
+  /* Block mit fehlender Karte bleibt unsichtbar, im Bearbeiten-Modus mit Hinweis */
+  assert.ok(!c._home().includes('Karte nicht verfügbar'));
+  c._edit = true; assert.match(c._home(), /Karte nicht verfügbar/);
+});
+
+test('Design: mergeLook behält Karten-Blöcke', () => {
+  const m = L.mergeLook({ v: 3, blocks: [{ id: 'c:abc', w: 6, on: true }, { id: 'x:foo', w: 4 }] });
+  assert.equal(m.blocks[0].id, 'c:abc');
+  assert.ok(!m.blocks.some((b) => b.id === 'x:foo'));
 });

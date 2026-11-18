@@ -97,6 +97,8 @@ color_to: "#d6c5a8"
 - **Farben und Stil:** Farbthema (auch unabhängig von der Karten-YAML), Akzentfarbe, Hintergrundverlauf, Rundung, Kartenstil (flach, weich, Glas), Abstand und Schrift.
 - **Texte:** Titel, Untertitel, Grußkachel (mit `{name}` und `{gruss}`, optional mit Hintergrundbild), Text des Hausstatus.
 
+**Karten hinzufügen:** Im Bearbeiten-Modus der Kachel-Startseite (oder im Design-Dialog) fügt „Karte hinzufügen“ weitere Karten als eigene Blöcke hinzu: vorhandene Karten (z. B. Energie/PV, Familienplaner, Gerätekarten) oder neu angelegte Geräte-, Fremd- und eigene Karten. Jede Karte lässt sich frei zwischen die anderen Blöcke ziehen, in der Breite ändern, aus- und einblenden oder wieder aus dem Layout entfernen. Neu angelegte Karten landen automatisch als Block.
+
 ## 3D-Drucker-Karte
 
 ### Anycubic Cloud & LAN (Nino6689/hass-anycubic)
