@@ -948,3 +948,16 @@ test('Gerätekarten: Packstation und Familienplaner, automatische Sammelkarten e
   c._set.devices = [];
   assert.equal(reg('packstation').length, 1);
 });
+
+test('Gerätekarten: Pakete zeigt Sendungen des gewählten Sensors, automatische Karte entfällt', () => {
+  assert.ok(L.DEVTPL.pkg);
+  const st = { entity_id: 'sensor.paketverfolgung', state: '2', attributes: { friendly_name: 'Paketverfolgung', today_count: 1, dhl: [{ tracking_id: '123', short_status: 'In Zustellung', progress: 4 }], amazon: [{ tracking_id: 'A1', custom_name: 'Kabel', status: 'Unterwegs' }] } };
+  const c = Object.create(L.card.prototype);
+  c._hass = { states: { [st.entity_id]: st, 'sensor.temperatur': { entity_id: 'sensor.temperatur', state: '20', attributes: {} } }, entities: {}, callWS: () => new Promise(() => {}) };
+  c._cfg = {}; c._dvP = null; c._dvR = null; c._set = { sources: {}, hidden: [], size: {}, place: {}, devices: [] };
+  assert.deepEqual([...c._dvMains(L.DEVTPL.pkg).map((x) => x.id)], ['sensor.paketverfolgung']);
+  const html = L.DEVTPL.pkg.render(c, { id: 'p1', type: 'pkg', main: st.entity_id, map: {}, title: '' }, {}, st);
+  assert.match(html, /DHL 123/); assert.match(html, /Kabel/); assert.match(html, /1 heute in Zustellung/);
+  c._set.devices = [{ id: 'p1', type: 'pkg', main: st.entity_id, map: {}, title: '' }];
+  assert.equal(c._allReg().filter((x) => x.def.id === 'pkg').length, 0);
+});

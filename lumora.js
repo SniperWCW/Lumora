@@ -2141,8 +2141,8 @@ class LumoraCard extends HTMLElement {
     const sub = [i.label, i.active && i.left !== null ? `noch ${this._fmtMin(i.left)}` : null, i.active ? i.program : null].filter(Boolean).join(' · ');
     return `<div class="ap ${i.active ? 'run' : ''}" data-act="info" data-id="${a.base}_zustand"><div class="h"><ha-icon icon="${a.icon}"></ha-icon><div><b>${esc(a.title)}</b><span>${esc(i.off ? 'Aus' : sub)}</span></div></div>${i.active && i.prog !== null ? `<div class="bar"><i style="width:${Math.round(i.prog)}%"></i></div>` : ''}</div>`;
   }
-  _pkgs() {
-    const st = this._xs('packages'); if (!st) return null;
+  _pkgs(st0) {
+    const st = st0 || this._xs('packages'); if (!st) return null;
     const arr = (v) => (Array.isArray(v) ? v : []);
     const keep = (x) => this._pkgKeep(x);
     const dhl = arr(st.attributes.dhl).filter((x) => x && x.tracking_id && keep(x));
@@ -4221,6 +4221,7 @@ registerCard({ id: 'appliances', label: 'Haushaltsgeräte', icon: 'mdi:washing-m
 } });
 registerCard({ id: 'pkg', label: 'Pakete', icon: 'mdi:package-variant-closed', items: (c) => {
   const { items, add } = newItems();
+    if (c._dvAll().some((x) => x.type === 'pkg')) return items;
     const pk = c._pkgs(); if (pk) add('pkg', c._pkgPanel(pk), true);
   return items;
 } });
@@ -4783,6 +4784,16 @@ registerDevice({
     const first = c._dvAll().find((x) => x.type === 'family');
     if (first && first.id !== iv.id) return c._edit ? '<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="mdi:calendar-account"></ha-icon></div><div class="tt"><b>Familienplaner</b><span>Es wird nur eine Familienplaner-Karte gezeichnet. Diese hier bitte löschen.</span></div></div></div>' : '';
     return c._fpHtml();
+  },
+});
+/* Pakete: Sensor mit den Attributen dhl und amazon (z. B. Paketverfolgung). Mehrere Karten möglich, jede für ihren Sensor. Mit einer Gerätekarte entfällt die automatische Paket-Karte. */
+registerDevice({
+  type: 'pkg', label: 'Pakete', icon: 'mdi:package-variant-closed', desc: 'Offene und zuletzt zugestellte Sendungen (DHL, Amazon) mit Status und Fortschritt', size: 'w',
+  main: { dom: 'sensor', re: /paket|package|parcel/, prefer: /paket|package|parcel/ },
+  fields: {},
+  render: (c, iv, F, st) => {
+    const pk = c._pkgs(st);
+    return pk ? c._pkgPanel(pk) : (c._edit ? '<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="mdi:package-variant-closed"></ha-icon></div><div class="tt"><b>Pakete</b><span>Keine Sendungsdaten an diesem Sensor</span></div></div></div>' : '');
   },
 });
 registerCard({ id: 'dev', label: 'Gerätekarten', icon: 'mdi:view-grid-plus-outline', home: true, size: 'w', items: (c) => c._dvAll().map((iv) => {
