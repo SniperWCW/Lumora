@@ -37,14 +37,15 @@ const LOOK_DEF = {
   title: 'Zuhause', sub: 'Willkommen daheim ♡', greet: 'Schön, dass du da bist!', greetImg: '', statusOk: 'Alles in Ordnung', statusSub: '',
   showClock: true, showWeather: true, roomImg: true, roomMax: 4, rooms: [], kpis: ['lights', 'heat', 'temp'], cals: [], evMax: 3,
 };
+const LOOK_V = 2;
 /* id, Name, Standardbreite (von 12 Spalten), Standard an */
 const BLOCK_DEF = [
-  ['head', 'Kopfzeile', 12, 1], ['kpis', 'Kennzahlen', 12, 1], ['rooms', 'Räume', 12, 1], ['alerts', 'Meldungen und Chips', 12, 0],
+  ['head', 'Kopfzeile', 12, 1], ['alerts', 'Meldungen und Chips', 12, 1], ['kpis', 'Kennzahlen', 12, 1], ['rooms', 'Räume', 12, 1],
   ['termine', 'Termine', 4, 1], ['status', 'Hausstatus', 4, 1], ['greeting', 'Grußkachel', 4, 1],
-  ['reg', 'Karten (Energie, Familie …)', 12, 0], ['active', 'Aktiv jetzt', 12, 0], ['cams', 'Kameras', 12, 0],
+  ['reg', 'Karten (Energie, Familie …)', 12, 1], ['active', 'Aktiv jetzt', 12, 1], ['cams', 'Kameras', 12, 0],
 ];
 const BLOCK_W = [[3, '¼'], [4, '⅓'], [6, '½'], [8, '⅔'], [12, 'Voll']];
-const KPI_DEF = { lights: ['Beleuchtung', 'mdi:lightbulb-on-outline'], heat: ['Heizung', 'mdi:radiator'], temp: ['Raumtemperatur Ø', 'mdi:thermometer'], hum: ['Luftfeuchte Ø', 'mdi:water-percent'], power: ['Verbrauch', 'mdi:flash-outline'], open: ['Offene Fenster/Türen', 'mdi:window-open-variant'], persons: ['Zu Hause', 'mdi:account-multiple-outline'] };
+const KPI_DEF = { lights: ['Beleuchtung', 'mdi:lightbulb-on-outline'], heat: ['Heizung', 'mdi:radiator'], temp: ['Raumtemperatur Ø', 'mdi:thermometer'], hum: ['Luftfeuchte Ø', 'mdi:water-percent'], power: ['Verbrauch', 'mdi:flash-outline'], open: ['Offene Fenster/Türen', 'mdi:window-open-variant'], persons: ['Zu Hause', 'mdi:account-multiple-outline'], entity: ['Eigene Kennzahl', 'mdi:gauge'] };
 const LOOK_THEMES = [['', 'Aus Karte'], ['sand', 'Sand'], ['forest', 'Wald'], ['sage', 'Salbei'], ['auto', 'Auto']];
 const LOOK_RADIUS = { sm: '10px', md: '20px', lg: '30px' };
 const LOOK_GAP = { s: '6px', m: '10px', l: '16px' };
@@ -61,13 +62,14 @@ const LOOK_IN = ['accent', 'bg1', 'bg2', 'title', 'sub', 'greet', 'greetImg', 's
 const mergeLook = (v) => {
   v = v || {};
   const o = { ...LOOK_DEF, ...v };
-  o.kpis = Array.isArray(v.kpis) ? v.kpis.filter((k) => KPI_DEF[k]) : [...LOOK_DEF.kpis];
+  o.kpis = (Array.isArray(v.kpis) ? v.kpis : LOOK_DEF.kpis).map((x) => (typeof x === 'string' ? { k: x } : x)).filter((x) => x && KPI_DEF[x.k]).map((x) => ({ k: x.k, id: x.id || '', title: x.title || '' })).slice(0, 8);
+  o.v = LOOK_V;
   o.rooms = Array.isArray(v.rooms) ? [...v.rooms] : [];
   o.cals = Array.isArray(v.cals) ? [...v.cals] : [];
   o.roomMax = Math.max(1, Math.min(12, parseInt(v.roomMax, 10) || LOOK_DEF.roomMax));
   o.evMax = Math.max(1, Math.min(8, parseInt(v.evMax, 10) || LOOK_DEF.evMax));
   const out = [];
-  (Array.isArray(v.blocks) ? v.blocks : []).forEach((b) => {
+  ((v.v || 0) >= LOOK_V && Array.isArray(v.blocks) ? v.blocks : []).forEach((b) => {
     const d = BLOCK_DEF.find((x) => x[0] === (b && b.id));
     if (d && !out.some((x) => x.id === d[0])) out.push({ id: d[0], w: BLOCK_W.some((x) => x[0] === b.w) ? b.w : d[2], on: b.on !== false });
   });
@@ -361,7 +363,9 @@ const embedConfig = (yaml) => {
 const merge = (v) => {
   v = v || {};
   const arr = (k) => [...(v[k] || DEF[k])];
-  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), embeds: JSON.parse(JSON.stringify(v.embeds || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify }, ptz: { ...DEF.ptz, ...v.ptz }, door: { ...DEF.door, ...v.door, bell: [...((v.door && v.door.bell) || [])], motion: [...((v.door && v.door.motion) || [])] }, look: mergeLook(v.look) };
+  const r = { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), embeds: JSON.parse(JSON.stringify(v.embeds || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify }, ptz: { ...DEF.ptz, ...v.ptz }, door: { ...DEF.door, ...v.door, bell: [...((v.door && v.door.bell) || [])], motion: [...((v.door && v.door.motion) || [])] }, look: mergeLook(v.look) };
+  if (((v.look && v.look.v) || 0) < LOOK_V) delete r.order.lookb;
+  return r;
 };
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -445,6 +449,12 @@ const CSS = `
  .kps{grid-template-columns:repeat(2,minmax(0,1fr))}.kp:last-child:nth-child(odd){grid-column:1/-1}.kp{padding:12px;gap:10px}.kp .ic{width:48px;height:48px}.kp .ic ha-icon{--mdc-icon-size:28px}.kp .go{display:none}
  .rms{grid-template-columns:repeat(2,minmax(0,1fr))}.rm{min-height:150px}.rm .tp{padding:10px 8px 0;font-size:14px;gap:6px}.rm .tp ha-icon{--mdc-icon-size:22px}.rm .bt{margin:0 6px 6px;padding:6px 6px 6px 10px;gap:8px;font-size:12.5px}.rm .bt .go{width:26px;height:26px}
 }
+.bl>.b{position:relative}
+.b.ed{outline:1.5px dashed var(--fg2);outline-offset:4px;border-radius:var(--r,20px);min-height:48px;padding-top:14px}.b.ed.hid{opacity:.5}
+.b .bn{position:absolute;top:-10px;left:14px;z-index:3;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;background:var(--selbg);color:var(--selfg);border-radius:99px;padding:2px 9px;pointer-events:none}
+.b>.tools{position:absolute;top:-13px;right:10px;display:flex;gap:4px;z-index:3}.b>.tools .mini{background:var(--selbg);color:var(--selfg)}
+.mini.t{width:auto;min-width:26px;padding:0 9px;font-size:12px;font-weight:600}
+.kp.entity{--kc:rgba(170,150,110,.32);--kf:#7a6a4a}
 .lkc{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.lkc input[type=color]{width:46px;height:36px;border:0;padding:0;border-radius:10px;background:none;cursor:pointer}
 .lkc .pill{padding:7px 12px;font-size:13px}.lkc .pill.sel{background:var(--selbg);color:var(--selfg)}
 .lkb{display:flex;align-items:center;gap:6px}.lkb button{min-width:34px}
@@ -1188,8 +1198,9 @@ class LumoraCard extends HTMLElement {
         const st = this.shadowRoot.querySelector('.embst'); if (st) st.textContent = r.err ? r.err : r.cfg ? `Karte: ${r.cfg.type}` : '';
         clearTimeout(this._ct); this._ct = setTimeout(() => this._save(), 600);
       } else if (e.target.classList.contains('lkin')) {
-        const k = e.target.dataset.k; if (!LOOK_IN.includes(k)) return;
-        this._set.look[k] = e.target.value; this._applyLook(); clearTimeout(this._ct); this._ct = setTimeout(() => this._save(), 500);
+        const k = e.target.dataset.k;
+        if (e.target.dataset.i !== undefined) { const x = this._set.look.kpis[Number(e.target.dataset.i)]; if (x) x.title = e.target.value; } else if (LOOK_IN.includes(k)) this._set.look[k] = e.target.value; else return;
+        this._applyLook(); clearTimeout(this._ct); this._ct = setTimeout(() => this._save(), 500);
       } else if (e.target.classList.contains('dvin')) {
         const iv = this._set.devices.find((x) => x.id === this._dvId); if (!iv) return;
         iv.title = e.target.value; clearTimeout(this._ct); this._ct = setTimeout(() => { this._save(); this._sig = ''; }, 600);
@@ -1243,7 +1254,7 @@ class LumoraCard extends HTMLElement {
     if (first) this._load();
     if (this._loaded) this._notifyAlerts();
     if (this._loaded) this._doorCheck();
-    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'emb', 'dv', 'dvadd', 'dvmain', 'dvpick', 'dbpick', 'look'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
+    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'emb', 'dv', 'dvadd', 'dvmain', 'dvpick', 'dbpick', 'look', 'lkblk', 'lkpick'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
     if (this._down && this._edit) { this._pend = true; return; }
     if (this._plFocus()) return;
     this._fxUpdate();
@@ -1728,7 +1739,7 @@ class LumoraCard extends HTMLElement {
     const nav = [['home', 'mdi:home-outline', 'Zuhause'], ['rooms', 'mdi:view-grid-outline', 'Räume'], ['cams', 'mdi:cctv', 'Kameras'], ['more', 'mdi:view-dashboard-outline', 'Mehr']]
       .map(([v, i, l]) => `<button class="${this._view === v ? 'sel' : ''}" data-act="nav" data-v="${v}"><ha-icon icon="${i}"></ha-icon>${l}</button>`).join('');
     const scroll = this.shadowRoot.querySelector('.body'); const top = scroll ? scroll.scrollTop : 0;
-    const fsh = (this._sheet === 'fp' || this._sheet === 'look') && !this._fpReset ? this.shadowRoot.querySelector('.sheet') : null; const ftop = fsh ? fsh.scrollTop : 0; this._fpReset = false;
+    const fsh = (this._sheet === 'fp' || this._sheet === 'look' || this._sheet === 'lkblk') && !this._fpReset ? this.shadowRoot.querySelector('.sheet') : null; const ftop = fsh ? fsh.scrollTop : 0; this._fpReset = false;
     const keep = {}; const qa = this.shadowRoot.querySelectorAll;
     const pk = {}; let fk = null;
     if (qa) {
@@ -1746,7 +1757,7 @@ class LumoraCard extends HTMLElement {
       Object.keys(pk).forEach((k) => { const i = this.shadowRoot.querySelector(`[data-pk="${k}"]`); if (i && !i.disabled) i.value = pk[k]; });
       if (fk) { const i = this.shadowRoot.querySelector(`[data-pk="${fk.k}"]`); if (i) { i.focus(); try { if (fk.s != null) i.setSelectionRange(fk.s, fk.e); } catch (_) { /* number-Felder */ } } }
     }
-    if (['add', 'srcpick', 'quick', 'dvmain', 'dvpick', 'dbpick'].includes(this._sheet)) this._fillList();
+    if (['add', 'srcpick', 'quick', 'dvmain', 'dvpick', 'dbpick', 'lkpick'].includes(this._sheet)) this._fillList();
   }
   _num(id) { const st = this._hass.states[id]; const v = st ? parseFloat(st.state) : NaN; return isNaN(v) ? null : v; }
   _w(v) { return Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')} kW` : `${Math.round(v)} W`; }
@@ -1793,15 +1804,16 @@ class LumoraCard extends HTMLElement {
       : `<div class="note" data-act="alerts"><ha-icon icon="mdi:check-circle-outline"></ha-icon><span class="note-t">Alles in Ordnung</span></div>`;
     const apill = alarm ? `<button class="pill ${alarm.state === 'triggered' ? 'bad' : ''}" data-act="info" data-id="${alarm.entity_id}"><ha-icon icon="mdi:shield-home"></ha-icon>${esc(AL[alarm.state] || alarm.state)}</button>` : '';
     const wpill = wx && typeof wx.attributes.temperature === 'number' ? `<button class="pill" data-act="info" data-id="${wx.entity_id}"><ha-icon icon="${WX[wx.state] || 'mdi:weather-cloudy'}"></ha-icon>${wx.attributes.temperature.toFixed(1)}° draußen</button>` : '';
+    const Lk = this._set.look; const isTiles = Lk.layout === 'tiles'; const kLights = isTiles && Lk.kpis.some((x) => x.k === 'lights');
     const pills = [
-      lights.length && this._chipOn('lights') ? `<button class="pill" data-act="lights"><ha-icon icon="mdi:lamp"></ha-icon>${lights.length} an</button>` : '',
-      this._chipOn('outdoor') ? wpill : '',
+      lights.length && !kLights && this._chipOn('lights') ? `<button class="pill" data-act="lights"><ha-icon icon="mdi:lamp"></ha-icon>${lights.length} an</button>` : '',
+      this._chipOn('outdoor') && !(isTiles && Lk.showWeather) ? wpill : '',
       this._infoPills(al),
-      al.length && this._chipOn('count') ? `<button class="pill ${al.some((a) => a.sev === 0) ? 'bad' : 'warn'}" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>${al.length} Meldung${al.length > 1 ? 'en' : ''}</button>` : '',
+      al.length && this._chipOn('count') && !isTiles ? `<button class="pill ${al.some((a) => a.sev === 0) ? 'bad' : 'warn'}" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>${al.length} Meldung${al.length > 1 ? 'en' : ''}</button>` : '',
       this._edit ? '<button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips</button><button class="pill" data-act="src"><ha-icon icon="mdi:link-variant"></ha-icon>Quellen</button><button class="pill" data-act="hc"><ha-icon icon="mdi:cctv"></ha-icon>Kameras</button><button class="pill" data-act="door"><ha-icon icon="mdi:bell-ring"></ha-icon>Klingel</button><button class="pill" data-act="fx"><ha-icon icon="mdi:weather-night"></ha-icon>Effekte</button>' : '',
     ].join('');
     const cards = [];
-    if (lights.length) {
+    if (lights.length && !kLights) {
       const names = [...new Set(lights.map((l) => this._aname(this._areaOf(l.entity_id))).filter(Boolean))].slice(0, 3).join(', ');
       cards.push(`<div class="card" data-act="lights"><ha-icon icon="mdi:lightbulb-group"></ha-icon><div><b>${lights.length} Licht${lights.length > 1 ? 'er' : ''} an</b><span>${esc(names)}</span></div></div>`);
     }
@@ -1816,13 +1828,13 @@ class LumoraCard extends HTMLElement {
       if (idle && !this._edit) return;
       cards.push(this._card(st, `${this._state(st)}${this._edit && p.only ? ' · nur wenn aktiv' : ''}`, p.entity, this._edit, `${idle ? 'hid' : ''} ${this._set.size[p.entity] ? `sz-${this._set.size[p.entity]}` : ''}`, p));
     });
-    cards.push(`<div class="card add" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</div>`);
+    if (!isTiles || this._edit) cards.push(`<div class="card add" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</div>`);
     const en = this._energy();
     const regItems = this._regItems('home');
     if (en) regItems.push({ id: 'energyhome', html: `<div class="enw">${en}</div>`, size: this._set.size.energyhome || 'f', def: { fixed: true } });
     const regCells = this._ord('homereg', regItems, (x) => x.id).map((x) => this._cell(x, 'homereg')).filter(Boolean).join('');
     const dsg = '<button class="pill" style="padding:5px 10px;font-size:12px" data-act="look"><ha-icon icon="mdi:palette-outline"></ha-icon>Design</button>';
-    if (this._set.look.layout === 'tiles') return this._homeTiles({ D, al, persons, home, wx, temp, hum, me, nm, greet, lights, apill, note, pills, regCells, cardsHtml: `<div class="grid">${cards.join('')}</div>` });
+    if (this._set.look.layout === 'tiles') return this._homeTiles({ D, al, persons, home, wx, temp, hum, me, nm, greet, lights, apill, note, pills, regCells, nCards: cards.length, cardsHtml: `<div class="grid">${cards.join('')}</div>` });
     return `<div class="top"><div class="logo"><ha-icon icon="mdi:home-variant"></ha-icon></div><div class="ttl">Lumora.</div>${apill}</div>
       <div class="meta">${esc(meta)}</div>${this._vent()}
       <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${persons.length ? `${home}/${persons.length} zu Hause` : ''}</div></div></div>
@@ -1832,14 +1844,19 @@ class LumoraCard extends HTMLElement {
       ${this._hint()}<div class="grid">${cards.join('')}</div>`;
   }
 
-  /* ---------- Kachel-Startseite: frei ordnbare Blöcke (Design-Dialog) ---------- */
+  /* ---------- Kachel-Startseite: frei ordnbare Blöcke (Ziehen, Breite, Ein/Aus, Einstellungen je Block) ---------- */
   _homeTiles(f) {
-    const R = { head: () => this._bHead(f), kpis: () => this._bKpis(f), rooms: () => this._bRooms(f), alerts: () => `${this._vent()}${f.note}<div class="pills">${f.pills}</div>`, termine: () => this._bTermine(), status: () => this._bStatus(f), greeting: () => this._bGreeting(f), reg: () => (f.regCells ? `<div class="grid reg">${f.regCells}</div>` : ''), active: () => `<h3>Aktiv jetzt</h3>${f.cardsHtml}`, cams: () => this._homeCams() };
-    const out = this._set.look.blocks.filter((b) => b.on && R[b.id]).map((b) => {
+    const L = this._set.look; const ed = this._edit;
+    const R = { head: () => this._bHead(f), alerts: () => this._bAlerts(f), kpis: () => this._bKpis(f), rooms: () => this._bRooms(f), termine: () => this._bTermine(), status: () => this._bStatus(f), greeting: () => this._bGreeting(f), reg: () => (f.regCells ? `<div class="grid reg">${f.regCells}</div>` : ''), active: () => (f.nCards ? `<h3>Aktiv jetzt</h3>${f.cardsHtml}` : ''), cams: () => this._homeCams() };
+    const out = this._ord('lookb', L.blocks, (b) => b.id).map((b) => {
+      if (!R[b.id] || (!b.on && !ed)) return '';
       let html = ''; try { html = R[b.id](); } catch (_) { html = ''; }
-      return html ? `<div class="b w${b.w}">${html}</div>` : '';
+      if (!ed) return html ? `<div class="b w${b.w}">${html}</div>` : '';
+      const nm = BLOCK_DEF.find((d) => d[0] === b.id)[1]; const wl = (BLOCK_W.find((x) => x[0] === b.w) || [0, 'Voll'])[1];
+      const tools = `<span class="tools"><span class="mini t" data-act="blkw" data-id="${b.id}">${wl}</span><span class="mini" data-act="lkblk" data-id="${b.id}"><ha-icon icon="mdi:cog-outline"></ha-icon></span><span class="mini" data-act="blkon" data-id="${b.id}"><ha-icon icon="${b.on ? 'mdi:eye-off' : 'mdi:eye'}"></ha-icon></span></span>`;
+      return `<div class="b w${b.w} ed ${b.on ? '' : 'hid'}"><span class="bn">${esc(nm)}</span>${tools}${html || '<div class="tl"><div class="ev none">Gerade nichts anzuzeigen</div></div>'}<i class="dg" data-s="lookb" data-id="${b.id}" style="display:none"></i></div>`;
     }).join('');
-    return `<div class="bl">${out || '<div class="b empty">Alle Blöcke sind ausgeblendet. Über „Design“ lassen sie sich wieder einschalten.</div>'}</div>`;
+    return `${ed ? this._hint('Bearbeiten: Blöcke gedrückt halten und ziehen zum Verschieben. Am Block: Breite, Zahnrad für die Einstellungen des Blocks, Auge zum Ein- oder Ausblenden. Karten in „Karten“ und „Aktiv jetzt“ haben eigene Symbole.') : ''}<div class="bl">${out || '<div class="b"><div class="tl">Alle Blöcke sind ausgeblendet. Über „Design“ lassen sie sich wieder einschalten.</div></div>'}</div>`;
   }
   _bHead(f) {
     const L = this._set.look; const h = this._hass; const lang = (h.locale && h.locale.language) || 'de'; const now = new Date();
@@ -1848,31 +1865,53 @@ class LumoraCard extends HTMLElement {
     const time = now.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
     const clk = (L.showClock || (L.showWeather && wx)) ? `<div class="clk">${L.showClock ? `<div class="dt"><small>${esc(date)}</small><b>${esc(time)}</b></div>` : ''}${L.showClock && L.showWeather && wx ? '<i class="sp"></i>' : ''}${L.showWeather && wx ? `<div class="wxx" data-act="info" data-id="${wx.entity_id}"><ha-icon icon="${WX[wx.state] || 'mdi:weather-cloudy'}"></ha-icon><div><b>${Math.round(wx.attributes.temperature)}°</b><small>${esc(WXL[wx.state] || '')}</small></div></div>` : ''}</div>` : '';
     return `<div class="hd2"><div class="lg"><ha-icon icon="mdi:home-variant-outline"></ha-icon></div><div class="tx"><h1>${esc(L.title)}</h1>${L.sub ? `<div class="sub">${esc(L.sub)}</div>` : ''}</div>${clk}
-      <div class="tb">${f.apill}<button class="rb ${this._edit ? 'sel' : ''}" data-act="edit" aria-label="Bearbeiten"><ha-icon icon="mdi:pencil"></ha-icon></button><button class="rb" data-act="look" aria-label="Design"><ha-icon icon="mdi:palette-outline"></ha-icon></button></div></div>${this._hint()}`;
+      <div class="tb">${f.apill}<button class="rb ${this._edit ? 'sel' : ''}" data-act="edit" aria-label="Bearbeiten"><ha-icon icon="mdi:pencil"></ha-icon></button><button class="rb" data-act="look" aria-label="Design"><ha-icon icon="mdi:palette-outline"></ha-icon></button></div></div>`;
+  }
+  /* Meldungen und Chips: nur sichtbar, wenn es etwas zu melden gibt (kein "Alles in Ordnung", das zeigt der Hausstatus) */
+  _bAlerts(f) {
+    const pl = String(f.pills).replace(/\s/g, '') ? `<div class="pills">${f.pills}</div>` : '';
+    return `${this._vent()}${f.al.length ? f.note : ''}${pl}`;
+  }
+  _kpiName(x) {
+    if (x.title) return x.title;
+    if (x.k === 'entity') { const st = x.id && this._hass.states[x.id]; return st ? (st.attributes.friendly_name || x.id) : 'Eigene Kennzahl'; }
+    return KPI_DEF[x.k][0];
   }
   _bKpis(f) {
     const L = this._set.look; const h = this._hass; const D = f.D;
     const d1 = (v) => Number(v).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const fmt = (v) => Number(v).toLocaleString('de-DE', { maximumFractionDigits: Math.abs(v) >= 100 ? 0 : 1 });
     const lightsAll = (D.light || []).filter((l) => l.state !== 'unavailable');
-    const mk = (k) => {
-      const [label, ic] = KPI_DEF[k]; let val = null; let sub = ''; let act = 'noop'; let id = '';
+    const climOn = (D.climate || []).filter((c) => !['off', 'unavailable', 'unknown'].includes(c.state) && typeof c.attributes.temperature === 'number');
+    const mk = (x) => {
+      const k = x.k; const own = x.id && h.states[x.id] ? h.states[x.id] : null; const ov = own ? parseFloat(own.state) : NaN;
+      let ic = KPI_DEF[k][1]; let val = null; let sub = ''; let act = 'noop'; let id = '';
+      const room = (e) => this._aname(this._areaOf(e)) || '';
       if (k === 'lights') { val = `${f.lights.length}<small> / ${lightsAll.length}</small>`; sub = 'Lichter an'; act = 'lights'; }
       else if (k === 'heat') {
-        const cl = (D.climate || []).filter((c) => typeof c.attributes.temperature === 'number' && c.state !== 'unavailable');
-        const c = cl.find((x) => x.attributes.hvac_action === 'heating') || cl[0];
-        if (c) { val = `${d1(c.attributes.temperature)}°`; sub = this._aname(this._areaOf(c.entity_id)) || cleanName(c.attributes.friendly_name || ''); act = 'info'; id = c.entity_id; }
+        if (own && dom(x.id) === 'climate') { const tg = own.attributes.temperature; val = typeof tg === 'number' ? `${d1(tg)}°` : esc(this._state(own)); sub = room(x.id) || cleanName(own.attributes.friendly_name || ''); act = 'info'; id = x.id; }
+        else if (climOn.length) { const avg = climOn.reduce((a, c) => a + c.attributes.temperature, 0) / climOn.length; const hn = climOn.filter((c) => c.attributes.hvac_action === 'heating').length; val = `${d1(avg)}°`; sub = `Ø Soll · ${hn} von ${climOn.length} heizen`; act = 'heatall'; }
+        else if ((D.climate || []).length) { val = 'Aus'; sub = 'Keine Heizung aktiv'; act = 'heatall'; }
       } else if (k === 'temp') {
-        let v = f.temp !== null ? parseFloat(f.temp) : null;
-        if (v === null) { const l = (D.sensor || []).filter((x) => x.attributes.device_class === 'temperature' && !OUTDOOR.includes(this._areaOf(x.entity_id)) && !isNaN(parseFloat(x.state))).map((x) => parseFloat(x.state)); if (l.length) v = l.reduce((a, b) => a + b, 0) / l.length; }
-        if (v !== null) { val = `${d1(v)}°`; sub = 'Alle Räume'; }
-      } else if (k === 'hum') { if (f.hum !== null) { val = `${f.hum}<small> %</small>`; sub = 'Alle Räume'; } }
-      else if (k === 'power') { const e = this._slot('e_consumption'); const v = e ? this._num(e) : null; if (v !== null) { val = this._w(v); sub = 'Aktuell'; act = 'info'; id = e; } }
-      else if (k === 'open') {
-        const n = Object.values(h.states).filter((x) => dom(x.entity_id) === 'binary_sensor' && ['door', 'window', 'opening', 'garage_door'].includes(x.attributes.device_class) && x.state === 'on' && !this._set.excludeEntities.includes(x.entity_id) && !this._set.excludeAreas.includes(this._areaOf(x.entity_id))).length;
+        let v = !isNaN(ov) ? ov : (f.temp !== null ? parseFloat(f.temp) : null); sub = !isNaN(ov) ? room(x.id) : 'Alle Räume';
+        if (v === null) { const l = (D.sensor || []).filter((y) => y.attributes.device_class === 'temperature' && !OUTDOOR.includes(this._areaOf(y.entity_id)) && !isNaN(parseFloat(y.state))).map((y) => parseFloat(y.state)); if (l.length) v = l.reduce((a, b) => a + b, 0) / l.length; }
+        if (v !== null) { val = `${d1(v)}°`; if (!isNaN(ov)) { act = 'info'; id = x.id; } }
+      } else if (k === 'hum') {
+        const v = !isNaN(ov) ? ov : f.hum;
+        if (v !== null && v !== undefined) { val = `${Math.round(v)}<small> %</small>`; sub = !isNaN(ov) ? room(x.id) : 'Alle Räume'; if (!isNaN(ov)) { act = 'info'; id = x.id; } }
+      } else if (k === 'power') {
+        const e = own ? x.id : this._slot('e_consumption'); const v = e ? this._num(e) : null; if (v !== null) { val = this._w(v); sub = 'Aktuell'; act = 'info'; id = e; }
+      } else if (k === 'open') {
+        const n = Object.values(h.states).filter((y) => dom(y.entity_id) === 'binary_sensor' && ['door', 'window', 'opening', 'garage_door'].includes(y.attributes.device_class) && y.state === 'on' && !this._set.excludeEntities.includes(y.entity_id) && !this._set.excludeAreas.includes(this._areaOf(y.entity_id))).length;
         val = String(n); sub = n ? 'offen' : 'alles zu';
       } else if (k === 'persons') { if (f.persons.length) { val = `${f.home}<small> / ${f.persons.length}</small>`; sub = 'zu Hause'; } }
+      else if (k === 'entity') {
+        if (!own) return '';
+        const u = own.attributes.unit_of_measurement || ''; ic = this._icon(own);
+        val = !isNaN(ov) ? `${fmt(ov)}${u ? `<small> ${esc(u)}</small>` : ''}` : esc(this._state(own)); sub = room(x.id); act = 'info'; id = x.id;
+      }
       if (val === null) return '';
-      return `<div class="kp ${k}" data-act="${act}" data-id="${esc(id)}"><div class="ic"><ha-icon icon="${ic}"></ha-icon></div><div class="t"><b>${label}</b><strong>${val}</strong><span>${esc(sub)}</span></div>${act !== 'noop' ? '<div class="go"><ha-icon icon="mdi:chevron-right"></ha-icon></div>' : ''}</div>`;
+      return `<div class="kp ${k}" data-act="${act}" data-id="${esc(id)}"><div class="ic"><ha-icon icon="${ic}"></ha-icon></div><div class="t"><b>${esc(this._kpiName(x))}</b><strong>${val}</strong><span>${esc(sub)}</span></div>${act !== 'noop' ? '<div class="go"><ha-icon icon="mdi:chevron-right"></ha-icon></div>' : ''}</div>`;
     };
     const html = L.kpis.map(mk).join('');
     return html ? `<div class="kps">${html}</div>` : '';
@@ -2783,10 +2822,10 @@ _more() {
     (this._ids || (this._ids = {}))[scope] = res.map(idf);
     return res;
   }
-  _hint() {
+  _hint(txt) {
     if (!this._edit) return '';
     const admin = this._hass.user && this._hass.user.is_admin;
-    return `<div class="hint">${this._msg ? esc(this._msg) : 'Bearbeiten: Element gedrückt halten und ziehen zum Verschieben. Das Auge blendet aus oder ein, das Größen-Symbol ändert die Breite, das Haus-Symbol verschiebt eine Karte zwischen Zuhause und Mehr.'}${admin && this._cfg.shared !== false ? ' <button class="pill" data-act="publish" style="margin-top:8px"><ha-icon icon="mdi:account-group"></ha-icon>Layout für alle speichern</button>' : ''}${this._hasBase ? ' <button class="pill" data-act="resetmine" style="margin-top:8px"><ha-icon icon="mdi:backup-restore"></ha-icon>Auf Gruppenlayout zurücksetzen</button>' : ''}</div>`;
+    return `<div class="hint">${this._msg ? esc(this._msg) : txt || 'Bearbeiten: Element gedrückt halten und ziehen zum Verschieben. Das Auge blendet aus oder ein, das Größen-Symbol ändert die Breite, das Haus-Symbol verschiebt eine Karte zwischen Zuhause und Mehr.'}${admin && this._cfg.shared !== false ? ' <button class="pill" data-act="publish" style="margin-top:8px"><ha-icon icon="mdi:account-group"></ha-icon>Layout für alle speichern</button>' : ''}${this._hasBase ? ' <button class="pill" data-act="resetmine" style="margin-top:8px"><ha-icon icon="mdi:backup-restore"></ha-icon>Auf Gruppenlayout zurücksetzen</button>' : ''}</div>`;
   }
   async _publish() {
     const h = this._hass; const seg = (location.pathname.split('/')[1] || ''); const url = !seg || seg === 'lovelace' ? null : seg;
@@ -2988,6 +3027,12 @@ _more() {
       c = this._embSheet();
     } else if (this._sheet === 'look') {
       c = this._lookSheet();
+    } else if (this._sheet === 'lkblk') {
+      c = this._blkSheet();
+    } else if (this._sheet === 'lkpick') {
+      c = `<h2>Quelle wählen</h2><input class="srch" placeholder="Suchen …" value="${esc(this._q)}"><div class="list"></div>`;
+    } else if (this._sheet === 'heat') {
+      c = `<h2>Heizung</h2>${(this._byDomain().climate || []).map((x) => { const a = x.attributes; const st = a.hvac_action === 'heating' ? 'Heizt' : a.hvac_action === 'cooling' ? 'Kühlt' : x.state === 'off' ? 'Aus' : 'Bereit'; return `<div class="row" data-act="info" data-id="${esc(x.entity_id)}"><ha-icon icon="mdi:radiator"></ha-icon><div class="t"><b>${esc(this._aname(this._areaOf(x.entity_id)) || a.friendly_name || x.entity_id)}</b><span>${st}${typeof a.current_temperature === 'number' ? ` · ist ${a.current_temperature}°` : ''}${typeof a.temperature === 'number' ? ` · Soll ${a.temperature}°` : ''}</span></div></div>`; }).join('')}`;
     } else if (this._sheet === 'events') {
       const ev = this._events();
       c = `<h2>Termine</h2>${ev.list.slice(0, 40).map((x) => this._evRow(x)).join('') || '<div class="hint">Keine anstehenden Termine.</div>'}`;
@@ -3004,37 +3049,55 @@ _more() {
     }
     return `<div class="sbg" data-act="close"><div class="sheet" data-act="noop"><div class="sxw"><button class="sx" data-act="close" aria-label="Schließen"><ha-icon icon="mdi:close"></ha-icon></button></div>${c}</div></div>`;
   }
+  /* kleine Bausteine der Design-Dialoge */
+  _lkSeg(k, opts, cur) { return `<div class="lkc">${opts.map(([v, l]) => `<button class="pill ${cur === v ? 'sel' : ''}" data-act="lk" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`; }
+  _lkTg(k) { const L = this._set.look; return `<button class="${L[k] ? 'sel' : ''}" data-act="lkt" data-k="${k}">${L[k] ? 'An' : 'Aus'}</button>`; }
+  _lkInp(k, lbl, ph) { return `<div class="lkl">${lbl}</div><input class="lkin" data-k="${k}" placeholder="${esc(ph)}" value="${esc(this._set.look[k])}">`; }
+  _lkStep(k, lbl, sub) { return `<div class="row"><div class="t"><b>${lbl}</b><span>${sub}</span></div><div class="lkb"><button data-act="lkn" data-k="${k}" data-d="-1" aria-label="Weniger"><ha-icon icon="mdi:minus"></ha-icon></button><b>${this._set.look[k]}</b><button data-act="lkn" data-k="${k}" data-d="1" aria-label="Mehr"><ha-icon icon="mdi:plus"></ha-icon></button></div></div>`; }
   _lookSheet() {
-    const L = this._set.look; const h = this._hass;
-    const seg = (k, opts, cur) => `<div class="lkc">${opts.map(([v, l]) => `<button class="pill ${cur === v ? 'sel' : ''}" data-act="lk" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
-    const tg = (k) => `<button class="${L[k] ? 'sel' : ''}" data-act="lkt" data-k="${k}">${L[k] ? 'An' : 'Aus'}</button>`;
+    const L = this._set.look;
     const col = (k, def, lbl) => `<div class="row"><div class="t"><b>${lbl}</b></div><div class="lkc"><input type="color" class="lkin" data-k="${k}" value="${/^#[0-9a-f]{6}$/i.test(L[k]) ? L[k] : def}"><button data-act="lkclr" data-k="${k}">Standard</button></div></div>`;
-    const inp = (k, lbl, ph) => `<div class="lkl">${lbl}</div><input class="lkin" data-k="${k}" placeholder="${esc(ph)}" value="${esc(L[k])}">`;
-    const step = (k, lbl, sub) => `<div class="row"><div class="t"><b>${lbl}</b><span>${sub}</span></div><div class="lkb"><button data-act="lkn" data-k="${k}" data-d="-1" aria-label="Weniger"><ha-icon icon="mdi:minus"></ha-icon></button><b>${L[k]}</b><button data-act="lkn" data-k="${k}" data-d="1" aria-label="Mehr"><ha-icon icon="mdi:plus"></ha-icon></button></div></div>`;
-    const blocks = L.blocks.map((b, i) => { const d = BLOCK_DEF.find((x) => x[0] === b.id); const wl = (BLOCK_W.find((x) => x[0] === b.w) || [0, 'Voll'])[1];
-      return `<div class="row"><div class="t"><b>${d[1]}</b></div><div class="lkb"><button data-act="blk" data-id="${b.id}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Nach oben"><ha-icon icon="mdi:arrow-up"></ha-icon></button><button data-act="blk" data-id="${b.id}" data-d="1" ${i === L.blocks.length - 1 ? 'disabled' : ''} aria-label="Nach unten"><ha-icon icon="mdi:arrow-down"></ha-icon></button><button data-act="blkw" data-id="${b.id}" aria-label="Breite">${wl}</button><button class="${b.on ? 'sel' : ''}" data-act="blkon" data-id="${b.id}">${b.on ? 'An' : 'Aus'}</button></div></div>`; }).join('');
-    const kpis = `<div class="lkc">${Object.keys(KPI_DEF).map((k) => { const i = L.kpis.indexOf(k); return `<button class="pill ${i >= 0 ? 'sel' : ''}" data-act="kpi" data-k="${k}">${i >= 0 ? `${i + 1} · ` : ''}${KPI_DEF[k][0]}</button>`; }).join('')}</div>`;
-    const areas = []; this._roomData().forEach((fl) => fl.areas.forEach((a) => areas.push(a)));
-    const rooms = `<div class="lkc"><button class="pill ${L.rooms.length ? '' : 'sel'}" data-act="lkrooms0">Automatisch</button>${areas.map((a) => { const i = L.rooms.indexOf(a.id); return `<button class="pill ${i >= 0 ? 'sel' : ''}" data-act="lkroom" data-id="${esc(a.id)}">${i >= 0 ? `${i + 1} · ` : ''}${esc(a.name)}</button>`; }).join('')}</div>`;
-    const cals = (this._byDomain().calendar || []);
-    const calh = `<div class="lkc"><button class="pill ${L.cals.length ? '' : 'sel'}" data-act="lkcals0">Automatisch</button>${cals.map((x) => `<button class="pill ${L.cals.includes(x.entity_id) ? 'sel' : ''}" data-act="lkcal" data-id="${esc(x.entity_id)}">${esc(x.attributes.friendly_name || x.entity_id)}</button>`).join('')}</div>`;
+    const blocks = this._ord('lookb', L.blocks, (b) => b.id).map((b, i, a) => { const d = BLOCK_DEF.find((x) => x[0] === b.id); const wl = (BLOCK_W.find((x) => x[0] === b.w) || [0, 'Voll'])[1];
+      return `<div class="row"><div class="t"><b>${d[1]}</b></div><div class="lkb"><button data-act="mv" data-s="lookb" data-id="${b.id}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Nach oben"><ha-icon icon="mdi:arrow-up"></ha-icon></button><button data-act="mv" data-s="lookb" data-id="${b.id}" data-d="1" ${i === a.length - 1 ? 'disabled' : ''} aria-label="Nach unten"><ha-icon icon="mdi:arrow-down"></ha-icon></button><button data-act="blkw" data-id="${b.id}" aria-label="Breite">${wl}</button><button data-act="lkblk" data-id="${b.id}" aria-label="Einstellungen"><ha-icon icon="mdi:cog-outline"></ha-icon></button><button class="${b.on ? 'sel' : ''}" data-act="blkon" data-id="${b.id}">${b.on ? 'An' : 'Aus'}</button></div></div>`; }).join('');
     return `<h2>Design</h2>
       <h4>Vorlagen</h4><div class="lkc">${[['sand', 'Sand'], ['forest', 'Wald'], ['sage', 'Salbei (Kacheln)']].map(([k, l]) => `<button class="pill" data-act="lkpre" data-k="${k}">${l}</button>`).join('')}</div>
       <div class="hint" style="margin-top:8px">Eine Vorlage setzt Startseite, Farbthema, Rundung, Kartenstil und Schrift auf einmal. Danach lässt sich alles einzeln anpassen.</div>
-      <h4>Startseite</h4>${seg('layout', [['classic', 'Klassisch'], ['tiles', 'Kacheln']], L.layout)}
-      <h4>Farben</h4>${seg('theme', LOOK_THEMES, L.theme)}
+      <h4>Startseite</h4>${this._lkSeg('layout', [['classic', 'Klassisch'], ['tiles', 'Kacheln']], L.layout)}
+      <h4>Farben</h4>${this._lkSeg('theme', LOOK_THEMES, L.theme)}
       ${col('accent', '#6b8f4e', 'Akzentfarbe')}${col('bg1', '#f8f0e4', 'Hintergrund oben')}${col('bg2', '#ebdcc4', 'Hintergrund unten')}
-      <h4>Form</h4><div class="lkl">Rundung</div>${seg('radius', [['', 'Standard'], ['sm', 'Eckig'], ['md', 'Rund'], ['lg', 'Extra rund']], L.radius)}
-      <div class="lkl">Kartenstil</div>${seg('cards', [['', 'Passend zum Thema'], ['flat', 'Flach'], ['soft', 'Weich'], ['glass', 'Glas']], L.cards)}
-      <div class="lkl">Abstand</div>${seg('gap', [['', 'Standard'], ['s', 'Eng'], ['m', 'Normal'], ['l', 'Weit']], L.gap)}
-      <div class="lkl">Schrift</div>${seg('font', [['', 'Standard'], ['round', 'Rund'], ['serif', 'Serif']], L.font)}
-      <h4>Texte (Kacheln)</h4>${inp('title', 'Titel', 'Zuhause')}${inp('sub', 'Untertitel', 'Willkommen daheim ♡')}${inp('greet', 'Grußkachel (mit {name} und {gruss})', 'Schön, dass du da bist!')}${inp('greetImg', 'Grußkachel Hintergrundbild (Adresse, z. B. /local/bild.jpg)', 'https://…')}${inp('statusOk', 'Hausstatus, wenn alles passt', 'Alles in Ordnung')}${inp('statusSub', 'Hausstatus Zusatzzeile', 'leer = Anwesenheit')}
-      <h4>Kopfzeile (Kacheln)</h4><div class="row"><div class="t"><b>Datum und Uhrzeit</b></div>${tg('showClock')}</div><div class="row"><div class="t"><b>Wetter</b></div>${tg('showWeather')}</div>
-      <h4>Blöcke und Reihenfolge (Kacheln)</h4>${blocks}<div class="hint" style="margin-top:8px">Die Breite wird in zwölf Spalten gerechnet: ¼, ⅓, ½, ⅔ oder voll. Auf dem Handy stehen die Blöcke untereinander.</div>
-      <h4>Kennzahlen (Kacheln)</h4>${kpis}
-      <h4>Räume (Kacheln)</h4>${step('roomMax', 'Anzahl bei Automatik', 'Die ersten Räume nach Etage')}<div class="row"><div class="t"><b>Raumfoto</b><span>Bild aus dem Bereich in Home Assistant</span></div>${tg('roomImg')}</div><div class="lkl">Eigene Auswahl und Reihenfolge</div>${rooms}
-      <h4>Termine (Kacheln)</h4>${step('evMax', 'Anzahl Termine', 'In der Kachel')}<div class="lkl">Kalender</div>${calh}
+      <h4>Form</h4><div class="lkl">Rundung</div>${this._lkSeg('radius', [['', 'Standard'], ['sm', 'Eckig'], ['md', 'Rund'], ['lg', 'Extra rund']], L.radius)}
+      <div class="lkl">Kartenstil</div>${this._lkSeg('cards', [['', 'Passend zum Thema'], ['flat', 'Flach'], ['soft', 'Weich'], ['glass', 'Glas']], L.cards)}
+      <div class="lkl">Abstand</div>${this._lkSeg('gap', [['', 'Standard'], ['s', 'Eng'], ['m', 'Normal'], ['l', 'Weit']], L.gap)}
+      <div class="lkl">Schrift</div>${this._lkSeg('font', [['', 'Standard'], ['round', 'Rund'], ['serif', 'Serif']], L.font)}
+      <h4>Blöcke der Kachel-Startseite</h4>${blocks}<div class="hint" style="margin-top:8px">Pfeile verschieben, die Breite wird in zwölf Spalten gerechnet (¼, ⅓, ½, ⅔, voll), das Zahnrad öffnet die Einstellungen des Blocks. Direkt auf der Startseite geht es auch im Bearbeiten-Modus: Blöcke ziehen, Breite, Zahnrad und Auge.</div>
       <div class="row" style="border:0;margin-top:10px"><button data-act="lkreset">Zurücksetzen</button><button class="sel" data-act="close">Fertig</button></div>`;
+  }
+  _blkSheet() {
+    const id = this._lkb; const L = this._set.look; const s = this._set; const d = BLOCK_DEF.find((x) => x[0] === id); if (!d) return '';
+    let c = '';
+    if (id === 'head') c = `${this._lkInp('title', 'Titel', 'Zuhause')}${this._lkInp('sub', 'Untertitel', 'Willkommen daheim ♡')}<div class="row"><div class="t"><b>Datum und Uhrzeit</b></div>${this._lkTg('showClock')}</div><div class="row"><div class="t"><b>Wetter</b></div>${this._lkTg('showWeather')}</div>`;
+    else if (id === 'alerts') c = `<div class="hint">Dieser Block erscheint nur, wenn es etwas zu melden gibt oder Chips angezeigt werden. Chips für Lichter und Außentemperatur entfallen, wenn Kennzahl oder Kopfzeile sie schon zeigen. „Alles in Ordnung“ zeigt der Hausstatus.</div><div class="lkc"><button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips wählen</button><button class="pill" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>Meldungen</button></div>`;
+    else if (id === 'kpis') {
+      const rows = L.kpis.map((x, i) => { const src = ['heat', 'temp', 'hum', 'power', 'entity'].includes(x.k); const st = x.id && this._hass.states[x.id]; const sub = src ? (st ? (st.attributes.friendly_name || x.id) : (x.k === 'entity' ? 'Entität wählen' : 'Automatisch')) : '';
+        return `<div class="row"><div class="t"><b>${esc(KPI_DEF[x.k][0])}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div><div class="lkb"><button data-act="kpimv" data-i="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Nach oben"><ha-icon icon="mdi:arrow-up"></ha-icon></button><button data-act="kpimv" data-i="${i}" data-d="1" ${i === L.kpis.length - 1 ? 'disabled' : ''} aria-label="Nach unten"><ha-icon icon="mdi:arrow-down"></ha-icon></button>${src ? `<button data-act="kpisrc" data-i="${i}">Quelle</button>` : ''}<button data-act="kpidel" data-i="${i}" aria-label="Entfernen"><ha-icon icon="mdi:close"></ha-icon></button></div></div><input class="lkin" data-i="${i}" placeholder="Eigener Name (optional)" value="${esc(x.title)}">`; }).join('');
+      c = `${rows || '<div class="hint">Keine Kennzahlen. Unten lassen sich welche hinzufügen.</div>'}<h4>Hinzufügen</h4><div class="lkc">${Object.keys(KPI_DEF).map((k) => `<button class="pill" data-act="kpiadd" data-k="${k}">+ ${KPI_DEF[k][0]}</button>`).join('')}</div><div class="hint" style="margin-top:8px">Bei der Heizung zeigt „Automatisch“ den Durchschnitt der Soll-Temperaturen aller aktiven Thermostate. Mit „Quelle“ lässt sich stattdessen ein bestimmter Thermostat oder Sensor wählen. Mit „Eigene Kennzahl“ geht jede Entität.</div>`;
+    } else if (id === 'rooms') {
+      const areas = []; this._roomData().forEach((fl) => fl.areas.forEach((a) => areas.push(a)));
+      c = `${this._lkStep('roomMax', 'Anzahl bei Automatik', 'Die ersten Räume nach Etage')}<div class="row"><div class="t"><b>Raumfoto</b><span>Bild aus dem Bereich in Home Assistant</span></div>${this._lkTg('roomImg')}</div><div class="lkl">Eigene Auswahl und Reihenfolge</div><div class="lkc"><button class="pill ${L.rooms.length ? '' : 'sel'}" data-act="lkrooms0">Automatisch</button>${areas.map((a) => { const i = L.rooms.indexOf(a.id); return `<button class="pill ${i >= 0 ? 'sel' : ''}" data-act="lkroom" data-id="${esc(a.id)}">${i >= 0 ? `${i + 1} · ` : ''}${esc(a.name)}</button>`; }).join('')}</div>`;
+    } else if (id === 'termine') {
+      const cals = (this._byDomain().calendar || []);
+      c = `${this._lkStep('evMax', 'Anzahl Termine', 'In der Kachel')}<div class="lkl">Kalender</div><div class="lkc"><button class="pill ${L.cals.length ? '' : 'sel'}" data-act="lkcals0">Automatisch</button>${cals.map((x) => `<button class="pill ${L.cals.includes(x.entity_id) ? 'sel' : ''}" data-act="lkcal" data-id="${esc(x.entity_id)}">${esc(x.attributes.friendly_name || x.entity_id)}</button>`).join('')}</div>`;
+    } else if (id === 'status') c = `${this._lkInp('statusOk', 'Text, wenn alles passt', 'Alles in Ordnung')}${this._lkInp('statusSub', 'Zusatzzeile', 'leer = Anwesenheit')}`;
+    else if (id === 'greeting') c = `${this._lkInp('greet', 'Text (mit {name} und {gruss})', 'Schön, dass du da bist!')}${this._lkInp('greetImg', 'Hintergrundbild (Adresse, z. B. /local/bild.jpg)', 'https://…')}`;
+    else if (id === 'reg') {
+      const all = this._allReg().filter((x) => !x.def.fixed); const cnt = {}; all.forEach((x) => { cnt[x.def.id] = (cnt[x.def.id] || 0) + 1; }); const seen = {};
+      const row = (name, sub, idc, size, hd, moveable) => `<div class="row"><div class="t"><b>${esc(name)}</b><span>${esc(sub)}${hd ? ' · ausgeblendet' : ''}</span></div><div class="lkb">${moveable ? `<button data-act="placeopen" data-id="${esc(idc)}">Ort</button>` : ''}<button data-act="size" data-id="${esc(idc)}" data-d="${size}" aria-label="Größe"><ha-icon icon="${SIZE_ICON[size]}"></ha-icon></button><button class="${hd ? '' : 'sel'}" data-act="hidee" data-id="${esc(idc)}">${hd ? 'Aus' : 'An'}</button></div></div>`;
+      const rows = all.map((x) => { seen[x.def.id] = (seen[x.def.id] || 0) + 1; const nm = cnt[x.def.id] > 1 ? `${x.def.label} ${seen[x.def.id]}` : x.def.label; const pl = x.pl === 'home' ? 'Zuhause' : x.pl === 'more' ? 'Mehr' : String(x.pl).startsWith('area:') ? this._aname(String(x.pl).slice(5)) : x.pl; return row(nm, pl, x.id, x.size, s.hidden.includes(x.id), true); }).join('');
+      const en = this._energy() ? row('Energie', 'Zuhause', 'energyhome', s.size.energyhome || 'f', s.hidden.includes('energyhome'), false) : '';
+      c = `<div class="hint">Alle Karten mit ihrem Ort. „Ort“ legt eine Karte auf Zuhause, Mehr oder in einen Raum. Hier erscheinen nur Karten, die auf Zuhause liegen. Größe und Ein/Aus gelten für jede Karte einzeln, die Reihenfolge ändert sich im Bearbeiten-Modus per Ziehen.</div>${en}${rows}`;
+    } else if (id === 'active') c = `<div class="hint">Zeigt, was gerade aktiv ist (laufende Geräte, Medien, Drucker, Pakete) und deine angehefteten Entitäten. Ohne Inhalt verschwindet der Block. Die Lichter-Karte entfällt, wenn die Kennzahl Beleuchtung aktiv ist. Anheften und Verschieben gehen im Bearbeiten-Modus.</div><div class="lkc"><button class="pill" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte anheften</button></div>`;
+    else if (id === 'cams') c = `<div class="hint">Kameras auf der Startseite. Welche, legst du hier fest.</div><div class="lkc"><button class="pill" data-act="hc"><ha-icon icon="mdi:cctv"></ha-icon>Kameras wählen</button></div>`;
+    return `<div class="lkc" style="margin-bottom:6px"><button class="pill" data-act="look"><ha-icon icon="mdi:chevron-left"></ha-icon>Design</button></div><h2>${esc(d[1])}</h2>${c}<div class="row" style="border:0;margin-top:10px"><span></span><button class="sel" data-act="close">Fertig</button></div>`;
   }
   _fillList() {
     this._fillList0(); this._a11y();
@@ -3042,6 +3105,17 @@ _more() {
 
   _fillList0() {
     const el = this.shadowRoot.querySelector('.list'); if (!el) return;
+    if (this._sheet === 'lkpick') {
+      const x = this._set.look.kpis[this._lkp && this._lkp.i]; if (!x) { el.innerHTML = ''; return; }
+      const q = norm(this._q); const h = this._hass; const k = x.k;
+      const ok = (st) => { const d = dom(st.entity_id); const dc = st.attributes.device_class;
+        if (k === 'heat') return d === 'climate'; if (k === 'temp') return d === 'sensor' && dc === 'temperature'; if (k === 'hum') return d === 'sensor' && dc === 'humidity'; if (k === 'power') return d === 'sensor' && (dc === 'power' || dc === 'energy');
+        return ['sensor', 'binary_sensor', 'climate', 'light', 'switch', 'weather', 'person', 'input_number', 'number', 'cover', 'lock', 'alarm_control_panel', 'input_boolean'].includes(d); };
+      const res = Object.values(h.states).filter((st) => ok(st) && (!q || norm(`${st.entity_id} ${st.attributes.friendly_name || ''}`).includes(q))).sort((a, b) => String(a.attributes.friendly_name || a.entity_id).localeCompare(String(b.attributes.friendly_name || b.entity_id), 'de')).slice(0, 60);
+      const auto = k === 'entity' ? '' : `<div class="row" data-act="lkset" data-id=""><ha-icon icon="mdi:auto-fix"></ha-icon><div class="t"><b>Automatisch</b><span>Werte aller passenden Geräte</span></div></div>`;
+      el.innerHTML = auto + res.map((st) => `<div class="row" data-act="lkset" data-id="${esc(st.entity_id)}"><ha-icon icon="${this._icon(st)}"></ha-icon><div class="t"><b>${esc(st.attributes.friendly_name || st.entity_id)}</b><span>${esc(st.entity_id)} · ${esc(this._state(st))}</span></div></div>`).join('');
+      return;
+    }
     if (this._sheet === 'srcpick') {
       const q = norm(this._q); const k = this._sk;
       el.innerHTML = this._cands(k, true).filter((x) => !q || norm(`${x.id} ${x.name}`).includes(q)).slice(0, 60).map((x) => `<div class="row" data-act="srcset" data-k="${k}" data-id="${x.id}"><ha-icon icon="mdi:link-variant"></ha-icon><div class="t"><b>${esc(x.name)}</b><span>${esc(x.id)}${x.ok ? ' · passt' : ''}</span></div></div>`).join('') || '<div class="empty">Nichts gefunden.</div>';
@@ -3905,7 +3979,7 @@ _more() {
     if (act === 'noop') return;
     e.stopPropagation();
     if (Date.now() - (this._dgAt || 0) < 450) return;
-    if (this._edit && ['info', 'toggle', 'vstart', 'vdock', 'vlocate', 'vfan', 'qrun', 'knum'].includes(act)) return;
+    if (this._edit && ['info', 'toggle', 'vstart', 'vdock', 'vlocate', 'vfan', 'qrun', 'knum', 'gotoroom', 'evall', 'heatall', 'lights'].includes(act)) return;
     if (act.startsWith('pr-')) { if (this._edit) return; if (this._printClick(t, act)) { this._sig = ''; this._render(); } return; }
     if (act.startsWith('pl-')) { if (this._edit) return; if (this._poolClick(t, act)) { this._sig = ''; this._render(); } return; }
     if (act.startsWith('fp-')) { if (this._edit) return; if (this._fpClick(t, act)) { this._sig = ''; this._render(); } return; }
@@ -4067,15 +4141,20 @@ _more() {
       case 'lkt': { const k = t.dataset.k; if (['showClock', 'showWeather', 'roomImg'].includes(k)) { s.look[k] = !s.look[k]; this._save(); } break; }
       case 'lkclr': { const k = t.dataset.k; if (['accent', 'bg1', 'bg2'].includes(k)) { s.look[k] = ''; this._save(); } break; }
       case 'lkn': { const k = t.dataset.k; const mx = k === 'roomMax' ? 12 : k === 'evMax' ? 8 : 0; if (mx) { s.look[k] = Math.max(1, Math.min(mx, s.look[k] + Number(t.dataset.d))); this._save(); } break; }
-      case 'kpi': { const k = t.dataset.k; if (KPI_DEF[k]) { s.look.kpis = s.look.kpis.includes(k) ? s.look.kpis.filter((x) => x !== k) : [...s.look.kpis, k].slice(0, 6); this._save(); } break; }
-      case 'blk': { const b = s.look.blocks; const i = b.findIndex((x) => x.id === id); const j = i + Number(t.dataset.d); if (i >= 0 && j >= 0 && j < b.length) { [b[i], b[j]] = [b[j], b[i]]; this._save(); } break; }
+      case 'lkblk': this._sheet = 'lkblk'; this._lkb = id; break;
+      case 'heatall': this._sheet = 'heat'; break;
+      case 'kpiadd': { const k = t.dataset.k; if (KPI_DEF[k] && s.look.kpis.length < 8) { s.look.kpis.push({ k, id: '', title: '' }); this._save(); if (k === 'entity') { this._lkp = { i: s.look.kpis.length - 1 }; this._sheet = 'lkpick'; this._q = ''; } } break; }
+      case 'kpidel': s.look.kpis.splice(Number(t.dataset.i), 1); this._save(); break;
+      case 'kpimv': { const i = Number(t.dataset.i); const j = i + Number(t.dataset.d); const a = s.look.kpis; if (i >= 0 && j >= 0 && j < a.length) { [a[i], a[j]] = [a[j], a[i]]; this._save(); } break; }
+      case 'kpisrc': this._lkp = { i: Number(t.dataset.i) }; this._sheet = 'lkpick'; this._q = ''; break;
+      case 'lkset': { const x = s.look.kpis[this._lkp && this._lkp.i]; if (x) { x.id = id || ''; this._save(); } this._sheet = 'lkblk'; this._lkb = 'kpis'; break; }
       case 'blkw': { const b = s.look.blocks.find((x) => x.id === id); if (b) { const i = BLOCK_W.findIndex((x) => x[0] === b.w); b.w = BLOCK_W[(i + 1) % BLOCK_W.length][0]; this._save(); } break; }
       case 'blkon': { const b = s.look.blocks.find((x) => x.id === id); if (b) { b.on = !b.on; this._save(); } break; }
       case 'lkroom': s.look.rooms = s.look.rooms.includes(id) ? s.look.rooms.filter((x) => x !== id) : [...s.look.rooms, id]; this._save(); break;
       case 'lkrooms0': s.look.rooms = []; this._save(); break;
       case 'lkcal': s.look.cals = s.look.cals.includes(id) ? s.look.cals.filter((x) => x !== id) : [...s.look.cals, id]; this._evc = {}; this._save(); break;
       case 'lkcals0': s.look.cals = []; this._evc = {}; this._save(); break;
-      case 'lkreset': s.look = mergeLook({}); this._save(); break;
+      case 'lkreset': s.look = mergeLook({}); delete s.order.lookb; this._save(); break;
       case 'publish': this._publish(); return;
       case 'mv': {
         const sc = t.dataset.s; const dd = Number(t.dataset.d);

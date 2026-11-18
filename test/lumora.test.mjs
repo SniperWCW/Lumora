@@ -723,12 +723,19 @@ test('Design: mergeLook ergänzt fehlende Blöcke und verwirft Ungültiges', () 
   const d = L.mergeLook({});
   assert.equal(d.blocks.map((b) => b.id).join(), L.BLOCK_DEF.map((b) => b[0]).join());
   assert.equal(d.layout, 'classic');
-  const m = L.mergeLook({ blocks: [{ id: 'greeting', w: 6, on: true }, { id: 'unbekannt', w: 4 }, { id: 'head', w: 99, on: false }], kpis: ['temp', 'quatsch'], roomMax: 99, evMax: 0 });
+  assert.equal(d.blocks.find((b) => b.id === 'reg').on, true);
+  const m = L.mergeLook({ v: 2, blocks: [{ id: 'greeting', w: 6, on: true }, { id: 'unbekannt', w: 4 }, { id: 'head', w: 99, on: false }], kpis: ['temp', 'quatsch', { k: 'entity', id: 'sensor.x', title: 'X' }], roomMax: 99, evMax: 0 });
   assert.equal(JSON.stringify(m.blocks.slice(0, 2).map((b) => [b.id, b.w, b.on])), JSON.stringify([['greeting', 6, true], ['head', 12, false]]));
   assert.equal(m.blocks.length, L.BLOCK_DEF.length);
-  assert.equal(m.kpis.join(), 'temp');
+  assert.equal(JSON.stringify(m.kpis), JSON.stringify([{ k: 'temp', id: '', title: '' }, { k: 'entity', id: 'sensor.x', title: 'X' }]));
   assert.equal(m.roomMax, 12);
   assert.equal(m.evMax, 3);
+});
+
+test('Design: alte Block-Anordnung (vor Version 2) wird auf die neuen Standardwerte gesetzt, Kennzahlen bleiben', () => {
+  const m = L.mergeLook({ blocks: [{ id: 'greeting', w: 6, on: true }], kpis: ['hum', 'open'] });
+  assert.equal(m.blocks[0].id, 'head');
+  assert.equal(m.kpis.map((x) => x.k).join(), 'hum,open');
 });
 
 test('Design: Vorlage Salbei schaltet auf Kacheln', () => {
@@ -755,34 +762,81 @@ test('Raumsymbole nach Namen', () => {
   assert.equal(L.roomIcon('Irgendwas'), 'mdi:door-open');
 });
 
-test('Kachel-Startseite: Blöcke, Kennzahlen, Räume, Termine und Reihenfolge', async () => {
+function tilesCard(extra = {}) {
   const c = new L.card(); c.setConfig({});
   const st = (id, state, attributes = {}) => ({ entity_id: id, state, attributes });
   const states = {
     'light.a': st('light.a', 'on', { friendly_name: 'A' }), 'light.b': st('light.b', 'off', { friendly_name: 'B' }),
     'climate.w': st('climate.w', 'heat', { friendly_name: 'Wohnzimmer', current_temperature: 20, temperature: 21.5, hvac_action: 'heating' }),
+    'climate.k': st('climate.k', 'heat', { friendly_name: 'Kinderzimmer', current_temperature: 21, temperature: 19.5, hvac_action: 'idle' }),
+    'sensor.x': st('sensor.x', '42.5', { friendly_name: 'Wert X', unit_of_measurement: 'kWh' }),
     'weather.h': st('weather.h', 'cloudy', { temperature: 18 }), 'person.s': st('person.s', 'home', { friendly_name: 'S' }), 'calendar.k': st('calendar.k', 'off', { friendly_name: 'Familie' }),
+    ...extra,
   };
   const day = new Date(Date.now() + 3600e3).toISOString();
-  c._hass = { states, entities: { 'light.a': { area_id: 'wz' }, 'light.b': { area_id: 'wz' }, 'climate.w': { area_id: 'wz' } }, devices: {}, areas: { wz: { name: 'Wohnzimmer', floor_id: 'eg' } }, floors: { eg: { name: 'EG', level: 0 } },
+  c._hass = { states, entities: { 'light.a': { area_id: 'wz' }, 'light.b': { area_id: 'wz' }, 'climate.w': { area_id: 'wz' }, 'climate.k': { area_id: 'kz' } }, devices: {}, areas: { wz: { name: 'Wohnzimmer', floor_id: 'eg' }, kz: { name: 'Kinderzimmer', floor_id: 'eg' } }, floors: { eg: { name: 'EG', level: 0 } },
     locale: { language: 'de' }, user: { id: 'u', is_admin: true }, callApi: async () => [],
     callWS: async () => ({ response: { 'calendar.k': { events: [{ start: day, end: day, summary: 'Training' }] } } }) };
   c._loaded = true; c._set.look.layout = 'tiles';
+  return c;
+}
+
+test('Kachel-Startseite: Blöcke, Kennzahlen, Räume, Termine und Reihenfolge', async () => {
+  const c = tilesCard();
   c._home(); await new Promise((r) => setTimeout(r, 30));
   let html = c._home();
   assert.match(html, /class="b w12"><div class="hd2"/);
   assert.match(html, /class="kp lights"[\s\S]*1<small> \/ 2<\/small>/);
-  assert.match(html, /class="kp heat"[\s\S]*21,5°/);
   assert.match(html, /class="rm "[\s\S]*Wohnzimmer[\s\S]*>AN</);
   assert.match(html, /Training/);
   assert.match(html, /Alles in Ordnung/);
-  /* Block ausblenden und Reihenfolge ändern */
+  /* Block ausblenden und Reihenfolge per Ordnung ändern */
   c._set.look.blocks.find((b) => b.id === 'greeting').on = false;
-  const sw = c._set.look.blocks; [sw[0], sw[1]] = [sw[1], sw[0]];
+  c._set.order.lookb = ['kpis', 'head'];
   html = c._home();
   assert.ok(!html.includes('class="gt'));
   assert.ok(html.indexOf('class="kps"') < html.indexOf('class="hd2"'));
   /* Klassisch bleibt unverändert */
   c._set.look.layout = 'classic';
   assert.match(c._home(), /class="hello"/);
+});
+
+test('Kachel-Startseite: Heizung automatisch als Durchschnitt, wählbarer Thermostat, eigene Kennzahl', () => {
+  const c = tilesCard(); const K = c._set.look.kpis;
+  let html = c._home();
+  assert.match(html, /class="kp heat"[\s\S]*20,5°[\s\S]*Ø Soll · 1 von 2 heizen/);
+  K.find((x) => x.k === 'heat').id = 'climate.k';
+  html = c._home();
+  assert.match(html, /class="kp heat"[\s\S]*19,5°[\s\S]*Kinderzimmer/);
+  K.push({ k: 'entity', id: 'sensor.x', title: '' });
+  assert.match(c._home(), /class="kp entity"[\s\S]*Wert X[\s\S]*42,5<small> kWh/);
+});
+
+test('Kachel-Startseite: Meldungen-Block nur bei Inhalt, keine doppelten Chips; Aktiv jetzt ohne Lichter-Duplikat', () => {
+  const c = tilesCard();
+  let html = c._home();
+  assert.ok(!html.includes('class="note'), 'kein "Alles in Ordnung"-Hinweis im Meldungsblock');
+  assert.ok(!html.includes('data-act="lights"><ha-icon icon="mdi:lamp"'), 'Lichter-Chip entfällt (Kennzahl zeigt es)');
+  assert.ok(!html.includes('Aktiv jetzt'), 'leerer Block bleibt weg');
+  c._set.look.kpis = c._set.look.kpis.filter((x) => x.k !== 'lights');
+  html = c._home();
+  assert.match(html, /Aktiv jetzt/);
+});
+
+test('Kachel-Startseite: Bearbeiten zeigt Werkzeuge an jedem Block, auch an ausgeblendeten', () => {
+  const c = tilesCard(); c._edit = true;
+  c._set.look.blocks.find((b) => b.id === 'cams').on = false;
+  const html = c._home();
+  assert.ok((html.match(/class="mini t" data-act="blkw"/g) || []).length >= L.BLOCK_DEF.length - 1);
+  assert.match(html, /data-s="lookb" data-id="head"/);
+  assert.match(html, /class="b w12 ed hid"/);
+  assert.match(html, /data-act="lkblk" data-id="kpis"/);
+  c._edit = false;
+  assert.ok(!c._home().includes('data-act="blkw"'));
+});
+
+test('Design: Block-Dialoge lassen sich erzeugen', () => {
+  const c = tilesCard();
+  for (const d of L.BLOCK_DEF) { c._lkb = d[0]; assert.ok(c._blkSheet().includes(d[1]), d[0]); }
+  assert.match(c._lookSheet(), /data-s="lookb"/);
 });
