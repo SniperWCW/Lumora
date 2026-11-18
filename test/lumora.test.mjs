@@ -640,3 +640,75 @@ test('Kobra-X-Gerätekarte findet auch die Entitäten von Anycubic Cloud & LAN (
   const html = L.DEVTPL.kobrax.render(c, iv, F, c._hass.states[iv.main]);
   assert.match(html, /Druckt/); assert.match(html, /32 %/); assert.match(html, /background:#75787B/i);
 });
+
+/* ---------- Abfall-Karte ---------- */
+const day = (y, m, d) => new Date(y, m - 1, d);
+const wcEv = (s, y, m, d) => ({ s, d: day(y, m, d).getTime() });
+
+test('Abfall: Art der Abholung wird am Terminnamen erkannt', () => {
+  const k = (s) => L.WC.kind(s).k;
+  assert.equal(k('Bio'), 'bio'); assert.equal(k('Biotonne'), 'bio');
+  assert.equal(k('Restmüll'), 'rest'); assert.equal(k('Altpapier'), 'paper');
+  assert.equal(k('Gelber Sack'), 'yellow'); assert.equal(k('Sperrmüll'), 'bulky');
+  assert.equal(L.WC.kind('Glas').l, 'Glas');
+});
+
+test('Abfall: nächster Termin je Art, vergangene werden übersprungen', () => {
+  const ev = [wcEv('Bio', 2026, 11, 17), wcEv('Bio', 2026, 11, 18), wcEv('Bio', 2026, 11, 25), wcEv('Restmüll', 2026, 11, 19), wcEv('Altpapier', 2026, 12, 8)];
+  const l = L.WC.next(ev, day(2026, 11, 18));
+  assert.deepEqual([...l.map((x) => x.k)], ['bio', 'rest', 'paper']);
+  assert.equal(l[0].d, day(2026, 11, 18).getTime());
+});
+
+test('Abfall: Kalender-Antworten (WebSocket und REST) werden gelesen', () => {
+  const ws = { response: { 'calendar.abfall': { events: [{ start: '2026-11-18', end: '2026-11-19', summary: 'Bio' }] } } };
+  assert.deepEqual(JSON.parse(JSON.stringify(L.WC.norm(ws, 'calendar.abfall'))), [wcEv('Bio', 2026, 11, 18)]);
+  const rest = [{ summary: 'Restmüll', start: { date: '2026-11-19' }, end: { date: '2026-11-20' } }];
+  assert.deepEqual(JSON.parse(JSON.stringify(L.WC.norm(rest, 'calendar.abfall'))), [wcEv('Restmüll', 2026, 11, 19)]);
+  assert.equal(L.WC.norm({}, 'calendar.abfall'), null);
+});
+
+test('Abfall: Tonnenerkennung (present/missing und Binärsensoren)', () => {
+  assert.equal(L.WC.bin('present'), 'in'); assert.equal(L.WC.bin('missing'), 'out');
+  assert.equal(L.WC.bin('on'), 'in'); assert.equal(L.WC.bin('off'), 'out'); assert.equal(L.WC.bin('keine Ahnung'), null);
+});
+
+test('Abfall: Gerätekarte erkennt Kalender und Tonnensensoren automatisch', () => {
+  const T = L.DEVTPL.waste; assert.ok(T);
+  const mk = (states) => {
+    const c = Object.create(L.card.prototype); Object.keys(states).forEach((k) => { states[k].entity_id = k; });
+    c._hass = { states, entities: {} }; c._dvP = null; c._dvR = null; return c;
+  };
+  const S = (state, fn) => ({ state, attributes: { friendly_name: fn } });
+  const c = mk({
+    'calendar.abfall_stuttgart': S('on', 'Waste Collection Schedule Abfall Stuttgart'),
+    'sensor.mulltonnen_erkennung_mulltonne_braun': S('present', 'Mülltonnen Erkennung Mülltonne Braun'),
+    'sensor.mulltonnen_erkennung_mulltonne_grun': S('missing', 'Mülltonnen Erkennung Mülltonne Grün'),
+    'sensor.mulltonnen_erkennung_mulltonne_schwarz': S('present', 'Mülltonnen Erkennung Mülltonne Schwarz'),
+    'sensor.nachste_biotonne': S('Heute', 'Waste Collection Schedule Nächste Biotonne'),
+    'binary_sensor.mulltonnen_erkennung_mulltonnen_szene_gultig': S('on', 'Mülltonnen Erkennung Mülltonnen Szene gültig'),
+  });
+  assert.equal(c._dvMains(T)[0].id, 'calendar.abfall_stuttgart');
+  const iv = { id: 'w1', type: 'waste', main: 'calendar.abfall_stuttgart', map: {}, title: '' };
+  const F = c._dvMap(iv);
+  assert.equal(F.bin_bio, 'sensor.mulltonnen_erkennung_mulltonne_braun');
+  assert.equal(F.bin_paper, 'sensor.mulltonnen_erkennung_mulltonne_grun');
+  assert.equal(F.bin_rest, 'sensor.mulltonnen_erkennung_mulltonne_schwarz');
+  assert.equal(F.bin_yellow, null);
+  iv.map.bin_paper = '-'; c._dvR = null;
+  assert.equal(c._dvMap(iv).bin_paper, null);
+});
+
+test('Abfall: Karte zeigt nächste Abholung, Tonnenstatus und Erinnerungen', () => {
+  const T = L.DEVTPL.waste; const now = new Date(); const t0 = L.WC.day(now);
+  const at = (n) => new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() + n).getTime();
+  const c = Object.create(L.card.prototype);
+  const st = (state, fn) => ({ state, entity_id: fn, attributes: { friendly_name: fn } });
+  c._hass = { states: {} };
+  c._wcc = { 'calendar.a': { at: Date.now(), dk: now.toDateString(), busy: false, h: '', ev: [{ s: 'Bio', d: at(0) }, { s: 'Altpapier', d: at(20) }, { s: 'Restmüll', d: at(1) }] } };
+  const html = T.render(c, { id: 'w', main: 'calendar.a', title: '' }, {
+    bin_bio: 'sensor.b', bin_paper: 'sensor.g', bin_rest: 'sensor.s', bin_yellow: null,
+  }, st('on', 'calendar.a'));
+  assert.match(html, /Nächste Abholung/); assert.match(html, /Bioabfall/); assert.match(html, />Heute</);
+  assert.equal((html.match(/class="wct"/g) || []).length, 3);
+});

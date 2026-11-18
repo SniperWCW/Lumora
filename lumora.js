@@ -629,6 +629,23 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .px>ha-icon{--mdc-icon-size:22px}.px .t{min-width:0}.px .t b{display:block;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.px .t span{font-size:12px;color:var(--fg2)}
 .px>span{font-size:12.5px;text-align:right;white-space:nowrap}.px.off>ha-icon,.px.off .st{color:#c9694f}.px.na{opacity:.55}.px .st{grid-column:span 2;font-weight:600}
 .dvc.pxoff{opacity:.85}
+.wc .wch{display:flex;align-items:center;gap:12px;background:var(--line);border-radius:18px;padding:12px 14px;box-shadow:inset 4px 0 0 var(--wc);min-width:0;cursor:pointer}
+.wc .wci{position:relative;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;flex:none;color:var(--wc);overflow:hidden}
+.wc .wci::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:var(--wc);opacity:.18}
+.wc .wci ha-icon{position:relative}
+.wc .wch .tt{flex:1;min-width:0;display:flex;flex-direction:column}
+.wc .wch small{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fg2)}
+.wc .wch .tt b{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wc .wch .tt span{font-size:12.5px;color:var(--fg2)}
+.wcp{flex:none;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700;background:var(--line);color:var(--fg2);white-space:nowrap}
+.wcp.t0{background:rgba(214,96,88,.2);color:#d9776a}.wcp.t1{background:rgba(220,170,70,.2);color:#d3a24a}
+.wcg{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px}
+.wct{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;background:var(--line);border-radius:16px;padding:12px 8px;box-shadow:inset 3px 0 0 var(--wc);min-width:0;cursor:pointer}
+.wct .wci{width:38px;height:38px;border-radius:12px;margin-bottom:2px}
+.wct b{font-size:14px;font-weight:600;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wct .wcs{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--fg2)}
+.wct .wcs.out{color:var(--wc)}.wct .wcs.todo{color:#d3a24a}
+.wct small{font-size:11.5px;color:var(--fg2)}
 .sdc{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;flex-wrap:wrap}.sdc>div{display:flex;align-items:center;gap:6px}.sdc b{min-width:64px;text-align:center}.sdc .pill{display:inline-flex;align-items:center;gap:4px}.sdc .pill ha-icon{--mdc-icon-size:16px}
 .sdm small{display:block;font-size:11px;color:var(--fg2);margin-bottom:4px}.sdh{display:flex;align-items:flex-end;gap:3px;height:36px}.sdh i{flex:1;min-width:0;background:var(--b);border-radius:2px 2px 0 0;opacity:.85}
 .kx .dvm b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kxc>.kxr{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:default}.kxr>div{display:flex;align-items:center;gap:6px}.kxr b{min-width:56px;text-align:center}
@@ -1127,6 +1144,7 @@ class LumoraCard extends HTMLElement {
       else if (cuSet.has(id) || this._set.pinned.some((p) => p.entity === id)) parts.push(id + h.states[id].state);
     }
     for (const iv of this._dvAll()) { try { const m = this._dvMap(iv); parts.push(iv.main + (h.states[iv.main] ? h.states[iv.main].state + (h.states[iv.main].attributes.fan_speed || '') : '')); Object.values(m).forEach((x) => { if (x && h.states[x]) parts.push(x + h.states[x].state + (h.states[x].attributes.color_hex || '')); }); } catch (_) { /* ignore */ } }
+    if (this._dvAll().some((x) => x.type === 'waste')) parts.push(`wc${new Date().toDateString()}`);
     if (['home', 'more', 'rooms'].includes(this._view)) { parts.push(this._plSig()); parts.push(this._prSig()); }
     if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
     parts.push(this._bd.s);
@@ -2817,6 +2835,36 @@ _more() {
     return isNaN(v) ? esc(this._state(st)) : `${this._de(v, d === undefined ? (Math.abs(v) < 10 ? 1 : 0) : d)}${u ? ` ${esc(u)}` : ''}`;
   }
   _dvPow(st) { const v = parseFloat(st && st.state); if (isNaN(v)) return null; return st.attributes.unit_of_measurement === 'kW' ? v * 1000 : v; }
+  /* ---------- Abfallkalender: Termine aus einer calendar-Entität (z. B. Waste Collection Schedule), 30 Minuten im Speicher ---------- */
+  _wcGet(id) {
+    const cache = this._wcc || (this._wcc = {}); const now = Date.now(); const dk = new Date().toDateString();
+    let n = cache[id];
+    if (n && (n.busy || (n.dk === dk && now - n.at < 1800000))) return n;
+    if (!n) n = cache[id] = { at: 0, ev: null, busy: false, dk, h: '' };
+    const h = this._hass; if (!h || typeof h.callWS !== 'function') return n;
+    n.busy = true; n.dk = dk;
+    const a = WC.day(new Date()); const b = new Date(a.getFullYear(), a.getMonth(), a.getDate() + 75);
+    const tries = [
+      () => h.callWS({ type: 'call_service', domain: 'calendar', service: 'get_events', service_data: { start_date_time: a.toISOString(), end_date_time: b.toISOString() }, target: { entity_id: id }, return_response: true }),
+      () => h.callApi('GET', `calendars/${id}?start=${encodeURIComponent(a.toISOString())}&end=${encodeURIComponent(b.toISOString())}`),
+    ];
+    (async () => {
+      let ev = null;
+      for (const t of tries) { try { ev = WC.norm(await t(), id); if (ev) break; } catch (_) { /* nächster Versuch */ } }
+      const hh = JSON.stringify(ev || []);
+      const changed = hh !== n.h; n.h = hh; n.busy = false;
+      if (ev) { n.ev = ev; n.at = Date.now(); } else n.at = Date.now() - 1740000; /* nach einer Minute erneut versuchen */
+      if (changed) this._wcDone();
+    })();
+    return n;
+  }
+  _wcDone() {
+    clearTimeout(this._wcr);
+    this._wcr = setTimeout(() => {
+      if (this._edit || this._dg || this._drag || this._sheet || this._plFocus() || typeof this._render !== 'function') return;
+      this._sig = ''; this._render();
+    }, 250);
+  }
 
   /* ---------- Pool: Smart Pool Assistant + LayzSpa ---------- */
   _P() { return this._pl || (this._pl = { open: {}, wx: {}, wxBusy: {}, eta: {}, etaBusy: {}, fetching: false, fetchErr: null, opt: {}, optAt: 0 }); }
@@ -3926,6 +3974,86 @@ registerDevice({
     if (first && first.id !== iv.id) return c._edit ? '<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="mdi:pool"></ha-icon></div><div class="tt"><b>Pool</b><span>Es wird nur eine Pool-Karte gezeichnet. Diese hier bitte löschen.</span></div></div></div>' : '';
     c._pdv = { ...F, pool_rec: iv.main };
     return c._poolHtml(iv.id);
+  },
+});
+/* Abfall: Termine aus dem Abfallkalender (calendar-Entität, z. B. Waste Collection Schedule). Die Art der Abholung wird am Terminnamen erkannt.
+   Optional pro Tonne eine Erkennungs-Entität (Zustand present/missing o. ä.): zeigt "Am Platz" oder "Draußen" und erinnert ans Rausstellen und Reinholen. */
+const WC_TYPES = [
+  { k: 'bulky', re: /sperr/, l: 'Sperrmüll', t: 'Sperrmüll', icon: 'mdi:sofa-outline', col: '#a78f7c' },
+  { k: 'garden', re: /gruenschnitt|grunschnitt|garten|laub/, l: 'Grünschnitt', t: 'Grünschnitt', icon: 'mdi:leaf', col: '#7aa86a' },
+  { k: 'bio', re: /bio|organi|kompost/, l: 'Bioabfall', t: 'Biotonne', icon: 'mdi:flower', col: '#c9a07a', bin: /braun|bio/ },
+  { k: 'paper', re: /papier|pappe|karton|blau/, l: 'Altpapier', t: 'Altpapier', icon: 'mdi:trash-can', col: '#7fc47a', bin: /grun|gruen|papier|blau/ },
+  { k: 'yellow', re: /gelb|wertstoff|leichtverpack|plastik|verpackung/, l: 'Gelber Sack', t: 'Gelber Sack', icon: 'mdi:recycle', col: '#e3c64e', bin: /gelb|wertstoff/ },
+  { k: 'rest', re: /rest|hausmull|haus.?abfall|schwarz|grau/, l: 'Restmüll', t: 'Restmüll', icon: 'mdi:trash-can', col: '#b9bcc2', bin: /schwarz|rest|grau/ },
+];
+const WC = {
+  types: WC_TYPES,
+  day: (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()),
+  /* "2026-11-18" als lokalen Tag lesen, Zeitpunkte auf ihren lokalen Tag kürzen */
+  date: (v) => {
+    if (!v) return null; const x = typeof v === 'object' ? (v.date || v.dateTime) : v; if (!x) return null;
+    const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(x)); if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    const d = new Date(x); return isNaN(d.getTime()) ? null : WC.day(d);
+  },
+  norm: (r, id) => {
+    const resp = r && !Array.isArray(r) && (r.response || r); const e = Array.isArray(r) ? r : resp && resp[id] && resp[id].events;
+    if (!Array.isArray(e)) return null;
+    return e.map((x) => ({ s: String((x && x.summary) || '').trim(), d: x && WC.date(x.start) })).filter((x) => x.s && x.d).map((x) => ({ s: x.s, d: x.d.getTime() }));
+  },
+  fromState: (st) => {
+    const a = (st && st.attributes) || {}; const d = WC.date(String(a.start_time || '').slice(0, 10)); const s = String(a.message || '').trim();
+    return d && s ? [{ s, d: d.getTime() }] : [];
+  },
+  kind: (summary) => {
+    const t = norm(summary); const hit = WC_TYPES.find((x) => x.re.test(t));
+    return hit || { k: `x_${t}`, l: String(summary).trim(), t: String(summary).trim(), icon: 'mdi:trash-can-outline', col: '#9aa0a6' };
+  },
+  /* je Art der nächste Termin ab heute, nach Datum sortiert */
+  next: (events, t0) => {
+    const by = {};
+    (events || []).forEach((e) => { if (e.d < t0.getTime()) return; const k = WC.kind(e.s); if (!by[k.k] || e.d < by[k.k].d) by[k.k] = { ...k, d: e.d }; });
+    const ord = (x) => { const i = WC_TYPES.findIndex((y) => y.k === x.k); return i < 0 ? 99 : i; };
+    return Object.values(by).sort((a, b) => a.d - b.d || ord(a) - ord(b));
+  },
+  diff: (d, t0) => Math.round((d - t0.getTime()) / 864e5),
+  rel: (n) => (n <= 0 ? 'Heute' : n === 1 ? 'Morgen' : n === 2 ? 'Übermorgen' : `In ${n} Tagen`),
+  when: (d) => { const x = new Date(d); return `${x.toLocaleDateString('de-DE', { weekday: 'short' }).replace(/\.$/, '')}. ${x.getDate()}.${x.getMonth() + 1}.`; },
+  /* 'in' = Tonne am Platz, 'out' = draußen, null = unbekannt */
+  bin: (state) => {
+    const t = norm(state).trim().replace(/[\s-]+/g, '_');
+    if (/^(present|home|on|true|am_platz|at_place|vorhanden|da|detected|occupied)$/.test(t)) return 'in';
+    if (/^(missing|away|off|false|outside|draussen|weg|not_home|abwesend|absent|clear)$/.test(t)) return 'out';
+    return null;
+  },
+};
+const WC_BINNOT = /nachst|next|aktualis|update|szene|scene|schedule|waste|kalender|calendar|timestamp|erinnerung|reminder/;
+const WC_BINWIDE = /tonne|muell|abfall|waste|bin(?:[^a-z]|$)/;
+const wcBin = (k, l) => ({ l: `${l}: Tonnenerkennung (optional)`, dom: ['sensor', 'binary_sensor'], re: WC_TYPES.find((x) => x.k === k).bin, not: WC_BINNOT, wide: WC_BINWIDE });
+registerDevice({
+  type: 'waste', label: 'Abfall', icon: 'mdi:trash-can-outline', desc: 'Nächste Abholung aus dem Abfallkalender, optional mit Tonnenerkennung (Am Platz, Draußen)', size: 'w',
+  main: { dom: 'calendar', platform: 'waste_collection_schedule', prefer: /abfall|muell|waste|tonne|entsorg|garbage|trash/ },
+  fields: { bin_bio: wcBin('bio', 'Biotonne'), bin_paper: wcBin('paper', 'Altpapier'), bin_rest: wcBin('rest', 'Restmüll'), bin_yellow: wcBin('yellow', 'Gelber Sack') },
+  render: (c, iv, F, st) => {
+    const id = iv.main; const t0 = WC.day(new Date()); const d = c._wcGet(id);
+    const ev = d.ev && d.ev.length ? d.ev : WC.fromState(st);
+    const list = WC.next(ev, t0);
+    const label = iv.title || 'Nächste Abholung';
+    const head = (ic, col, name, sub, pill, cls) => `<div class="wch" style="--wc:${col}" data-act="info" data-id="${id}"><div class="wci"><ha-icon icon="${ic}"></ha-icon></div><div class="tt"><small>${esc(label)}</small><b>${esc(name)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>${pill ? `<div class="wcp ${cls || ''}">${esc(pill)}</div>` : ''}</div>`;
+    let h;
+    if (!list.length) h = head('mdi:trash-can-outline', '#9aa0a6', d.busy || !d.ev ? 'Lädt …' : 'Keine Abholung gefunden', d.busy || !d.ev ? '' : 'Im Abfallkalender stehen keine kommenden Termine', '', '');
+    else {
+      const f = list[0]; const same = list.filter((x) => x.d === f.d); const n = WC.diff(f.d, t0);
+      h = head(f.icon, f.col, same.map((x) => x.l).join(' + '), WC.when(f.d), WC.rel(n), n <= 0 ? 't0' : n === 1 ? 't1' : '');
+    }
+    const tiles = list.map((x) => ({ ...x, bin: WC_TYPES.find((y) => y.k === x.k) && c._dvS(F[`bin_${x.k}`]) }));
+    WC_TYPES.filter((x) => x.bin && !list.some((y) => y.k === x.k)).forEach((x) => { const b = c._dvS(F[`bin_${x.k}`]); if (b) tiles.push({ ...x, d: null, bin: b }); });
+    const tile = (x) => {
+      const n = x.d === null ? null : WC.diff(x.d, t0); const bs = x.bin ? WC.bin(x.bin.state) : null;
+      const stat = !x.bin ? '' : bs === 'in' ? (n !== null && n <= 1 ? ['todo', 'Rausstellen'] : ['in', 'Am Platz']) : bs === 'out' ? (n === null || n > 1 ? ['todo', 'Reinholen'] : ['out', 'Draußen']) : ['', c._state(x.bin)];
+      const date = n === null ? '' : `${WC.when(x.d)} · ${WC.rel(n).replace(/^./, (m) => m.toLowerCase())}`;
+      return `<div class="wct" style="--wc:${x.col}" data-act="info" data-id="${x.bin ? x.bin.entity_id : id}"><div class="wci"><ha-icon icon="${x.bin ? 'mdi:trash-can' : x.icon}"></ha-icon></div><b>${esc(x.t)}</b>${stat ? `<div class="wcs ${stat[0]}">${esc(stat[1])}</div>` : ''}${date ? `<small>${esc(date)}</small>` : ''}</div>`;
+    };
+    return `<div class="dvc wc">${h}${tiles.length ? `<div class="wcg">${tiles.map(tile).join('')}</div>` : ''}</div>`;
   },
 });
 /* Proxmox: Entitäten der Integration proxmoxve (deutsche und englische Namen). Pro Gerät (Node, LXC, VM) werden sie am selben Gerät gesucht. */
