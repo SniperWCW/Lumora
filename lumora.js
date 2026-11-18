@@ -70,7 +70,7 @@ const mergeLook = (v) => {
   o.evMax = Math.max(1, Math.min(8, parseInt(v.evMax, 10) || LOOK_DEF.evMax));
   const out = [];
   ((v.v || 0) >= LOOK_V && Array.isArray(v.blocks) ? v.blocks : []).forEach((b) => {
-    const id = b && b.id; const d = BLOCK_DEF.find((x) => x[0] === id); const card = typeof id === 'string' && /^c:.{1,120}$/.test(id);
+    const id = b && b.id; const d = BLOCK_DEF.find((x) => x[0] === id); const card = typeof id === 'string' && /^c:.{1,120}$/.test(id) && !/^c:(?:energyhome|espark)$/.test(id);
     if ((d || card) && !out.some((x) => x.id === id)) out.push({ id, w: BLOCK_W.some((x) => x[0] === b.w) ? b.w : (d ? d[2] : 6), on: b.on !== false });
   });
   BLOCK_DEF.forEach((d) => { if (!out.some((x) => x.id === d[0])) out.push({ id: d[0], w: d[2], on: !!d[3] }); });
@@ -738,6 +738,12 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .dvs{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px}
 .dvs>div{background:var(--line);border-radius:14px;padding:8px 10px;min-width:0;cursor:pointer}.dvs small{display:block;font-size:11px;color:var(--fg2)}.dvs b{font-size:15px;font-weight:600}
 .dvm{display:flex;flex-direction:column;gap:8px}.dvm>div{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:13px;cursor:pointer}.dvm span{color:var(--fg2)}
+.dve{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.dve .dh{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer}.dve .dh b{display:block;font-size:14px;font-weight:600}.dve .dh span{font-size:12px;color:var(--fg2)}
+.dve .big{font-size:26px;font-weight:600;white-space:nowrap}
+.dve .rw{cursor:pointer;min-width:0}.dve .rl{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13.5px}
+.dve .rl span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dve .rl span:last-child{font-weight:600;white-space:nowrap;flex:none}.dve .rl ha-icon{--mdc-icon-size:18px;margin-right:6px}
+.dve .spk{margin-top:6px}
 .dvm i{grid-column:1/-1;height:5px;border-radius:3px;background:var(--line);overflow:hidden}.dvm i u{display:block;height:100%;background:var(--b)}.dvm i.lo u{background:#c9694f}
 .dverr{display:flex;gap:8px;align-items:center;background:rgba(200,80,60,.16);border-radius:12px;padding:8px 10px;font-size:13px}.dverr ha-icon{--mdc-icon-size:20px;flex:none}
 .bb{height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:5px}.bb u{display:block;height:100%;background:#7fa56a}.bb.wn u{background:#d9a441}.bb.lo u{background:#c9694f}
@@ -1765,20 +1771,6 @@ class LumoraCard extends HTMLElement {
     const pic = p && p.attributes.entity_picture; const nm = (p && p.attributes.friendly_name) || '?';
     return `<div class="av">${pic ? `<img src="${esc(pic)}" alt="">` : `<span>${esc(nm[0])}</span>`}${big ? '' : '<i></i>'}</div>`;
   }
-  _energy() {
-    const e = {}; ['pv', 'consumption', 'grid_in', 'grid_out', 'battery_in', 'battery_out', 'soc', 'forecast'].forEach((k) => { e[k] = this._slot(`e_${k}`); }); const n = (k) => this._num(e[k]);
-    const cons = n('consumption'); const pv = n('pv');
-    if (cons === null && pv === null) return '';
-    const gin = n('grid_in') || 0; const gout = n('grid_out') || 0; const bin = n('battery_in') || 0; const bout = n('battery_out') || 0;
-    const soc = n('soc'); const fc = n('forecast');
-    const max = Math.max(cons || 0, pv || 0, gin, gout, bin, bout, 1);
-    const row = (ic, label, v, cls) => `<div class="rw"><div class="rl"><span><ha-icon icon="${ic}"></ha-icon>${label}</span><span>${this._w(v)}</span></div><div class="bar ${cls}"><i style="width:${Math.max(2, Math.round((v / max) * 100))}%"></i></div></div>`;
-    const grid = gout > gin ? ['Netz · Einspeisung', gout] : ['Netz · Bezug', gin];
-    const bat = bin > bout ? ['Batterie · lädt', bin] : ['Batterie · entlädt', bout];
-    const sub = fc !== null ? `Prognose heute bis ${this._w(fc)}` : 'Aktuelle Leistung';
-    return `<div class="en" data-act="info" data-id="${e.consumption || e.pv}"><div class="hd"><div class="ib"><ha-icon icon="mdi:flash"></ha-icon></div><div><b>Stromverbrauch</b><span>${sub}</span></div><div class="big">${this._w(cons || 0)}</div></div>
-      ${row('mdi:solar-power', 'PV-Erzeugung', pv || 0, '')}${row('mdi:transmission-tower', grid[0], grid[1], 'g')}${row('mdi:home-battery', `${bat[0]}${soc !== null ? ` · ${Math.round(soc)} %` : ''}`, bat[1], 'b')}</div>`;
-  }
   _home() {
     const h = this._hass; const D = this._byDomain(); const al = this._alerts();
     const persons = D.person || [];
@@ -1828,10 +1820,8 @@ class LumoraCard extends HTMLElement {
       cards.push(this._card(st, `${this._state(st)}${this._edit && p.only ? ' · nur wenn aktiv' : ''}`, p.entity, this._edit, `${idle ? 'hid' : ''} ${this._set.size[p.entity] ? `sz-${this._set.size[p.entity]}` : ''}`, p));
     });
     if (!isTiles || this._edit) cards.push(`<div class="card add" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</div>`);
-    const en = this._energy();
     const placed = new Set(isTiles ? Lk.blocks.filter((b) => b.id.startsWith('c:')).map((b) => b.id.slice(2)) : []);
     const regItems = this._regItems('home').filter((x) => !placed.has(x.id));
-    if (en && !placed.has('energyhome')) regItems.push({ id: 'energyhome', html: `<div class="enw">${en}</div>`, size: this._set.size.energyhome || 'f', def: { fixed: true } });
     const regCells = this._ord('homereg', regItems, (x) => x.id).map((x) => this._cell(x, 'homereg')).filter(Boolean).join('');
     const dsg = '<button class="pill" style="padding:5px 10px;font-size:12px" data-act="look"><ha-icon icon="mdi:palette-outline"></ha-icon>Design</button>';
     if (this._set.look.layout === 'tiles') return this._homeTiles({ D, al, persons, home, wx, temp, hum, me, nm, greet, lights, apill, note, pills, regCells, nCards: cards.length, cardsHtml: `<div class="grid">${cards.join('')}</div>` });
@@ -1863,9 +1853,7 @@ class LumoraCard extends HTMLElement {
   }
   /* Karten-Katalog: alle Register-Karten plus Energie; jede lässt sich als eigener Block ins Layout setzen */
   _cardCat() {
-    const out = this._allReg().filter((x) => !x.def.fixed); const en = this._energy();
-    if (en) out.unshift({ id: 'energyhome', html: `<div class="enw">${en}</div>`, size: this._set.size.energyhome || 'f', name: 'Energie', def: { id: 'energyhome', label: 'Energie', icon: 'mdi:lightning-bolt', fixed: true } });
-    return out;
+    return this._allReg().filter((x) => !x.def.fixed);
   }
   _cardNames(cat) {
     const cnt = {}; cat.forEach((x) => { cnt[x.def.id] = (cnt[x.def.id] || 0) + 1; }); const seen = {}; const res = {};
@@ -3114,7 +3102,7 @@ _more() {
       const cat = this._cardCat(); const it = cat.find((x) => x.id === id.slice(2)); const nm = it ? this._cardNames(cat)[it.id] : 'Karte nicht verfügbar';
       return `<div class="lkc" style="margin-bottom:6px"><button class="pill" data-act="look"><ha-icon icon="mdi:chevron-left"></ha-icon>Design</button></div><h2>${esc(nm)}</h2>
         ${it ? '' : '<div class="hint">Diese Karte gibt es gerade nicht (gelöscht oder keine passenden Daten). Sie lässt sich aus dem Layout entfernen.</div>'}
-        <div class="lkc">${it && it.cfg ? `<button class="pill" data-act="cc" data-id="${esc(it.id)}"><ha-icon icon="mdi:cog-outline"></ha-icon>Karte konfigurieren</button>` : ''}${it && it.id !== 'energyhome' ? `<button class="pill" data-act="placeopen" data-id="${esc(it.id)}"><ha-icon icon="mdi:folder-move-outline"></ha-icon>Ort ändern</button>` : ''}<button class="pill" data-act="lkcdel" data-id="${esc(id)}"><ha-icon icon="mdi:close"></ha-icon>Aus dem Layout entfernen</button></div>
+        <div class="lkc">${it && it.cfg ? `<button class="pill" data-act="cc" data-id="${esc(it.id)}"><ha-icon icon="mdi:cog-outline"></ha-icon>Karte konfigurieren</button>` : ''}${it ? `<button class="pill" data-act="placeopen" data-id="${esc(it.id)}"><ha-icon icon="mdi:folder-move-outline"></ha-icon>Ort ändern</button>` : ''}<button class="pill" data-act="lkcdel" data-id="${esc(id)}"><ha-icon icon="mdi:close"></ha-icon>Aus dem Layout entfernen</button></div>
         <div class="hint" style="margin-top:8px">Breite und Ein/Aus stehen im Design-Dialog oder direkt am Block im Bearbeiten-Modus. Die Karte bleibt erhalten, wenn du sie nur aus dem Layout entfernst.</div>
         <div class="row" style="border:0;margin-top:10px"><span></span><button class="sel" data-act="close">Fertig</button></div>`;
     }
@@ -3139,8 +3127,7 @@ _more() {
       const all = this._allReg().filter((x) => !x.def.fixed); const cnt = {}; all.forEach((x) => { cnt[x.def.id] = (cnt[x.def.id] || 0) + 1; }); const seen = {};
       const row = (name, sub, idc, size, hd, moveable) => `<div class="row"><div class="t"><b>${esc(name)}</b><span>${esc(sub)}${hd ? ' · ausgeblendet' : ''}</span></div><div class="lkb">${moveable ? `<button data-act="placeopen" data-id="${esc(idc)}">Ort</button>` : ''}<button data-act="size" data-id="${esc(idc)}" data-d="${size}" aria-label="Größe"><ha-icon icon="${SIZE_ICON[size]}"></ha-icon></button><button class="${hd ? '' : 'sel'}" data-act="hidee" data-id="${esc(idc)}">${hd ? 'Aus' : 'An'}</button></div></div>`;
       const rows = all.map((x) => { seen[x.def.id] = (seen[x.def.id] || 0) + 1; const nm = cnt[x.def.id] > 1 ? `${x.def.label} ${seen[x.def.id]}` : x.def.label; const pl = x.pl === 'home' ? 'Zuhause' : x.pl === 'more' ? 'Mehr' : String(x.pl).startsWith('area:') ? this._aname(String(x.pl).slice(5)) : x.pl; return row(nm, pl, x.id, x.size, s.hidden.includes(x.id), true); }).join('');
-      const en = this._energy() ? row('Energie', 'Zuhause', 'energyhome', s.size.energyhome || 'f', s.hidden.includes('energyhome'), false) : '';
-      c = `<div class="hint">Alle Karten mit ihrem Ort. „Ort“ legt eine Karte auf Zuhause, Mehr oder in einen Raum. Hier erscheinen nur Karten, die auf Zuhause liegen. Größe und Ein/Aus gelten für jede Karte einzeln, die Reihenfolge ändert sich im Bearbeiten-Modus per Ziehen.</div>${en}${rows}`;
+      c = `<div class="hint">Alle Karten mit ihrem Ort. „Ort“ legt eine Karte auf Zuhause, Mehr oder in einen Raum. Hier erscheinen nur Karten, die auf Zuhause liegen. Größe und Ein/Aus gelten für jede Karte einzeln, die Reihenfolge ändert sich im Bearbeiten-Modus per Ziehen.</div>${rows}`;
     } else if (id === 'active') c = `<div class="hint">Zeigt, was gerade aktiv ist (laufende Geräte, Medien, Drucker, Pakete) und deine angehefteten Entitäten. Ohne Inhalt verschwindet der Block. Die Lichter-Karte entfällt, wenn die Kennzahl Beleuchtung aktiv ist. Anheften und Verschieben gehen im Bearbeiten-Modus.</div><div class="lkc"><button class="pill" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte anheften</button></div>`;
     else if (id === 'cams') c = `<div class="hint">Kameras auf der Startseite. Welche, legst du hier fest.</div><div class="lkc"><button class="pill" data-act="hc"><ha-icon icon="mdi:cctv"></ha-icon>Kameras wählen</button></div>`;
     return `<div class="lkc" style="margin-bottom:6px"><button class="pill" data-act="look"><ha-icon icon="mdi:chevron-left"></ha-icon>Design</button></div><h2>${esc(d[1])}</h2>${c}<div class="row" style="border:0;margin-top:10px"><span></span><button class="sel" data-act="close">Fertig</button></div>`;
@@ -3259,11 +3246,11 @@ _more() {
     return null;
   }
   _dvMap(iv) {
-    const tp = DEVTPL[iv.type]; const P = this._dvPool(iv); const ck = `${P.k}|${JSON.stringify(iv.map)}`;
+    const tp = DEVTPL[iv.type]; const P = this._dvPool(iv); const ck = `${P.k}|${JSON.stringify(iv.map)}|${JSON.stringify((this._set || {}).sources)}`;
     const cache = this._dvR || (this._dvR = {});
     if (cache[iv.id] && cache[iv.id].k === ck) return cache[iv.id].v;
     const v = {};
-    for (const k in tp.fields) { const m = iv.map[k]; v[k] = m === '-' ? null : m || this._dvFind(iv, tp.fields[k]); }
+    for (const k in tp.fields) { const m = iv.map[k]; const fs = tp.fields[k]; v[k] = m === '-' ? null : m || (fs.slot ? this._slot(fs.slot) : this._dvFind(iv, fs)); }
     cache[iv.id] = { k: ck, v };
     return v;
   }
@@ -4235,11 +4222,6 @@ registerCard({ id: 'pkg', label: 'Pakete', icon: 'mdi:package-variant-closed', i
     const pk = c._pkgs(); if (pk) add('pkg', c._pkgPanel(pk), true);
   return items;
 } });
-registerCard({ id: 'energy', label: 'Energie', icon: 'mdi:lightning-bolt', fixed: true, items: (c) => {
-  const { items, add } = newItems();
-    add('energy', c._energy(), true);
-  return items;
-} });
 registerCard({ id: 'meter', label: 'Netzbezug', icon: 'mdi:meter-electric', items: (c) => {
   const { items, add } = newItems();
     const m = c._xs('meter'); if (m) add('stat:meter', c._stat('mdi:meter-electric', 'Netzbezug aktuell', c._de(parseFloat(m.state)), 'W', m.entity_id));
@@ -4331,12 +4313,6 @@ registerCard({ id: 'offline', label: 'Geräte offline', icon: 'mdi:lan-disconnec
   const l = c._offline();
   return l.length ? [{ id: 'offline', html: c._offHtml(l), size: 'w' }] : [];
 } });
-registerCard({ id: 'espark', label: 'Energie-Verlauf', icon: 'mdi:chart-areaspline', size: 'f', items: (c) => {
-  const rows = [['PV-Erzeugung', c._xs('e_pv'), 'a'], ['Hausverbrauch', c._xs('e_consumption'), '']].filter((r) => r[1]);
-  if (!rows.length) return [];
-  const body = rows.map(([l, st, cl]) => `<div class="rw" data-act="info" data-id="${st.entity_id}"><div class="rl"><span>${l}</span><span>${c._w(parseFloat(st.state) || 0)}</span></div>${c._spark(c._hist(st.entity_id, 24), 56, cl)}</div>`).join('');
-  return [{ id: 'espark', html: `<div class="en nopt"><div class="hd"><div class="ib"><ha-icon icon="mdi:chart-areaspline"></ha-icon></div><div><b>Energie-Verlauf</b><span>letzte 24 Stunden</span></div></div>${body}</div>`, size: 'f' }];
-} });
 registerCard({ id: 'custom', label: 'Eigene Karten', icon: 'mdi:card-text-outline', home: true, size: 's', items: (c) => c._set.custom.map((cu) => {
   const st = c._hass.states[cu.entity];
   if (!st) return c._edit ? { id: cu.id, html: c._customMissing(cu), cfg: true } : null;
@@ -4399,6 +4375,14 @@ registerDevice({
     temp: { l: 'Temperatur Wechselrichter', dom: 'sensor', dc: 'temperature', re: /inverter|wechselrichter|temp|internal/ },
     status: { l: 'Status', dom: 'sensor', re: /status|state|betriebs|operating|work_?mode|zustand/, not: /battery|batter|charge|laden/ },
     forecast: { l: 'Prognose heute', dom: 'sensor', dc: 'energy', re: /(forecast|prognose|production|erzeugung).*(today|heute)|(today|heute).*(forecast|prognose)/, wide: /forecast|prognose|solar|energy_production_(today|heute)/ },
+    /* Hausverbrauch und Energiefluss: dieselbe automatische Erkennung (und dieselben Quellen-Einstellungen) wie die früheren Karten Stromverbrauch und Energie-Verlauf */
+    cons: { l: 'Hausverbrauch', dom: 'sensor', slot: 'e_consumption' },
+    gridin: { l: 'Netzbezug', dom: 'sensor', slot: 'e_grid_in' },
+    gridout: { l: 'Einspeisung', dom: 'sensor', slot: 'e_grid_out' },
+    batin: { l: 'Batterie lädt', dom: 'sensor', slot: 'e_battery_in' },
+    batout: { l: 'Batterie entlädt', dom: 'sensor', slot: 'e_battery_out' },
+    soc: { l: 'Batterie-Ladestand', dom: 'sensor', slot: 'e_soc' },
+    peak: { l: 'Prognose Leistung heute', dom: 'sensor', slot: 'e_forecast' },
   },
   render: (c, iv, F, st) => {
     const w = c._dvPow(st); const id = iv.main;
@@ -4406,8 +4390,24 @@ registerDevice({
     const stat = (l, s2, d) => dvStat(c, l, s2, d);
     const stats = [stat('Heute', c._dvS(F.today), 1), stat('Gesamt', c._dvS(F.total), 0), stat('Prognose', c._dvS(F.forecast), 1), stat('Wechselrichter', c._dvS(F.temp), 0)].join('');
     const strs = ['string1', 'string2'].map((k) => { const s2 = c._dvS(F[k]); const p = s2 ? c._dvPow(s2) : null; return p === null ? '' : `<div data-act="info" data-id="${s2.entity_id}"><b>${esc(DEVTPL.pv.fields[k].l)}</b><span>${c._w(p)}</span></div>`; }).join('');
+    const pw = (k) => { const s2 = c._dvS(F[k]); const v = s2 ? c._dvPow(s2) : null; return v === null ? null : v; };
+    const cons = pw('cons'); const gin = pw('gridin'); const gout = pw('gridout'); const bin = pw('batin'); const bout = pw('batout'); const soc = pw('soc'); const peak = pw('peak');
+    /* Stromverbrauch: Verbrauch, PV, Netz und Batterie als Balken */
+    let flow = '';
+    if ([cons, gin, gout, bin, bout, soc].some((v) => v !== null)) {
+      const max = Math.max(cons || 0, w || 0, gin || 0, gout || 0, bin || 0, bout || 0, 1);
+      const row = (ic, label, v, cls, eid) => `<div class="rw" data-act="info" data-id="${eid}"><div class="rl"><span><ha-icon icon="${ic}"></ha-icon>${esc(label)}</span><span>${esc(c._w(v))}</span></div><div class="bar ${cls}"><i style="width:${Math.max(2, Math.round((v / max) * 100))}%"></i></div></div>`;
+      const grid = (gout || 0) > (gin || 0) ? ['Netz · Einspeisung', gout || 0, F.gridout] : ['Netz · Bezug', gin || 0, F.gridin];
+      const bat = (bin || 0) > (bout || 0) ? ['Batterie · lädt', bin || 0, F.batin] : ['Batterie · entlädt', bout || 0, F.batout];
+      const hasGrid = gin !== null || gout !== null; const hasBat = bin !== null || bout !== null || soc !== null;
+      flow = `<div class="dve"><div class="dh"${cons !== null ? ` data-act="info" data-id="${F.cons}"` : ''}><div><b>Stromverbrauch</b><span>${peak !== null ? `Prognose heute bis ${esc(c._w(peak))}` : 'Aktuelle Leistung'}</span></div>${cons !== null ? `<div class="big">${esc(c._w(cons))}</div>` : ''}</div>
+        ${row('mdi:solar-power', 'PV-Erzeugung', w || 0, '', id)}${hasGrid ? row('mdi:transmission-tower', grid[0], grid[1], 'g', grid[2] || F.gridin || F.gridout) : ''}${hasBat ? row('mdi:home-battery', `${bat[0]}${soc !== null ? ` · ${Math.round(soc)} %` : ''}`, bat[1], 'b', bat[2] || F.batin || F.batout || F.soc) : ''}</div>`;
+    }
+    /* Energie-Verlauf: Hausverbrauch der letzten 24 Stunden (die PV-Kurve ist oben schon die Hauptkurve) */
+    const consS = cons !== null ? c._dvS(F.cons) : null;
+    const hist = consS ? `<div class="dve"><div class="dh"><div><b>Energie-Verlauf</b><span>letzte 24 Stunden</span></div></div><div class="rw" data-act="info" data-id="${consS.entity_id}"><div class="rl"><span>Hausverbrauch</span><span>${esc(c._w(cons))}</span></div>${c._spark(c._hist(consS.entity_id, 24), 56, '')}</div></div>` : '';
     return `<div class="dvc"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="mdi:solar-power-variant"></ha-icon></div><div class="tt"><b>${esc(iv.title || st.attributes.friendly_name || id)}</b><span>${esc(sub)}</span></div><div class="big">${w === null ? '–' : esc(c._w(w))}</div></div>
-      ${c._spark(c._hist(id, 24), 56, 'a')}${stats ? `<div class="dvs">${stats}</div>` : ''}${strs ? `<div class="dvm">${strs}</div>` : ''}</div>`;
+      ${c._spark(c._hist(id, 24), 56, 'a')}${stats ? `<div class="dvs">${stats}</div>` : ''}${strs ? `<div class="dvm">${strs}</div>` : ''}${flow}${hist}</div>`;
   },
 });
 /* Pool: Smart Pool Assistant (Empfehlung, Chlor, pH, Baden, Verlauf) und LayzSpa (Pumpe, Heizung, Blubber, Zieltemperatur).

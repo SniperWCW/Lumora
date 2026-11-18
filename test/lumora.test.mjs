@@ -878,3 +878,44 @@ test('Design: mergeLook behält Karten-Blöcke', () => {
   assert.equal(m.blocks[0].id, 'c:abc');
   assert.ok(!m.blocks.some((b) => b.id === 'x:foo'));
 });
+
+test('PV-Anlage: Gerätekarte enthält Stromverbrauch und Energie-Verlauf mit automatischer Erkennung', () => {
+  const T = L.DEVTPL.pv; assert.ok(T);
+  const S = (state, fn, a = {}) => ({ state, attributes: { friendly_name: fn, device_class: 'power', unit_of_measurement: 'W', ...a } });
+  const states = {
+    'sensor.foxess_pv_power': S('0', 'FoxESS - Modbus (Solarwatt) PV Power'),
+    'sensor.hausverbrauch': S('344', 'Hausverbrauch'),
+    'sensor.netzbezug': S('22', 'Netzbezug'),
+    'sensor.batterie_entladen': S('333', 'Batterie entladen'),
+    'sensor.batterie_ladestand': S('33', 'Batterie Ladestand', { device_class: 'battery', unit_of_measurement: '%' }),
+    'sensor.pv_prognose_heute_leistung': S('996', 'PV Prognose heute Leistung'),
+  };
+  Object.keys(states).forEach((k) => { states[k].entity_id = k; });
+  const c = Object.create(L.card.prototype);
+  c._hass = { states, entities: {}, callWS: () => new Promise(() => {}) }; c._set = { sources: {}, hidden: [], size: {}, place: {}, devices: [] }; c._cfg = {}; c._dvP = null; c._dvR = null; c._hc = {};
+  const iv = { id: 'pv1', type: 'pv', main: 'sensor.foxess_pv_power', map: {}, title: '' };
+  const F = c._dvMap(iv);
+  assert.equal(F.cons, 'sensor.hausverbrauch');
+  assert.equal(F.gridin, 'sensor.netzbezug');
+  assert.equal(F.batout, 'sensor.batterie_entladen');
+  assert.equal(F.soc, 'sensor.batterie_ladestand');
+  const html = T.render(c, iv, F, states['sensor.foxess_pv_power']);
+  assert.match(html, /Stromverbrauch/); assert.match(html, /344 W/); assert.match(html, /Prognose heute bis 996 W/);
+  assert.match(html, /Netz · Bezug/); assert.match(html, /Batterie · entlädt · 33 %/); assert.match(html, /Energie-Verlauf/);
+  /* manuell abwählbar */
+  iv.map.cons = '-'; c._dvR = null;
+  const h2 = T.render(c, iv, c._dvMap(iv), states['sensor.foxess_pv_power']);
+  assert.ok(!h2.includes('Energie-Verlauf'));
+  /* ohne Energie-Sensoren bleibt die Karte unverändert schlank */
+  const c2 = Object.create(L.card.prototype); const only = { 'sensor.foxess_pv_power': states['sensor.foxess_pv_power'] };
+  c2._hass = { states: only, entities: {}, callWS: () => new Promise(() => {}) }; c2._set = c._set; c2._cfg = {}; c2._dvP = null; c2._dvR = null; c2._hc = {};
+  const h3 = T.render(c2, { id: 'pv2', type: 'pv', main: 'sensor.foxess_pv_power', map: {}, title: '' }, c2._dvMap({ id: 'pv2', type: 'pv', main: 'sensor.foxess_pv_power', map: {}, title: '' }), only['sensor.foxess_pv_power']);
+  assert.ok(!h3.includes('Stromverbrauch') && !h3.includes('Energie-Verlauf'));
+});
+
+test('Energie: alte Einzelkarten sind entfernt, alte Kachel-Blöcke verschwinden', () => {
+  assert.ok(!L.win.LumoraCards.list().some((x) => x.id === 'energy' || x.id === 'espark'));
+  const m = L.mergeLook({ v: 3, blocks: [{ id: 'c:energyhome', w: 6, on: true }, { id: 'c:espark', w: 12, on: true }, { id: 'c:abc', w: 6, on: true }] });
+  assert.ok(!m.blocks.some((b) => b.id === 'c:energyhome' || b.id === 'c:espark'));
+  assert.ok(m.blocks.some((b) => b.id === 'c:abc'));
+});
