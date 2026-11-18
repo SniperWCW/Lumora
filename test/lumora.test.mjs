@@ -712,3 +712,9 @@ test('Abfall: Karte zeigt nächste Abholung, Tonnenstatus und Erinnerungen', () 
   assert.match(html, /Nächste Abholung/); assert.match(html, /Bioabfall/); assert.match(html, />Heute</);
   assert.equal((html.match(/class="wct"/g) || []).length, 3);
 });
+
+test('Abfall: Rausstellen am Abholtag bis mittags und am Vorabend ab 16 Uhr', () => {
+  assert.equal(L.WC.due(0, 7), true); assert.equal(L.WC.due(0, 13), false);
+  assert.equal(L.WC.due(1, 8), false); assert.equal(L.WC.due(1, 16), true);
+  assert.equal(L.WC.due(2, 18), false);
+});

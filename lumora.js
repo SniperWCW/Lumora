@@ -630,22 +630,22 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .px>span{font-size:12.5px;text-align:right;white-space:nowrap}.px.off>ha-icon,.px.off .st{color:#c9694f}.px.na{opacity:.55}.px .st{grid-column:span 2;font-weight:600}
 .dvc.pxoff{opacity:.85}
 .wc .wch{display:flex;align-items:center;gap:12px;background:var(--line);border-radius:18px;padding:12px 14px;box-shadow:inset 4px 0 0 var(--wc);min-width:0;cursor:pointer}
-.wc .wci{position:relative;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;flex:none;color:var(--wc);overflow:hidden}
-.wc .wci::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:var(--wc);opacity:.18}
+.wc .wci{position:relative;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;flex:none;color:var(--fg);overflow:hidden}
+.wc .wci::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:var(--wc);opacity:.35}
 .wc .wci ha-icon{position:relative}
 .wc .wch .tt{flex:1;min-width:0;display:flex;flex-direction:column}
-.wc .wch small{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fg2)}
+.wc .wch small{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fg);opacity:.75}
 .wc .wch .tt b{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wc .wch .tt span{font-size:12.5px;color:var(--fg2)}
-.wcp{flex:none;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700;background:var(--line);color:var(--fg2);white-space:nowrap}
-.wcp.t0{background:rgba(214,96,88,.2);color:#d9776a}.wcp.t1{background:rgba(220,170,70,.2);color:#d3a24a}
+.wc .wch .tt span{font-size:13px;color:var(--fg);opacity:.8}
+.wcp{flex:none;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700;background:rgba(128,128,128,.22);color:var(--fg);white-space:nowrap}
+.wcp.t0{background:rgba(214,96,88,.4)}.wcp.t1{background:rgba(220,160,50,.4)}
 .wcg{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px}
 .wct{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;background:var(--line);border-radius:16px;padding:12px 8px;box-shadow:inset 3px 0 0 var(--wc);min-width:0;cursor:pointer}
 .wct .wci{width:38px;height:38px;border-radius:12px;margin-bottom:2px}
 .wct b{font-size:14px;font-weight:600;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wct .wcs{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--fg2)}
-.wct .wcs.out{color:var(--wc)}.wct .wcs.todo{color:#d3a24a}
-.wct small{font-size:11.5px;color:var(--fg2)}
+.wct .wcs{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--fg);border-radius:999px;padding:3px 10px;background:rgba(128,128,128,.2)}
+.wct .wcs.in{background:none;opacity:.8}.wct .wcs.out{background:rgba(120,150,200,.35)}.wct .wcs.todo{background:rgba(220,160,50,.45)}
+.wct small{font-size:12px;color:var(--fg);opacity:.75}
 .sdc{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;flex-wrap:wrap}.sdc>div{display:flex;align-items:center;gap:6px}.sdc b{min-width:64px;text-align:center}.sdc .pill{display:inline-flex;align-items:center;gap:4px}.sdc .pill ha-icon{--mdc-icon-size:16px}
 .sdm small{display:block;font-size:11px;color:var(--fg2);margin-bottom:4px}.sdh{display:flex;align-items:flex-end;gap:3px;height:36px}.sdh i{flex:1;min-width:0;background:var(--b);border-radius:2px 2px 0 0;opacity:.85}
 .kx .dvm b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kxc>.kxr{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:default}.kxr>div{display:flex;align-items:center;gap:6px}.kxr b{min-width:56px;text-align:center}
@@ -1144,7 +1144,7 @@ class LumoraCard extends HTMLElement {
       else if (cuSet.has(id) || this._set.pinned.some((p) => p.entity === id)) parts.push(id + h.states[id].state);
     }
     for (const iv of this._dvAll()) { try { const m = this._dvMap(iv); parts.push(iv.main + (h.states[iv.main] ? h.states[iv.main].state + (h.states[iv.main].attributes.fan_speed || '') : '')); Object.values(m).forEach((x) => { if (x && h.states[x]) parts.push(x + h.states[x].state + (h.states[x].attributes.color_hex || '')); }); } catch (_) { /* ignore */ } }
-    if (this._dvAll().some((x) => x.type === 'waste')) parts.push(`wc${new Date().toDateString()}`);
+    if (this._dvAll().some((x) => x.type === 'waste')) parts.push(`wc${new Date().toDateString()}${new Date().getHours()}`);
     if (['home', 'more', 'rooms'].includes(this._view)) { parts.push(this._plSig()); parts.push(this._prSig()); }
     if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
     parts.push(this._bd.s);
@@ -4015,6 +4015,8 @@ const WC = {
     const ord = (x) => { const i = WC_TYPES.findIndex((y) => y.k === x.k); return i < 0 ? 99 : i; };
     return Object.values(by).sort((a, b) => a.d - b.d || ord(a) - ord(b));
   },
+  /* Rausstellen: am Abholtag bis mittags, am Vorabend ab 16 Uhr */
+  due: (n, hour) => (n === 0 && hour < 12) || (n === 1 && hour >= 16),
   diff: (d, t0) => Math.round((d - t0.getTime()) / 864e5),
   rel: (n) => (n <= 0 ? 'Heute' : n === 1 ? 'Morgen' : n === 2 ? 'Übermorgen' : `In ${n} Tagen`),
   when: (d) => { const x = new Date(d); return `${x.toLocaleDateString('de-DE', { weekday: 'short' }).replace(/\.$/, '')}. ${x.getDate()}.${x.getMonth() + 1}.`; },
@@ -4034,7 +4036,7 @@ registerDevice({
   main: { dom: 'calendar', platform: 'waste_collection_schedule', prefer: /abfall|muell|waste|tonne|entsorg|garbage|trash/ },
   fields: { bin_bio: wcBin('bio', 'Biotonne'), bin_paper: wcBin('paper', 'Altpapier'), bin_rest: wcBin('rest', 'Restmüll'), bin_yellow: wcBin('yellow', 'Gelber Sack') },
   render: (c, iv, F, st) => {
-    const id = iv.main; const t0 = WC.day(new Date()); const d = c._wcGet(id);
+    const id = iv.main; const now = new Date(); const t0 = WC.day(now); const hour = now.getHours(); const d = c._wcGet(id);
     const ev = d.ev && d.ev.length ? d.ev : WC.fromState(st);
     const list = WC.next(ev, t0);
     const label = iv.title || 'Nächste Abholung';
@@ -4049,7 +4051,7 @@ registerDevice({
     WC_TYPES.filter((x) => x.bin && !list.some((y) => y.k === x.k)).forEach((x) => { const b = c._dvS(F[`bin_${x.k}`]); if (b) tiles.push({ ...x, d: null, bin: b }); });
     const tile = (x) => {
       const n = x.d === null ? null : WC.diff(x.d, t0); const bs = x.bin ? WC.bin(x.bin.state) : null;
-      const stat = !x.bin ? '' : bs === 'in' ? (n !== null && n <= 1 ? ['todo', 'Rausstellen'] : ['in', 'Am Platz']) : bs === 'out' ? (n === null || n > 1 ? ['todo', 'Reinholen'] : ['out', 'Draußen']) : ['', c._state(x.bin)];
+      const stat = !x.bin ? '' : bs === 'in' ? (n !== null && WC.due(n, hour) ? ['todo', 'Rausstellen'] : ['in', 'Am Platz']) : bs === 'out' ? (n === null || n > 1 ? ['todo', 'Reinholen'] : ['out', 'Draußen']) : ['', c._state(x.bin)];
       const date = n === null ? '' : `${WC.when(x.d)} · ${WC.rel(n).replace(/^./, (m) => m.toLowerCase())}`;
       return `<div class="wct" style="--wc:${x.col}" data-act="info" data-id="${x.bin ? x.bin.entity_id : id}"><div class="wci"><ha-icon icon="${x.bin ? 'mdi:trash-can' : x.icon}"></ha-icon></div><b>${esc(x.t)}</b>${stat ? `<div class="wcs ${stat[0]}">${esc(stat[1])}</div>` : ''}${date ? `<small>${esc(date)}</small>` : ''}</div>`;
     };
