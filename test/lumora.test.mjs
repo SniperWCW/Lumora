@@ -919,3 +919,32 @@ test('Energie: alte Einzelkarten sind entfernt, alte Kachel-Blöcke verschwinden
   assert.ok(!m.blocks.some((b) => b.id === 'c:energyhome' || b.id === 'c:espark'));
   assert.ok(m.blocks.some((b) => b.id === 'c:abc'));
 });
+
+test('Gerätekarten: Packstation und Familienplaner, automatische Sammelkarten entfallen', () => {
+  assert.ok(L.DEVTPL.packstation && L.DEVTPL.family);
+  const S = (state, fn, a = {}) => ({ state, attributes: { friendly_name: fn, ...a } });
+  const states = {
+    'sensor.dhl_packstation_stuttgart_freie_facher_gesamt': S('7', 'DHL Packstation Stuttgart Freie Fächer Gesamt', { address: 'Hauptstr. 1' }),
+    'sensor.dhl_packstation_stuttgart_freie_facher_s': S('3', 'DHL Packstation Stuttgart Freie Fächer S'),
+    'sensor.dhl_packstation_stuttgart_freie_facher_m': S('4', 'DHL Packstation Stuttgart Freie Fächer M'),
+    'sensor.dhl_packstation_esslingen_freie_facher_gesamt': S('1', 'DHL Packstation Esslingen Freie Fächer Gesamt'),
+    'sensor.familienplaner_heute': S('2', 'Familienplaner Heute'),
+    'sensor.temperatur': S('20', 'Temperatur'),
+  };
+  Object.keys(states).forEach((k) => { states[k].entity_id = k; });
+  const c = Object.create(L.card.prototype);
+  c._hass = { states, entities: {}, callWS: () => new Promise(() => {}) }; c._cfg = {}; c._dvP = null; c._dvR = null;
+  c._set = { sources: {}, hidden: [], size: {}, place: {}, devices: [] };
+  assert.deepEqual([...c._dvMains(L.DEVTPL.packstation).map((x) => x.id)].sort(), ['sensor.dhl_packstation_esslingen_freie_facher_gesamt', 'sensor.dhl_packstation_stuttgart_freie_facher_gesamt']);
+  assert.deepEqual([...c._dvMains(L.DEVTPL.family).map((x) => x.id)], ['sensor.familienplaner_heute']);
+  /* eine Karte je Station */
+  const iv = { id: 'ps1', type: 'packstation', main: 'sensor.dhl_packstation_stuttgart_freie_facher_gesamt', map: {}, title: '' };
+  const html = L.DEVTPL.packstation.render(c, iv, {}, states[iv.main]);
+  assert.match(html, /Stuttgart/); assert.ok(!html.includes('Esslingen'));
+  /* mit Gerätekarte entfallen die automatischen Karten */
+  c._set.devices = [iv];
+  const reg = (id) => c._allReg().filter((x) => x.def.id === id);
+  assert.equal(reg('packstation').length, 0);
+  c._set.devices = [];
+  assert.equal(reg('packstation').length, 1);
+});

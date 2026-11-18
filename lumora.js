@@ -1288,6 +1288,7 @@ class LumoraCard extends HTMLElement {
       else if (cuSet.has(id) || this._set.pinned.some((p) => p.entity === id)) parts.push(id + h.states[id].state);
     }
     for (const iv of this._dvAll()) { try { const m = this._dvMap(iv); parts.push(iv.main + (h.states[iv.main] ? h.states[iv.main].state + (h.states[iv.main].attributes.fan_speed || '') : '')); Object.values(m).forEach((x) => { if (x && h.states[x]) parts.push(x + h.states[x].state + (h.states[x].attributes.color_hex || '')); }); } catch (_) { /* ignore */ } }
+    if (this._dvAll().some((x) => x.type === 'packstation')) { for (const id in h.states) if (PS_RE.test(id)) parts.push(id + h.states[id].state); }
     if (this._dvAll().some((x) => x.type === 'waste')) parts.push(`wc${new Date().toDateString()}${new Date().getHours()}`);
     if (['home', 'more', 'rooms'].includes(this._view)) { parts.push(this._plSig()); parts.push(this._prSig()); }
     if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
@@ -3202,6 +3203,7 @@ _more() {
       if (usePl && !(reg0[id] && pls.includes(reg0[id].platform))) return false;
       if (sp.dc && a.device_class !== sp.dc) return false;
       if (sp.unit && !sp.unit.includes(a.unit_of_measurement)) return false;
+      if (sp.re && !usePl && !sp.re.test(id)) return false;
       const r = this._hass.entities && this._hass.entities[id]; return !(r && r.hidden);
     }).map((x) => ({ id: x.entity_id, name: x.attributes.friendly_name || x.entity_id, hit: sp.prefer ? sp.prefer.test(norm(`${x.entity_id} ${x.attributes.friendly_name || ''}`)) : false }));
     return out.sort((a, b) => (b.hit ? 1 : 0) - (a.hit ? 1 : 0));
@@ -4747,12 +4749,13 @@ registerCard({ id: 'proxmox', label: 'Proxmox', icon: 'mdi:server', size: 'w', i
 } });
 /* Packstation: Sensoren der Integration dhl_packstation_availability, z. B. sensor.dhl_packstation_<station>_freie_facher_<gesamt|s|m|l|xl>. Mehrere Stationen werden in einer Karte untereinander gezeigt. */
 registerCard({ id: 'packstation', label: 'Packstation', icon: 'mdi:package-variant', size: 'w', items: (c) => {
+  if (c._dvAll().some((x) => x.type === 'packstation')) return [];
   const l = c._psStations();
   return l.length ? [{ id: 'packstation', html: c._psHtml(l), size: 'w' }] : [];
 } });
 /* Familienplaner: Integration familienplaner (SniperWCW/Familienkalender). Erscheint nur, wenn die Integration vorhanden ist. */
 registerCard({ id: 'family', label: 'Familienplaner', icon: 'mdi:calendar-account', home: true, size: 'w', items: (c) => {
-  if (!c._fpOn()) return [];
+  if (!c._fpOn() || c._dvAll().some((x) => x.type === 'family')) return [];
   const h = c._fpHtml();
   return h ? [{ id: 'family', html: h, size: 'w' }] : [];
 } });
@@ -4760,6 +4763,28 @@ registerCard({ id: 'batt_all', label: 'Batterien Übersicht', icon: 'mdi:battery
   const l = c._batteries(true);
   return l.length ? [{ id: 'batt_all', html: c._battAllHtml(l), size: 'w' }] : [];
 } });
+/* Packstation: eine Gerätekarte pro Station (Sensoren der Integration dhl_packstation_availability). Wird mindestens eine angelegt, entfällt die automatische Sammelkarte. */
+registerDevice({
+  type: 'packstation', label: 'Packstation', icon: 'mdi:package-variant', desc: 'Freie Fächer je Größe einer DHL-Packstation', size: 'w',
+  main: { dom: 'sensor', platform: 'dhl_packstation_availability', re: /^sensor\.dhl_packstation_.+_freie_facher_gesamt$/, prefer: /packstation/ },
+  fields: {},
+  render: (c, iv) => {
+    const m = PS_RE.exec(iv.main); const l = c._psStations().filter((x) => !m || x.key === m[1]);
+    if (l.length) return c._psHtml(l);
+    return c._edit ? '<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="mdi:package-variant"></ha-icon></div><div class="tt"><b>Packstation</b><span>Keine Daten für diese Station</span></div></div></div>' : '';
+  },
+});
+/* Familienplaner: Integration familienplaner. Es wird nur eine Familienplaner-Karte gezeichnet; mit einer Gerätekarte entfällt die automatische Karte. */
+registerDevice({
+  type: 'family', label: 'Familienplaner', icon: 'mdi:calendar-account', desc: 'Termine heute und morgen je Person, nicht zugeordnete Termine, Tagesübersicht', size: 'w',
+  main: { dom: 'sensor', platform: 'familienplaner', re: /^sensor\.familienplaner_/, prefer: /familienplaner/ },
+  fields: {},
+  render: (c, iv) => {
+    const first = c._dvAll().find((x) => x.type === 'family');
+    if (first && first.id !== iv.id) return c._edit ? '<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="mdi:calendar-account"></ha-icon></div><div class="tt"><b>Familienplaner</b><span>Es wird nur eine Familienplaner-Karte gezeichnet. Diese hier bitte löschen.</span></div></div></div>' : '';
+    return c._fpHtml();
+  },
+});
 registerCard({ id: 'dev', label: 'Gerätekarten', icon: 'mdi:view-grid-plus-outline', home: true, size: 'w', items: (c) => c._dvAll().map((iv) => {
   const tp = DEVTPL[iv.type]; const st = c._hass.states[iv.main];
   if (!st) return c._edit ? { id: iv.id, html: `<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="${tp.icon}"></ha-icon></div><div class="tt"><b>${esc(iv.title || tp.label)}</b><span>${esc(iv.main)} nicht gefunden</span></div></div></div>`, size: tp.size, cfg: true } : null;
