@@ -63,7 +63,7 @@ Dashboard-Ansicht vom Typ `panel` mit folgender Karte:
 ```yaml
 type: custom:lumora-card
 # optional
-theme: sand        # Standard; alternativ: forest oder auto (hell/dunkel nach Gerät)
+theme: sand        # Standard; alternativ: forest, sage (Salbei) oder auto (hell/dunkel nach Gerät)
 name: Anna         # optional, sonst Name aus der Person des Benutzers
 energy:            # optional, überschreibt die automatische Erkennung
   pv: sensor.pv_leistung
@@ -83,6 +83,19 @@ info:              # optional
 color_from: "#f2eadb"
 color_to: "#d6c5a8"
 ```
+
+## Design und Anordnung
+
+Über die Schaltfläche **Design** (Palette) auf der Startseite lässt sich das Aussehen pro Benutzer anpassen. Die Einstellungen liegen im Benutzerprofil und gehören zum Layout, das auch als Gruppenlayout veröffentlicht werden kann.
+
+- **Vorlagen:** Sand, Wald oder Salbei (Kacheln). Eine Vorlage setzt Startseite, Farbthema, Rundung, Kartenstil und Schrift auf einmal.
+- **Startseite:** *Klassisch* (wie bisher) oder *Kacheln*. Die Kachel-Startseite besteht aus Blöcken: Kopfzeile mit Uhr und Wetter, Kennzahlen, Räume mit Foto, Meldungen, Termine, Hausstatus, Grußkachel sowie Karten, Aktiv jetzt und Kameras.
+- **Reihenfolge und Breite:** Jeder Block lässt sich nach oben oder unten schieben, ein- oder ausblenden und in der Breite wählen (¼, ⅓, ½, ⅔, voll; zwölf Spalten). Auf dem Handy stehen die Blöcke untereinander.
+- **Kennzahlen:** Beleuchtung, Heizung, Raumtemperatur Ø, Luftfeuchte Ø, Verbrauch, offene Fenster und Türen, Anwesenheit; Auswahl und Reihenfolge frei.
+- **Räume:** automatisch die ersten Bereiche je Etage oder eigene Auswahl in eigener Reihenfolge. Das Raumfoto kommt aus dem Bereich in Home Assistant (Einstellungen, Bereiche).
+- **Termine:** aus Kalender-Entitäten (automatisch ohne Abfall- und Feiertagskalender oder eigene Auswahl). „Alle anzeigen“ öffnet die Liste der nächsten 30 Tage.
+- **Farben und Stil:** Farbthema (auch unabhängig von der Karten-YAML), Akzentfarbe, Hintergrundverlauf, Rundung, Kartenstil (flach, weich, Glas), Abstand und Schrift.
+- **Texte:** Titel, Untertitel, Grußkachel (mit `{name}` und `{gruss}`, optional mit Hintergrundbild), Text des Hausstatus.
 
 ## 3D-Drucker-Karte
 

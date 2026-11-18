@@ -29,6 +29,55 @@ const DEF = {
   notify: { push: '', tts: '', min: 0 },
   door: { bell: [], motion: [], cam: '', secs: 30 },
   ptz: { cam: '' },
+  look: {},
+};
+/* Design und Anordnung: Vorlage (Layout), Farben, Rundung, Kartenstil, Abstand, Schrift, Kopfzeile, Blöcke der Kachel-Startseite */
+const LOOK_DEF = {
+  layout: 'classic', theme: '', accent: '', bg1: '', bg2: '', radius: '', cards: '', gap: '', font: '',
+  title: 'Zuhause', sub: 'Willkommen daheim ♡', greet: 'Schön, dass du da bist!', greetImg: '', statusOk: 'Alles in Ordnung', statusSub: '',
+  showClock: true, showWeather: true, roomImg: true, roomMax: 4, rooms: [], kpis: ['lights', 'heat', 'temp'], cals: [], evMax: 3,
+};
+/* id, Name, Standardbreite (von 12 Spalten), Standard an */
+const BLOCK_DEF = [
+  ['head', 'Kopfzeile', 12, 1], ['kpis', 'Kennzahlen', 12, 1], ['rooms', 'Räume', 12, 1], ['alerts', 'Meldungen und Chips', 12, 0],
+  ['termine', 'Termine', 4, 1], ['status', 'Hausstatus', 4, 1], ['greeting', 'Grußkachel', 4, 1],
+  ['reg', 'Karten (Energie, Familie …)', 12, 0], ['active', 'Aktiv jetzt', 12, 0], ['cams', 'Kameras', 12, 0],
+];
+const BLOCK_W = [[3, '¼'], [4, '⅓'], [6, '½'], [8, '⅔'], [12, 'Voll']];
+const KPI_DEF = { lights: ['Beleuchtung', 'mdi:lightbulb-on-outline'], heat: ['Heizung', 'mdi:radiator'], temp: ['Raumtemperatur Ø', 'mdi:thermometer'], hum: ['Luftfeuchte Ø', 'mdi:water-percent'], power: ['Verbrauch', 'mdi:flash-outline'], open: ['Offene Fenster/Türen', 'mdi:window-open-variant'], persons: ['Zu Hause', 'mdi:account-multiple-outline'] };
+const LOOK_THEMES = [['', 'Aus Karte'], ['sand', 'Sand'], ['forest', 'Wald'], ['sage', 'Salbei'], ['auto', 'Auto']];
+const LOOK_RADIUS = { sm: '10px', md: '20px', lg: '30px' };
+const LOOK_GAP = { s: '6px', m: '10px', l: '16px' };
+const LOOK_FONT = { round: 'ui-rounded,"SF Pro Rounded","Varela Round",Nunito,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', serif: '"Iowan Old Style","Palatino Linotype",Georgia,"Times New Roman",serif' };
+const LOOK_PRESETS = {
+  sand: { layout: 'classic', theme: 'sand', accent: '', bg1: '', bg2: '', radius: '', cards: 'flat', gap: '', font: '' },
+  forest: { layout: 'classic', theme: 'forest', accent: '', bg1: '', bg2: '', radius: '', cards: 'flat', gap: '', font: '' },
+  sage: { layout: 'tiles', theme: 'sage', accent: '', bg1: '', bg2: '', radius: 'lg', cards: 'soft', gap: 'm', font: 'round' },
+};
+const EV_CALX = /abfall|muell|waste|tonne|entsorg|garbage|trash|holiday|feiertag|geburtstag.*feiertag/;
+const ROOM_ICONS = [[/wohn|stube|living/, 'mdi:sofa-outline'], [/schlaf|bed/, 'mdi:bed-outline'], [/buro|office|arbeit/, 'mdi:briefcase-outline'], [/kuche|kitchen/, 'mdi:silverware-fork-knife'], [/bad|wc|dusche|gaste/, 'mdi:shower'], [/kind|spiel/, 'mdi:teddy-bear'], [/garten|aussen|terrasse|balkon/, 'mdi:tree-outline'], [/flur|diele|eingang/, 'mdi:door'], [/keller/, 'mdi:stairs-down'], [/garage/, 'mdi:garage-variant'], [/ess/, 'mdi:table-furniture'], [/dach|spitz|dg/, 'mdi:home-roof'], [/wasch|hauswirt|technik/, 'mdi:washing-machine']];
+const roomIcon = (name) => { const n = norm(name); const m = ROOM_ICONS.find((x) => x[0].test(n)); return m ? m[1] : 'mdi:door-open'; };
+const LOOK_IN = ['accent', 'bg1', 'bg2', 'title', 'sub', 'greet', 'greetImg', 'statusOk', 'statusSub'];
+const mergeLook = (v) => {
+  v = v || {};
+  const o = { ...LOOK_DEF, ...v };
+  o.kpis = Array.isArray(v.kpis) ? v.kpis.filter((k) => KPI_DEF[k]) : [...LOOK_DEF.kpis];
+  o.rooms = Array.isArray(v.rooms) ? [...v.rooms] : [];
+  o.cals = Array.isArray(v.cals) ? [...v.cals] : [];
+  o.roomMax = Math.max(1, Math.min(12, parseInt(v.roomMax, 10) || LOOK_DEF.roomMax));
+  o.evMax = Math.max(1, Math.min(8, parseInt(v.evMax, 10) || LOOK_DEF.evMax));
+  const out = [];
+  (Array.isArray(v.blocks) ? v.blocks : []).forEach((b) => {
+    const d = BLOCK_DEF.find((x) => x[0] === (b && b.id));
+    if (d && !out.some((x) => x.id === d[0])) out.push({ id: d[0], w: BLOCK_W.some((x) => x[0] === b.w) ? b.w : d[2], on: b.on !== false });
+  });
+  BLOCK_DEF.forEach((d) => { if (!out.some((x) => x.id === d[0])) out.push({ id: d[0], w: d[2], on: !!d[3] }); });
+  o.blocks = out;
+  return o;
+};
+const lumOf = (hex) => {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '')); if (!m) return 0;
+  const n = parseInt(m[1], 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
 };
 const norm = (t) => String(t || '').toLowerCase().replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ß/g, 'ss');
 const PV = '(?:^|[^a-z])pv(?:[^a-z]|$)|solar|photovolt';
@@ -312,7 +361,7 @@ const embedConfig = (yaml) => {
 const merge = (v) => {
   v = v || {};
   const arr = (k) => [...(v[k] || DEF[k])];
-  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), embeds: JSON.parse(JSON.stringify(v.embeds || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify }, ptz: { ...DEF.ptz, ...v.ptz }, door: { ...DEF.door, ...v.door, bell: [...((v.door && v.door.bell) || [])], motion: [...((v.door && v.door.motion) || [])] } };
+  return { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), embeds: JSON.parse(JSON.stringify(v.embeds || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify }, ptz: { ...DEF.ptz, ...v.ptz }, door: { ...DEF.door, ...v.door, bell: [...((v.door && v.door.bell) || [])], motion: [...((v.door && v.door.motion) || [])] }, look: mergeLook(v.look) };
 };
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -332,16 +381,74 @@ const cleanName = (n) => {
   return tail ? `${s} · ${tail}` : s;
 };
 
+const CARD_SEL = ['.en', '.cl', '.vc', '.pl:not(.on)', '.card', '.tile', '.ap', '.qs', '.dvc', '.pool', '.kp', '.tl', '.rm', '.gt'];
+const CARD_CSS = `${CARD_SEL.map((x) => `:host([data-cs=soft]) ${x}`).join(',')}{box-shadow:var(--shadow-soft,0 8px 22px rgba(90,70,40,.13),0 1px 2px rgba(90,70,40,.08))}
+${CARD_SEL.map((x) => `:host([data-cs=glass]) ${x}`).join(',')}{background-color:var(--glass,rgba(255,255,255,.4));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+:host([theme=forest]){--glass:rgba(255,255,255,.12)}
+.lkl{font-size:12.5px;color:var(--fg2);margin:8px 2px 4px}.lkc input[type=color]{margin:0}
+.lkb button{display:inline-flex;align-items:center;justify-content:center;min-width:34px}.lkb ha-icon{--mdc-icon-size:18px}.lkb button[disabled]{opacity:.35;cursor:default}
+`;
 const CSS = `
 :host{display:block;height:calc(100vh - var(--header-height,56px));height:calc(100dvh - var(--header-height,56px));
  --fg:#3b3226;--fg2:rgba(59,50,38,.68);--a:rgba(110,88,56,.11);--b:rgba(255,255,255,.75);--from:#f2eadb;--to:#d6c5a8;
  --sheet:#f6f0e4;--selbg:#4a3c2b;--selfg:#f6f0e4;--accent:#e6b655;--accentfg:#3a2a00;--on:rgba(238,176,52,.46);--onring:rgba(205,140,20,.6);--line:rgba(59,50,38,.12);--nav:rgba(255,255,255,.5);
  --bad:rgba(205,65,50,.25);--badfg:#7d1f16;--warn:rgba(224,160,40,.32);--okbg:rgba(100,150,80,.22);--scrim:rgba(40,30,15,.45);--shadow:0 1px 3px rgba(80,60,30,.14);
- color:var(--fg);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+ color:var(--fg);font-family:var(--ff,Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif)}
 :host([theme=forest]){--on:rgba(255,190,70,.3);--onring:rgba(255,205,110,.65);--fg:#fff;--fg2:rgba(255,255,255,.72);--a:rgba(255,255,255,.12);--b:rgba(255,255,255,.2);--from:#5b7248;--to:#232f21;
  --sheet:#1f2a1e;--selbg:rgba(255,255,255,.88);--selfg:#223;--line:rgba(255,255,255,.1);--nav:rgba(0,0,0,.18);
  --bad:rgba(244,67,54,.5);--badfg:#fff;--warn:rgba(255,193,7,.28);--okbg:rgba(120,200,120,.25);--scrim:rgba(0,0,0,.55);--shadow:none}
+:host([theme=sage]){--fg:#2f3b2a;--fg2:rgba(47,59,42,.62);--a:rgba(255,253,247,.86);--b:rgba(107,143,78,.16);--from:#f8f0e4;--to:#ebdcc4;
+ --sheet:#fbf7ee;--selbg:#4b6b3a;--selfg:#fbf7ee;--accent:#6b8f4e;--accentfg:#fff;--on:rgba(247,216,132,.6);--onring:rgba(214,160,40,.5);--line:rgba(47,59,42,.1);--nav:rgba(255,253,247,.72);
+ --bad:rgba(205,65,50,.22);--badfg:#7d1f16;--warn:rgba(224,160,40,.28);--okbg:rgba(107,143,78,.2);--scrim:rgba(40,40,20,.4);--shadow:0 8px 22px rgba(120,95,50,.13),0 1px 2px rgba(120,95,50,.08);--r:24px}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+.bl{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:var(--gap,10px);align-items:stretch}
+.bl>.b{grid-column:span 12;min-width:0}.bl>.w3{grid-column:span 3}.bl>.w4{grid-column:span 4}.bl>.w6{grid-column:span 6}.bl>.w8{grid-column:span 8}
+@media(max-width:900px){.bl>.w3,.bl>.w4,.bl>.w6{grid-column:span 6}.bl>.w8{grid-column:span 12}}
+@media(max-width:600px){.bl>.b{grid-column:span 12}}
+.hd2{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:4px 2px}
+.hd2 .lg{width:60px;height:60px;display:grid;place-items:center;color:var(--accent);flex:none}.hd2 .lg ha-icon{--mdc-icon-size:54px}
+.hd2 .tx{flex:1 1 180px;min-width:0}.hd2 h1{font-size:clamp(28px,6vw,42px)}.hd2 .sub{font-size:clamp(14px,2.6vw,18px);color:var(--fg2);margin-top:2px}
+.hd2 .clk{display:flex;align-items:center;gap:14px;background:var(--a);border-radius:99px;padding:10px 22px;box-shadow:var(--shadow);cursor:default}
+.hd2 .clk .dt{display:flex;flex-direction:column;align-items:flex-start}.hd2 .clk small{font-size:12.5px;color:var(--fg2)}.hd2 .clk b{font-size:clamp(24px,5vw,34px);font-weight:600;letter-spacing:-.01em;line-height:1.05}
+.hd2 .clk .sp{width:1px;align-self:stretch;background:var(--line)}.hd2 .clk .wxx{display:flex;align-items:center;gap:8px;cursor:pointer}.hd2 .clk .wxx ha-icon{--mdc-icon-size:34px;color:#e0a63a}
+.hd2 .clk .wxx div{display:flex;flex-direction:column}.hd2 .clk .wxx b{font-size:clamp(22px,4.6vw,30px)}
+.hd2 .tb{display:flex;gap:8px;align-items:center;margin-left:auto}
+.hd2 .rb{width:40px;height:40px;border-radius:50%;border:0;background:var(--a);color:inherit;display:grid;place-items:center;cursor:pointer;padding:0;box-shadow:var(--shadow)}.hd2 .rb.sel{background:var(--selbg);color:var(--selfg)}
+.kps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--gap,10px)}
+.kp{display:flex;align-items:center;gap:14px;background:var(--a);border-radius:var(--r,24px);padding:16px 16px 16px 14px;cursor:pointer;min-width:0}
+.kp .ic{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;flex:none;background:radial-gradient(circle at 50% 40%,var(--kc,rgba(255,215,120,.6)),transparent 72%)}.kp .ic ha-icon{--mdc-icon-size:38px;color:var(--kf,#c98a2b)}
+.kp .t{flex:1;min-width:0}.kp .t b{display:block;font-size:15px;font-weight:600}.kp .t strong{display:block;font-size:clamp(28px,5.4vw,38px);font-weight:600;letter-spacing:-.02em;line-height:1.1;white-space:nowrap}.kp .t strong small{font-size:.58em;font-weight:500;color:var(--fg2)}.kp .t span{font-size:13px;color:var(--fg2)}
+.kp .go{width:38px;height:38px;border-radius:50%;background:var(--b);display:grid;place-items:center;flex:none;color:var(--accent)}.kp .go ha-icon{--mdc-icon-size:22px}
+.kp.heat{--kc:rgba(240,150,80,.4);--kf:#d9742c}.kp.temp{--kc:rgba(120,170,100,.38);--kf:#4b6b3a}.kp.hum{--kc:rgba(110,170,210,.38);--kf:#2f78a8}.kp.power{--kc:rgba(240,200,80,.45);--kf:#b98a10}.kp.open{--kc:rgba(220,120,100,.35);--kf:#b24a3c}.kp.persons{--kc:rgba(150,150,200,.35);--kf:#5a5a9a}
+.rms{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:var(--gap,10px)}
+.rm{position:relative;border-radius:var(--r,24px);overflow:hidden;min-height:190px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(160deg,rgba(255,250,240,.9),rgba(222,206,176,.9));background-size:cover;background-position:center;color:var(--fg)}
+.rm.img{color:#fff}.rm.img:before{content:"";position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(180deg,rgba(0,0,0,.28) 0%,rgba(0,0,0,0) 38%,rgba(0,0,0,.05) 62%,rgba(0,0,0,.35) 100%)}
+.rm .tp{position:relative;display:flex;align-items:center;gap:8px;padding:12px 12px 0;font-weight:600;font-size:16px}.rm .tp ha-icon{--mdc-icon-size:28px}.rm .tp span.n{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rm .st{font-size:12px;font-weight:700;letter-spacing:.04em;padding:4px 10px;border-radius:99px;background:var(--accent);color:var(--accentfg);display:inline-flex;align-items:center;gap:6px;flex:none}.rm .st:after{content:"";width:7px;height:7px;border-radius:50%;background:#bff0a0}.rm .st.off{background:rgba(120,120,120,.7);color:#fff}.rm .st.off:after{background:#ddd}
+.rm .bt{position:relative;display:flex;align-items:center;gap:14px;margin:0 10px 10px;padding:8px 8px 8px 14px;border-radius:99px;background:rgba(255,253,247,.82);color:var(--fg);font-size:14px;font-weight:600;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.rm .bt span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}.rm .bt ha-icon{--mdc-icon-size:18px;color:#b98a30}.rm .bt .go{margin-left:auto;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.9);display:grid;place-items:center;color:var(--fg)}
+.tl{background:var(--a);border-radius:var(--r,24px);padding:16px;min-width:0;height:100%}
+.tl .th{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600}.tl .th ha-icon{--mdc-icon-size:30px;color:var(--accent)}.tl .th .all{margin-left:auto;font-size:13px;font-weight:500;color:var(--fg2);cursor:pointer;display:inline-flex;align-items:center}
+.tl .th .all ha-icon{--mdc-icon-size:18px;color:var(--fg2)}
+.ev{display:flex;gap:10px;margin-top:12px;cursor:pointer}.ev i{width:10px;height:10px;border-radius:50%;background:var(--line);margin-top:5px;flex:none}.ev.today i{background:var(--accent)}
+.ev b{display:block;font-size:13.5px;font-weight:600}.ev span{display:block;font-size:13px;color:var(--fg2)}.ev em{font-style:normal;margin-right:10px}.ev .tt{color:var(--fg)}
+.ev.none{cursor:default;color:var(--fg2);font-size:13.5px}
+.hs{display:flex;align-items:center;gap:14px;min-height:100px;position:relative;overflow:hidden}
+.hs .th{position:absolute;top:14px;left:16px}.hs .ck{width:76px;height:76px;border-radius:50%;background:var(--accent);color:var(--accentfg);display:grid;place-items:center;flex:none;box-shadow:0 0 0 8px var(--b);margin-top:34px}.hs .ck ha-icon{--mdc-icon-size:44px}
+.hs .ck.warn{background:#e0a63a;color:#fff}.hs .ck.bad{background:#d0524a;color:#fff}.hs .tx{margin-top:34px;min-width:0}.hs .tx b{display:block;font-size:clamp(17px,3.4vw,21px);font-weight:600}.hs .tx span{font-size:13px;color:var(--fg2)}
+.gt{display:flex;align-items:center;justify-content:center;text-align:center;min-height:120px;border-radius:var(--r,24px);padding:18px;background:linear-gradient(135deg,rgba(176,200,140,.5),rgba(247,240,222,.7));background-size:cover;background-position:center;position:relative;overflow:hidden;height:100%}
+.gt.img:before{content:"";position:absolute;top:0;right:0;bottom:0;left:0;background:rgba(255,253,247,.3)}
+.gt .s{position:relative;font-family:"Segoe Script","Bradley Hand","Snell Roundhand","Brush Script MT","Apple Chancery","Comic Sans MS",cursive;font-size:clamp(24px,4.6vw,32px);line-height:1.25;color:var(--fg);transform:rotate(-4deg)}
+.gt .s ha-icon{display:block;margin:6px auto 0;--mdc-icon-size:30px}
+@media(max-width:600px){
+ .hd2 .tb{order:2;margin-left:auto}.hd2 .clk{order:3;width:100%;justify-content:space-between}
+ .kps{grid-template-columns:repeat(2,minmax(0,1fr))}.kp:last-child:nth-child(odd){grid-column:1/-1}.kp{padding:12px;gap:10px}.kp .ic{width:48px;height:48px}.kp .ic ha-icon{--mdc-icon-size:28px}.kp .go{display:none}
+ .rms{grid-template-columns:repeat(2,minmax(0,1fr))}.rm{min-height:150px}.rm .tp{padding:10px 8px 0;font-size:14px;gap:6px}.rm .tp ha-icon{--mdc-icon-size:22px}.rm .bt{margin:0 6px 6px;padding:6px 6px 6px 10px;gap:8px;font-size:12.5px}.rm .bt .go{width:26px;height:26px}
+}
+.lkc{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.lkc input[type=color]{width:46px;height:36px;border:0;padding:0;border-radius:10px;background:none;cursor:pointer}
+.lkc .pill{padding:7px 12px;font-size:13px}.lkc .pill.sel{background:var(--selbg);color:var(--selfg)}
+.lkb{display:flex;align-items:center;gap:6px}.lkb button{min-width:34px}
+
 .app{height:100%;display:flex;flex-direction:column;background:linear-gradient(165deg,var(--zp-from,var(--from)) 0%,var(--zp-to,var(--to)) 100%)}
 .body{flex:1;overflow:auto;padding:20px 18px 16px}
 .top{display:flex;align-items:center;gap:12px}
@@ -361,7 +468,7 @@ h1{margin:0;font-size:clamp(26px,7.4vw,38px);line-height:1.1;font-weight:600;let
 .hello .av{width:64px;height:64px;font-size:24px}.pp.home .av i{background:#4caf50}
 .pp{position:relative;display:flex;align-items:center;gap:10px;background:var(--a);border-radius:99px;padding:5px 16px 5px 5px;cursor:pointer}
 .pp b{display:block;font-size:14px;font-weight:600}.pp span{font-size:12px;color:var(--fg2)}
-.en{background:var(--a);border-radius:20px;padding:16px;cursor:pointer}
+.en{background:var(--a);border-radius:var(--r,20px);padding:16px;cursor:pointer}
 .en .hd{display:flex;align-items:center;gap:12px}.en .ib{width:44px;height:44px;border-radius:14px;background:var(--b);display:grid;place-items:center;flex:none}
 .en .hd b{display:block;font-size:16px;font-weight:600}.en .hd span{font-size:12.5px;color:var(--fg2)}
 .en .big{margin-left:auto;font-size:30px;font-weight:600;white-space:nowrap}
@@ -369,7 +476,7 @@ h1{margin:0;font-size:clamp(26px,7.4vw,38px);line-height:1.1;font-weight:600;let
 .en .rl span:last-child{font-weight:600}.en .rl ha-icon{--mdc-icon-size:18px;margin-right:6px}
 .bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
 .bar.g i{background:#8da3b8}.bar.b i{background:#82b06c}
-.cl,.vc{background:var(--a);border-radius:20px;padding:14px;display:flex;gap:10px;min-height:156px;position:relative;min-width:0}
+.cl,.vc{background:var(--a);border-radius:var(--r,20px);padding:14px;display:flex;gap:10px;min-height:156px;position:relative;min-width:0}
 .cl.heat{background:rgba(226,140,70,.2)}.cl.hid,.vc.hid{opacity:.45}
 .clm,.vm{flex:1;min-width:0;display:flex;flex-direction:column;cursor:pointer}
 .clt{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg2);margin-bottom:auto}
@@ -386,10 +493,10 @@ h1{margin:0;font-size:clamp(26px,7.4vw,38px);line-height:1.1;font-weight:600;let
 
 .mw{position:relative;min-width:0}.mw.wide{grid-column:1/-1}.mw.hid{opacity:.45}
 .mw .tools{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:2}
-.ap{background:var(--a);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px;cursor:pointer;min-height:92px;min-width:0}
+.ap{background:var(--a);border-radius:var(--r,18px);padding:14px;display:flex;flex-direction:column;gap:10px;cursor:pointer;min-height:92px;min-width:0}
 .ap.run{background:rgba(70,170,190,.22)}.ap .h{display:flex;gap:10px;align-items:center}.ap ha-icon{--mdc-icon-size:26px;flex:none}
 .ap b{display:block;font-size:15px;font-weight:600}.ap span{font-size:12.5px;color:var(--fg2)}
-.pl{background:var(--a);border-radius:20px;padding:14px;min-height:140px;display:flex;flex-direction:column;position:relative;min-width:0}
+.pl{background:var(--a);border-radius:var(--r,20px);padding:14px;min-height:140px;display:flex;flex-direction:column;position:relative;min-width:0}
 .pl.on{background:var(--on);box-shadow:inset 0 0 0 1.5px var(--onring),var(--shadow)}.pl.on .plt ha-icon{color:var(--accentfg)}
 .plt{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg2);cursor:pointer}
 .plt ha-icon{--mdc-icon-size:24px;color:var(--fg)}.plt em{font-style:normal;margin-left:auto}
@@ -403,9 +510,9 @@ h1{margin:0;font-size:clamp(26px,7.4vw,38px);line-height:1.1;font-weight:600;let
 .note ha-icon{--mdc-icon-size:20px;flex:none}.note.sv0{color:#e5484d}.note.sv1{color:#e8a13a}.sev{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--fg2)}.sev.s0{background:#e5484d}.sev.s1{background:#e8a13a}
 .pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);display:flex;justify-content:space-between;align-items:center}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--gap,10px)}
 @media(min-width:760px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
-.card,.tile{background:var(--a);border-radius:18px;padding:14px;display:flex;gap:12px;align-items:center;min-width:0;position:relative;cursor:pointer}
+.card,.tile{background:var(--a);border-radius:var(--r,18px);padding:14px;display:flex;gap:12px;align-items:center;min-width:0;position:relative;cursor:pointer}
 .card{flex-direction:column;align-items:flex-start;gap:8px;min-height:92px}
 .card b,.tile b{display:block;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card span,.tile span{font-size:12.5px;color:var(--fg2)}
@@ -464,8 +571,8 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .row .t{flex:1;min-width:0}.row .t b{display:block;font-size:15px;font-weight:500}.row .t span{font-size:12.5px;color:var(--fg2)}
 .row button{border:0;border-radius:99px;padding:7px 12px;background:var(--a);color:inherit;font:inherit;font-size:13px;cursor:pointer}
 .row button.sel{background:var(--selbg);color:var(--selfg)}
-.srch,.ccin,.embyaml{width:100%;padding:12px 14px;border-radius:12px;border:0;background:var(--a);color:var(--fg);font:inherit;font-size:15px;margin-bottom:10px;outline:none}
-.srch::placeholder,.ccin::placeholder,.embyaml::placeholder{color:var(--fg2)}
+.srch,.ccin,.embyaml,.lkin{width:100%;padding:12px 14px;border-radius:12px;border:0;background:var(--a);color:var(--fg);font:inherit;font-size:15px;margin-bottom:10px;outline:none}
+.srch::placeholder,.ccin::placeholder,.embyaml::placeholder,.lkin::placeholder{color:var(--fg2)}
 textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow:auto}
 .emb{display:block;min-width:0}.emb:empty{min-height:56px}.embe{padding:12px;border-radius:14px;background:var(--a);color:var(--fg2);font-size:13px}
 :host(.ed) .emb>*{pointer-events:none}
@@ -492,7 +599,7 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .mini.sz{position:absolute;top:6px;left:70px;z-index:2;background:rgba(40,30,20,.72);color:#fff;width:26px;height:26px}
 .grid.reg{margin:4px 0 12px}
 .en.nopt{cursor:default}
-.qs{background:var(--a);border-radius:20px;padding:14px}
+.qs{background:var(--a);border-radius:var(--r,20px);padding:14px}
 .qh{display:flex;gap:8px;align-items:center;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);margin-bottom:10px}.qh ha-icon{--mdc-icon-size:18px}
 .qc{display:flex;flex-wrap:wrap;gap:8px}
 .qa{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:99px;padding:10px 14px;background:var(--b);color:inherit;font:inherit;font-size:14px;cursor:pointer;box-shadow:var(--shadow);transition:background .2s}
@@ -611,7 +718,7 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
   .prn-4{grid-template-columns:repeat(2,minmax(0,1fr))}
   .pool-ss{display:none}
 }
-.dvc{background:var(--a);border-radius:20px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0;position:relative}
+.dvc{background:var(--a);border-radius:var(--r,20px);padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0;position:relative}
 .dvc.run{background:rgba(120,170,110,.25)}
 .dvh{display:flex;align-items:center;gap:12px;cursor:pointer;min-width:0}.dvh .ib{width:42px;height:42px;border-radius:14px;background:var(--line);display:grid;place-items:center;flex:none}
 .dvh .tt{min-width:0;flex:1;display:flex;flex-direction:column}.dvh .tt b{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dvh .tt span{font-size:12.5px;color:var(--fg2)}
@@ -681,6 +788,7 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .fpu{padding:8px 0;border-bottom:1px solid var(--line)}.fpu b{display:block;font-size:14px;font-weight:500}.fpu>span{font-size:12.5px;color:var(--fg2)}
 .fpbt{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.fpbt .pill{padding:6px 12px;font-size:13px;background:var(--cb)}.fpbt .pill .fpdot{margin-right:2px}
 @media (max-width:480px){.fpr time{width:92px;font-size:12.5px}.fpdl .fpr time{width:60px}.fpp{padding:9px 10px;gap:8px}}
+${CARD_CSS}
 `;
 
 const SIZES = ['s', 'w', 'f'];
@@ -1079,6 +1187,9 @@ class LumoraCard extends HTMLElement {
         em.yaml = e.target.value; const r = embedConfig(em.yaml);
         const st = this.shadowRoot.querySelector('.embst'); if (st) st.textContent = r.err ? r.err : r.cfg ? `Karte: ${r.cfg.type}` : '';
         clearTimeout(this._ct); this._ct = setTimeout(() => this._save(), 600);
+      } else if (e.target.classList.contains('lkin')) {
+        const k = e.target.dataset.k; if (!LOOK_IN.includes(k)) return;
+        this._set.look[k] = e.target.value; this._applyLook(); clearTimeout(this._ct); this._ct = setTimeout(() => this._save(), 500);
       } else if (e.target.classList.contains('dvin')) {
         const iv = this._set.devices.find((x) => x.id === this._dvId); if (!iv) return;
         iv.title = e.target.value; clearTimeout(this._ct); this._ct = setTimeout(() => { this._save(); this._sig = ''; }, 600);
@@ -1087,15 +1198,30 @@ class LumoraCard extends HTMLElement {
   }
   setConfig(cfg) {
     this._cfg = cfg || {};
+    this._applyLook();
+  }
+  /* Farbthema (eigene Wahl vor Karten-YAML), Akzent, Hintergrund, Rundung, Abstand, Schrift und Kartenstil anwenden */
+  _applyLook() {
+    const cfg = this._cfg || {}; const L = (this._set && this._set.look) || mergeLook({});
     if (this._mq && this._mqf) { try { this._mq.removeEventListener('change', this._mqf); } catch (_) { /* ältere Browser */ } this._mq = this._mqf = null; }
-    if (cfg && cfg.theme === 'auto' && window.matchMedia) {
+    const th = L.theme || cfg.theme || '';
+    if (th === 'auto' && window.matchMedia) {
       this._mq = window.matchMedia('(prefers-color-scheme: dark)');
-      this._mqf = () => this.setAttribute('theme', this._mq.matches ? 'forest' : 'sand');
+      this._mqf = () => { this.setAttribute('theme', this._mq.matches ? 'forest' : 'sand'); this._applyCs(); };
       this._mqf();
       try { this._mq.addEventListener('change', this._mqf); } catch (_) { /* ältere Browser */ }
-    } else if (cfg && cfg.theme) this.setAttribute('theme', cfg.theme);
-    if (cfg && cfg.color_from) this.style.setProperty('--zp-from', cfg.color_from);
-    if (cfg && cfg.color_to) this.style.setProperty('--zp-to', cfg.color_to);
+    } else if (th) this.setAttribute('theme', th);
+    else if (this.removeAttribute) this.removeAttribute('theme');
+    const sp = (k, v) => { if (v) this.style.setProperty(k, v); else if (this.style.removeProperty) this.style.removeProperty(k); };
+    sp('--zp-from', L.bg1 || cfg.color_from); sp('--zp-to', L.bg2 || cfg.color_to);
+    sp('--r', LOOK_RADIUS[L.radius]); sp('--gap', LOOK_GAP[L.gap]); sp('--ff', LOOK_FONT[L.font]);
+    const ac = /^#[0-9a-f]{6}$/i.test(L.accent) ? L.accent : '';
+    sp('--accent', ac); sp('--accentfg', ac ? (lumOf(ac) > 0.6 ? '#2a2200' : '#fff') : '');
+    this._applyCs();
+  }
+  _applyCs() {
+    const L = (this._set && this._set.look) || mergeLook({});
+    this.setAttribute('data-cs', L.cards || (this.getAttribute('theme') === 'sage' ? 'soft' : 'flat'));
   }
   getCardSize() { return 12; }
   connectedCallback() {
@@ -1117,7 +1243,7 @@ class LumoraCard extends HTMLElement {
     if (first) this._load();
     if (this._loaded) this._notifyAlerts();
     if (this._loaded) this._doorCheck();
-    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'emb', 'dv', 'dvadd', 'dvmain', 'dvpick', 'dbpick'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
+    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'emb', 'dv', 'dvadd', 'dvmain', 'dvpick', 'dbpick', 'look'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
     if (this._down && this._edit) { this._pend = true; return; }
     if (this._plFocus()) return;
     this._fxUpdate();
@@ -1130,7 +1256,7 @@ class LumoraCard extends HTMLElement {
   }
   _signature() {
     const h = this._hass;
-    if (this._view === 'cams') return ['cams', this._sheet, this._edit, this._set.ptz.cam, this._ptzCam(), this._set.hidden.join(), (this._set.order.cams || []).join(), Object.values(h.states).filter((x) => dom(x.entity_id) === 'camera').map((x) => x.entity_id + (x.state === 'unavailable' ? 'x' : '') + (x.attributes.entity_picture || '')).join()].join('|'); const parts = [this._view, this._floor, this._area, this._sheet, this._edit, Math.floor(Date.now() / 60000), this._set.pinned.length, this._set.hidden.length, this._set.hiddenAreas.length];
+    if (this._view === 'cams') return ['cams', this._sheet, this._edit, this._set.ptz.cam, this._ptzCam(), this._set.hidden.join(), (this._set.order.cams || []).join(), Object.values(h.states).filter((x) => dom(x.entity_id) === 'camera').map((x) => x.entity_id + (x.state === 'unavailable' ? 'x' : '') + (x.attributes.entity_picture || '')).join()].join('|'); const parts = [this._view, this._floor, this._area, this._sheet, this._edit, Math.floor(Date.now() / 60000), this._set.pinned.length, this._set.hidden.length, this._set.hiddenAreas.length, JSON.stringify(this._set.look)];
     const cuSet = new Set(this._set.custom.map((x) => x.entity));
     const doms = ['weather', 'light', 'media_player', 'vacuum', 'person', 'alarm_control_panel', 'lock', 'binary_sensor', 'camera', 'switch', 'cover', 'climate', 'fan'];
     for (const id in h.states) {
@@ -1138,6 +1264,7 @@ class LumoraCard extends HTMLElement {
       if (d === 'camera' && this._view === 'cams') continue;
       if (doms.includes(d)) { const s = h.states[id]; parts.push(id + s.state + (d === 'climate' ? `${s.attributes.current_temperature}/${s.attributes.temperature}/${s.attributes.hvac_action}` : '')); }
       else if (this._view === 'rooms' && d === 'sensor') parts.push(id + h.states[id].state);
+      else if (this._view === 'home' && this._set.look.layout === 'tiles' && d === 'sensor' && ['temperature', 'humidity'].includes(h.states[id].attributes.device_class)) parts.push(id + h.states[id].state);
       else if (d === 'sensor' && (h.states[id].attributes.warning_count !== undefined || h.states[id].attributes.is_ice_warning !== undefined)) parts.push(id + h.states[id].state + h.states[id].attributes.warning_count);
       else if (id.startsWith('sensor.room_climate_')) parts.push(id + h.states[id].state + h.states[id].attributes.mold_risk);
       else if (this._auto().tracked.has(id)) parts.push(id + h.states[id].state);
@@ -1191,10 +1318,10 @@ class LumoraCard extends HTMLElement {
     const bp = base ? (base._pub || 0) : 0; const useMine = !!mine && (!base || (mine._base || 0) >= bp);
     const pick = useMine ? mine : base;
     if (pick) { this._set = merge(pick); if (!useMine) this._set._base = bp; }
-    this._loaded = true; this._sig = this._signature(); this._fxUpdate(true); this._render();
+    this._loaded = true; this._applyLook(); this._sig = this._signature(); this._fxUpdate(true); this._render();
   }
   async _save() {
-    this._fxUpdate(true);
+    this._applyLook(); this._fxUpdate(true);
     try { localStorage.setItem(KEY, JSON.stringify(this._set)); } catch (_) { /* ignore */ }
     try { await this._hass.callWS({ type: 'frontend/set_user_data', key: KEY, value: this._set }); } catch (_) { /* ignore */ }
   }
@@ -1202,7 +1329,7 @@ class LumoraCard extends HTMLElement {
   /* Eigene Einstellungen verwerfen, danach gilt wieder das veröffentlichte Gruppenlayout */
   async _resetMine() {
     const base = this._cfg && this._cfg.layout; if (!base) return;
-    this._set = merge(base); this._set._base = base._pub || 0;
+    this._set = merge(base); this._set._base = base._pub || 0; this._applyLook();
     try { localStorage.removeItem(KEY); } catch { /* ignore */ }
     try { await this._hass.callWS({ type: 'frontend/set_user_data', key: KEY, value: null }); } catch { /* ignore */ }
     this._msg = 'Zurückgesetzt: Es gilt wieder das Gruppenlayout.'; this._sig = ''; this._render();
@@ -1601,7 +1728,7 @@ class LumoraCard extends HTMLElement {
     const nav = [['home', 'mdi:home-outline', 'Zuhause'], ['rooms', 'mdi:view-grid-outline', 'Räume'], ['cams', 'mdi:cctv', 'Kameras'], ['more', 'mdi:view-dashboard-outline', 'Mehr']]
       .map(([v, i, l]) => `<button class="${this._view === v ? 'sel' : ''}" data-act="nav" data-v="${v}"><ha-icon icon="${i}"></ha-icon>${l}</button>`).join('');
     const scroll = this.shadowRoot.querySelector('.body'); const top = scroll ? scroll.scrollTop : 0;
-    const fsh = this._sheet === 'fp' && !this._fpReset ? this.shadowRoot.querySelector('.sheet') : null; const ftop = fsh ? fsh.scrollTop : 0; this._fpReset = false;
+    const fsh = (this._sheet === 'fp' || this._sheet === 'look') && !this._fpReset ? this.shadowRoot.querySelector('.sheet') : null; const ftop = fsh ? fsh.scrollTop : 0; this._fpReset = false;
     const keep = {}; const qa = this.shadowRoot.querySelectorAll;
     const pk = {}; let fk = null;
     if (qa) {
@@ -1694,13 +1821,167 @@ class LumoraCard extends HTMLElement {
     const regItems = this._regItems('home');
     if (en) regItems.push({ id: 'energyhome', html: `<div class="enw">${en}</div>`, size: this._set.size.energyhome || 'f', def: { fixed: true } });
     const regCells = this._ord('homereg', regItems, (x) => x.id).map((x) => this._cell(x, 'homereg')).filter(Boolean).join('');
+    const dsg = '<button class="pill" style="padding:5px 10px;font-size:12px" data-act="look"><ha-icon icon="mdi:palette-outline"></ha-icon>Design</button>';
+    if (this._set.look.layout === 'tiles') return this._homeTiles({ D, al, persons, home, wx, temp, hum, me, nm, greet, lights, apill, note, pills, regCells, cardsHtml: `<div class="grid">${cards.join('')}</div>` });
     return `<div class="top"><div class="logo"><ha-icon icon="mdi:home-variant"></ha-icon></div><div class="ttl">Lumora.</div>${apill}</div>
       <div class="meta">${esc(meta)}</div>${this._vent()}
       <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${persons.length ? `${home}/${persons.length} zu Hause` : ''}</div></div></div>
       ${note}<div class="pills">${pills}</div>${regCells ? `<div class="grid reg">${regCells}</div>` : ''}
       ${this._homeCams()}
-      <h3>Aktiv jetzt<button class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button></h3>
+      <h3>Aktiv jetzt<span style="display:flex;gap:6px">${dsg}<button class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button></span></h3>
       ${this._hint()}<div class="grid">${cards.join('')}</div>`;
+  }
+
+  /* ---------- Kachel-Startseite: frei ordnbare Blöcke (Design-Dialog) ---------- */
+  _homeTiles(f) {
+    const R = { head: () => this._bHead(f), kpis: () => this._bKpis(f), rooms: () => this._bRooms(f), alerts: () => `${this._vent()}${f.note}<div class="pills">${f.pills}</div>`, termine: () => this._bTermine(), status: () => this._bStatus(f), greeting: () => this._bGreeting(f), reg: () => (f.regCells ? `<div class="grid reg">${f.regCells}</div>` : ''), active: () => `<h3>Aktiv jetzt</h3>${f.cardsHtml}`, cams: () => this._homeCams() };
+    const out = this._set.look.blocks.filter((b) => b.on && R[b.id]).map((b) => {
+      let html = ''; try { html = R[b.id](); } catch (_) { html = ''; }
+      return html ? `<div class="b w${b.w}">${html}</div>` : '';
+    }).join('');
+    return `<div class="bl">${out || '<div class="b empty">Alle Blöcke sind ausgeblendet. Über „Design“ lassen sie sich wieder einschalten.</div>'}</div>`;
+  }
+  _bHead(f) {
+    const L = this._set.look; const h = this._hass; const lang = (h.locale && h.locale.language) || 'de'; const now = new Date();
+    const wx = f.wx && typeof f.wx.attributes.temperature === 'number' ? f.wx : null;
+    const date = now.toLocaleDateString(lang, { weekday: 'long', day: 'numeric', month: 'long' });
+    const time = now.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
+    const clk = (L.showClock || (L.showWeather && wx)) ? `<div class="clk">${L.showClock ? `<div class="dt"><small>${esc(date)}</small><b>${esc(time)}</b></div>` : ''}${L.showClock && L.showWeather && wx ? '<i class="sp"></i>' : ''}${L.showWeather && wx ? `<div class="wxx" data-act="info" data-id="${wx.entity_id}"><ha-icon icon="${WX[wx.state] || 'mdi:weather-cloudy'}"></ha-icon><div><b>${Math.round(wx.attributes.temperature)}°</b><small>${esc(WXL[wx.state] || '')}</small></div></div>` : ''}</div>` : '';
+    return `<div class="hd2"><div class="lg"><ha-icon icon="mdi:home-variant-outline"></ha-icon></div><div class="tx"><h1>${esc(L.title)}</h1>${L.sub ? `<div class="sub">${esc(L.sub)}</div>` : ''}</div>${clk}
+      <div class="tb">${f.apill}<button class="rb ${this._edit ? 'sel' : ''}" data-act="edit" aria-label="Bearbeiten"><ha-icon icon="mdi:pencil"></ha-icon></button><button class="rb" data-act="look" aria-label="Design"><ha-icon icon="mdi:palette-outline"></ha-icon></button></div></div>${this._hint()}`;
+  }
+  _bKpis(f) {
+    const L = this._set.look; const h = this._hass; const D = f.D;
+    const d1 = (v) => Number(v).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const lightsAll = (D.light || []).filter((l) => l.state !== 'unavailable');
+    const mk = (k) => {
+      const [label, ic] = KPI_DEF[k]; let val = null; let sub = ''; let act = 'noop'; let id = '';
+      if (k === 'lights') { val = `${f.lights.length}<small> / ${lightsAll.length}</small>`; sub = 'Lichter an'; act = 'lights'; }
+      else if (k === 'heat') {
+        const cl = (D.climate || []).filter((c) => typeof c.attributes.temperature === 'number' && c.state !== 'unavailable');
+        const c = cl.find((x) => x.attributes.hvac_action === 'heating') || cl[0];
+        if (c) { val = `${d1(c.attributes.temperature)}°`; sub = this._aname(this._areaOf(c.entity_id)) || cleanName(c.attributes.friendly_name || ''); act = 'info'; id = c.entity_id; }
+      } else if (k === 'temp') {
+        let v = f.temp !== null ? parseFloat(f.temp) : null;
+        if (v === null) { const l = (D.sensor || []).filter((x) => x.attributes.device_class === 'temperature' && !OUTDOOR.includes(this._areaOf(x.entity_id)) && !isNaN(parseFloat(x.state))).map((x) => parseFloat(x.state)); if (l.length) v = l.reduce((a, b) => a + b, 0) / l.length; }
+        if (v !== null) { val = `${d1(v)}°`; sub = 'Alle Räume'; }
+      } else if (k === 'hum') { if (f.hum !== null) { val = `${f.hum}<small> %</small>`; sub = 'Alle Räume'; } }
+      else if (k === 'power') { const e = this._slot('e_consumption'); const v = e ? this._num(e) : null; if (v !== null) { val = this._w(v); sub = 'Aktuell'; act = 'info'; id = e; } }
+      else if (k === 'open') {
+        const n = Object.values(h.states).filter((x) => dom(x.entity_id) === 'binary_sensor' && ['door', 'window', 'opening', 'garage_door'].includes(x.attributes.device_class) && x.state === 'on' && !this._set.excludeEntities.includes(x.entity_id) && !this._set.excludeAreas.includes(this._areaOf(x.entity_id))).length;
+        val = String(n); sub = n ? 'offen' : 'alles zu';
+      } else if (k === 'persons') { if (f.persons.length) { val = `${f.home}<small> / ${f.persons.length}</small>`; sub = 'zu Hause'; } }
+      if (val === null) return '';
+      return `<div class="kp ${k}" data-act="${act}" data-id="${esc(id)}"><div class="ic"><ha-icon icon="${ic}"></ha-icon></div><div class="t"><b>${label}</b><strong>${val}</strong><span>${esc(sub)}</span></div>${act !== 'noop' ? '<div class="go"><ha-icon icon="mdi:chevron-right"></ha-icon></div>' : ''}</div>`;
+    };
+    const html = L.kpis.map(mk).join('');
+    return html ? `<div class="kps">${html}</div>` : '';
+  }
+  _areaTemp(aid, ents) {
+    const st = this._hass.states; const rs = this._set.roomSensors[aid] || {};
+    const num = (id) => { const x = id && st[id]; const v = x ? parseFloat(x.state) : NaN; return isNaN(v) ? null : v; };
+    const own = num(rs.temp); if (own !== null) return own;
+    const DER = /taupunkt|dew|frost|hitzeindex|heat.?index|humidex|simmer|soll|target|offset|setpoint|gef(ü|u)hlt|feels|comfort|absolut/i;
+    const l = ents.filter((x) => dom(x.entity_id) === 'sensor' && x.attributes.device_class === 'temperature' && !isNaN(parseFloat(x.state)) && !DER.test(`${x.entity_id} ${x.attributes.friendly_name || ''}`));
+    const x = l.find((y) => !/thermostat/i.test(y.attributes.friendly_name || y.entity_id)) || l[0]; if (x) return parseFloat(x.state);
+    const c = ents.find((y) => dom(y.entity_id) === 'climate' && typeof y.attributes.current_temperature === 'number');
+    return c ? c.attributes.current_temperature : null;
+  }
+  _bRooms(f) {
+    const L = this._set.look; const h = this._hass; const all = [];
+    this._roomData().forEach((fl) => fl.areas.forEach((a) => all.push({ ...a, floor: fl.id })));
+    const list = L.rooms.length ? L.rooms.map((id) => all.find((a) => a.id === id)).filter(Boolean) : all.filter((a) => !['fahrzeug', 'system', 'allgemein'].includes(a.id)).slice(0, L.roomMax);
+    if (!list.length) return '';
+    const d1 = (v) => Number(v).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const wt = f.wx && typeof f.wx.attributes.temperature === 'number' ? f.wx.attributes.temperature : null;
+    const tiles = list.map((a) => {
+      const ar = (h.areas && h.areas[a.id]) || {}; const ents = a.ents;
+      const lg = ents.filter((x) => dom(x.entity_id) === 'light' && x.state !== 'unavailable'); const lon = lg.filter((x) => x.state === 'on').length;
+      const act = ents.some((x) => ['light', 'fan', 'media_player'].includes(dom(x.entity_id)) && !INACTIVE.includes(x.state));
+      const out = OUTDOOR.includes(a.id) || /garten|aussen|terrasse|balkon/.test(norm(a.name));
+      const t = out ? wt : this._areaTemp(a.id, ents);
+      const pic = L.roomImg && ar.picture && /^(https?:\/\/|\/)[^\s'"()<>]+$/.test(ar.picture) ? ar.picture : '';
+      const bt = `${t !== null ? `<span><ha-icon icon="${out ? 'mdi:weather-sunny' : 'mdi:thermometer'}"></ha-icon>${out ? `Außen ${Math.round(t)}°` : `${d1(t)}°`}</span>` : ''}${lg.length ? `<span><ha-icon icon="mdi:lightbulb-outline"></ha-icon>${lon} / ${lg.length}</span>` : ''}`;
+      return `<div class="rm ${pic ? 'img' : ''}" ${pic ? `style="background-image:url('${esc(pic)}')"` : ''} data-act="gotoroom" data-id="${esc(a.id)}" data-f="${esc(a.floor)}"><div class="tp"><ha-icon icon="${esc(ar.icon || roomIcon(a.name))}"></ha-icon><span class="n">${esc(a.name)}</span><span class="st ${act ? '' : 'off'}">${act ? 'AN' : 'AUS'}</span></div><div class="bt">${bt}<span class="go"><ha-icon icon="mdi:chevron-right"></ha-icon></span></div></div>`;
+    }).join('');
+    return `<div class="rms">${tiles}</div>`;
+  }
+  _bStatus(f) {
+    const L = this._set.look; const al = f.al; const worst = al.length ? Math.min(...al.map((a) => a.sev)) : 9;
+    const cls = !al.length ? '' : worst === 0 ? 'bad' : 'warn';
+    const t = al.length ? al[this._ai % al.length].text : (L.statusOk || 'Alles in Ordnung');
+    const sub = al.length ? `${al.length} Meldung${al.length > 1 ? 'en' : ''}` : (L.statusSub || (f.persons.length ? `${f.home}/${f.persons.length} zu Hause` : ''));
+    return `<div class="tl hs" data-act="alerts"><div class="th"><ha-icon icon="mdi:home-variant-outline"></ha-icon>Hausstatus</div><div class="ck ${cls}"><ha-icon icon="${al.length ? 'mdi:bell-ring-outline' : 'mdi:check'}"></ha-icon></div><div class="tx"><b>${esc(t)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div></div>`;
+  }
+  _bGreeting(f) {
+    const L = this._set.look; const txt = String(L.greet || '').replace(/\{name\}/gi, f.nm || '').replace(/\{gruss\}/gi, f.greet).trim();
+    if (!txt) return '';
+    const img = /^(https?:\/\/|\/)[^\s'"()<>]+$/.test(L.greetImg || '') ? L.greetImg : '';
+    return `<div class="gt ${img ? 'img' : ''}" ${img ? `style="background-image:url('${esc(img)}')"` : ''}><div class="s">${esc(txt)}<ha-icon icon="mdi:heart-outline"></ha-icon></div></div>`;
+  }
+
+  /* ---------- Termine aus Kalender-Entitäten (Kachel-Startseite) ---------- */
+  _calIds() {
+    const L = this._set.look; const h = this._hass;
+    if (L.cals.length) return L.cals.filter((id) => h.states[id]);
+    return (this._byDomain().calendar || []).filter((c) => !EV_CALX.test(norm(`${c.entity_id} ${c.attributes.friendly_name || ''}`))).map((c) => c.entity_id);
+  }
+  _evNorm(r, id) {
+    const resp = r && !Array.isArray(r) && (r.response || r); const e = Array.isArray(r) ? r : resp && resp[id] && resp[id].events;
+    if (!Array.isArray(e)) return null;
+    const day = (v) => { const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(v)); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(v); };
+    const part = (v) => (v && typeof v === 'object' ? (v.dateTime || v.date) : v);
+    return e.map((x) => {
+      const s = part(x.start); if (!s) return null;
+      const en = part(x.end); const all = /^\d{4}-\d\d-\d\d$/.test(String(s));
+      const a = day(s); const b = en ? day(en) : a; if (isNaN(a.getTime())) return null;
+      return { t: String(x.summary || x.title || ''), s: a.getTime(), e: isNaN(b.getTime()) ? a.getTime() : b.getTime(), all, cal: id };
+    }).filter(Boolean);
+  }
+  _evFetch(id) {
+    const cache = this._evc || (this._evc = {}); const dk = new Date().toDateString(); const h = this._hass;
+    const n = cache[id] || (cache[id] = { at: 0, ev: null, busy: false, dk, h: '' });
+    if (!h || typeof h.callWS !== 'function') return n;
+    n.busy = true; n.dk = dk;
+    const a = WC.day(new Date()); const b = new Date(a.getFullYear(), a.getMonth(), a.getDate() + 30);
+    const tries = [
+      () => h.callWS({ type: 'call_service', domain: 'calendar', service: 'get_events', service_data: { start_date_time: a.toISOString(), end_date_time: b.toISOString() }, target: { entity_id: id }, return_response: true }),
+      () => h.callApi('GET', `calendars/${id}?start=${encodeURIComponent(a.toISOString())}&end=${encodeURIComponent(b.toISOString())}`),
+    ];
+    (async () => {
+      let ev = null;
+      for (const t of tries) { try { ev = this._evNorm(await t(), id); if (ev) break; } catch (_) { /* nächster Versuch */ } }
+      const hh = JSON.stringify(ev || []); const changed = hh !== n.h; n.h = hh; n.busy = false;
+      if (ev) { n.ev = ev; n.at = Date.now(); } else n.at = Date.now() - 540000; /* nach einer Minute erneut versuchen */
+      if (changed) this._wcDone();
+    })();
+    return n;
+  }
+  _events() {
+    const cache = this._evc || (this._evc = {}); const now = Date.now(); const dk = new Date().toDateString();
+    let list = []; let busy = false; const ids = this._calIds();
+    ids.forEach((id) => {
+      let n = cache[id];
+      if (!n || (!n.busy && (n.dk !== dk || now - n.at > 600000))) n = this._evFetch(id);
+      if (n.busy && !n.ev) busy = true;
+      if (n.ev) list = list.concat(n.ev);
+    });
+    list = list.filter((x) => x.e > now || x.s > now).sort((x, y) => x.s - y.s);
+    return { list, busy, n: ids.length };
+  }
+  _evRow(x) {
+    const now = new Date(); const d0 = new Date(x.s); const dd = Math.round((WC.day(d0) - WC.day(now)) / 86400000);
+    const d = dd < 0 ? now : d0;
+    const dl = dd <= 0 ? 'Heute' : dd === 1 ? 'Morgen' : d.toLocaleDateString('de-DE', { weekday: 'short' }).replace(/\.$/, '');
+    const dn = d.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' });
+    const tm = x.all ? 'ganztägig' : `${d0.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`;
+    return `<div class="ev ${dd <= 0 ? 'today' : ''}" data-act="info" data-id="${esc(x.cal)}"><i></i><div><b>${esc(dl)}, ${esc(dn)}</b><span><em>${tm}</em><span class="tt" style="display:inline">${esc(x.t)}</span></span></div></div>`;
+  }
+  _bTermine() {
+    const L = this._set.look; const ev = this._events();
+    const rows = ev.list.slice(0, L.evMax).map((x) => this._evRow(x)).join('');
+    const none = !ev.n ? 'Keine Kalender gefunden' : ev.busy ? 'Termine werden geladen …' : 'Keine anstehenden Termine';
+    return `<div class="tl"><div class="th"><ha-icon icon="mdi:calendar-month-outline"></ha-icon>Termine${ev.list.length ? '<span class="all" data-act="evall">Alle anzeigen<ha-icon icon="mdi:chevron-right"></ha-icon></span>' : ''}</div>${rows || `<div class="ev none">${none}</div>`}</div>`;
   }
   _card(st, sub, pinId, edit, cls, p) {
     const x = edit && pinId ? `<span class="x" data-act="unpin" data-id="${pinId}"><ha-icon icon="mdi:close"></ha-icon></span><span class="mini po" data-act="ponly" data-id="${pinId}"><ha-icon icon="${p && p.only ? 'mdi:flash' : 'mdi:flash-off'}"></ha-icon></span><span class="mini sz" data-act="size" data-id="${pinId}" data-d="${this._set.size[pinId] || 's'}"><ha-icon icon="${SIZE_ICON[this._set.size[pinId] || 's']}"></ha-icon></span>${this._tools('pinned', pinId, null)}` : '';
@@ -2705,6 +2986,11 @@ _more() {
       c = this._fpSheet();
     } else if (this._sheet === 'emb') {
       c = this._embSheet();
+    } else if (this._sheet === 'look') {
+      c = this._lookSheet();
+    } else if (this._sheet === 'events') {
+      const ev = this._events();
+      c = `<h2>Termine</h2>${ev.list.slice(0, 40).map((x) => this._evRow(x)).join('') || '<div class="hint">Keine anstehenden Termine.</div>'}`;
     } else if (this._sheet === 'cc') {
       const cu = this._set.custom.find((x) => x.id === this._ccId);
       if (cu) {
@@ -2717,6 +3003,38 @@ _more() {
       }
     }
     return `<div class="sbg" data-act="close"><div class="sheet" data-act="noop"><div class="sxw"><button class="sx" data-act="close" aria-label="Schließen"><ha-icon icon="mdi:close"></ha-icon></button></div>${c}</div></div>`;
+  }
+  _lookSheet() {
+    const L = this._set.look; const h = this._hass;
+    const seg = (k, opts, cur) => `<div class="lkc">${opts.map(([v, l]) => `<button class="pill ${cur === v ? 'sel' : ''}" data-act="lk" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
+    const tg = (k) => `<button class="${L[k] ? 'sel' : ''}" data-act="lkt" data-k="${k}">${L[k] ? 'An' : 'Aus'}</button>`;
+    const col = (k, def, lbl) => `<div class="row"><div class="t"><b>${lbl}</b></div><div class="lkc"><input type="color" class="lkin" data-k="${k}" value="${/^#[0-9a-f]{6}$/i.test(L[k]) ? L[k] : def}"><button data-act="lkclr" data-k="${k}">Standard</button></div></div>`;
+    const inp = (k, lbl, ph) => `<div class="lkl">${lbl}</div><input class="lkin" data-k="${k}" placeholder="${esc(ph)}" value="${esc(L[k])}">`;
+    const step = (k, lbl, sub) => `<div class="row"><div class="t"><b>${lbl}</b><span>${sub}</span></div><div class="lkb"><button data-act="lkn" data-k="${k}" data-d="-1" aria-label="Weniger"><ha-icon icon="mdi:minus"></ha-icon></button><b>${L[k]}</b><button data-act="lkn" data-k="${k}" data-d="1" aria-label="Mehr"><ha-icon icon="mdi:plus"></ha-icon></button></div></div>`;
+    const blocks = L.blocks.map((b, i) => { const d = BLOCK_DEF.find((x) => x[0] === b.id); const wl = (BLOCK_W.find((x) => x[0] === b.w) || [0, 'Voll'])[1];
+      return `<div class="row"><div class="t"><b>${d[1]}</b></div><div class="lkb"><button data-act="blk" data-id="${b.id}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Nach oben"><ha-icon icon="mdi:arrow-up"></ha-icon></button><button data-act="blk" data-id="${b.id}" data-d="1" ${i === L.blocks.length - 1 ? 'disabled' : ''} aria-label="Nach unten"><ha-icon icon="mdi:arrow-down"></ha-icon></button><button data-act="blkw" data-id="${b.id}" aria-label="Breite">${wl}</button><button class="${b.on ? 'sel' : ''}" data-act="blkon" data-id="${b.id}">${b.on ? 'An' : 'Aus'}</button></div></div>`; }).join('');
+    const kpis = `<div class="lkc">${Object.keys(KPI_DEF).map((k) => { const i = L.kpis.indexOf(k); return `<button class="pill ${i >= 0 ? 'sel' : ''}" data-act="kpi" data-k="${k}">${i >= 0 ? `${i + 1} · ` : ''}${KPI_DEF[k][0]}</button>`; }).join('')}</div>`;
+    const areas = []; this._roomData().forEach((fl) => fl.areas.forEach((a) => areas.push(a)));
+    const rooms = `<div class="lkc"><button class="pill ${L.rooms.length ? '' : 'sel'}" data-act="lkrooms0">Automatisch</button>${areas.map((a) => { const i = L.rooms.indexOf(a.id); return `<button class="pill ${i >= 0 ? 'sel' : ''}" data-act="lkroom" data-id="${esc(a.id)}">${i >= 0 ? `${i + 1} · ` : ''}${esc(a.name)}</button>`; }).join('')}</div>`;
+    const cals = (this._byDomain().calendar || []);
+    const calh = `<div class="lkc"><button class="pill ${L.cals.length ? '' : 'sel'}" data-act="lkcals0">Automatisch</button>${cals.map((x) => `<button class="pill ${L.cals.includes(x.entity_id) ? 'sel' : ''}" data-act="lkcal" data-id="${esc(x.entity_id)}">${esc(x.attributes.friendly_name || x.entity_id)}</button>`).join('')}</div>`;
+    return `<h2>Design</h2>
+      <h4>Vorlagen</h4><div class="lkc">${[['sand', 'Sand'], ['forest', 'Wald'], ['sage', 'Salbei (Kacheln)']].map(([k, l]) => `<button class="pill" data-act="lkpre" data-k="${k}">${l}</button>`).join('')}</div>
+      <div class="hint" style="margin-top:8px">Eine Vorlage setzt Startseite, Farbthema, Rundung, Kartenstil und Schrift auf einmal. Danach lässt sich alles einzeln anpassen.</div>
+      <h4>Startseite</h4>${seg('layout', [['classic', 'Klassisch'], ['tiles', 'Kacheln']], L.layout)}
+      <h4>Farben</h4>${seg('theme', LOOK_THEMES, L.theme)}
+      ${col('accent', '#6b8f4e', 'Akzentfarbe')}${col('bg1', '#f8f0e4', 'Hintergrund oben')}${col('bg2', '#ebdcc4', 'Hintergrund unten')}
+      <h4>Form</h4><div class="lkl">Rundung</div>${seg('radius', [['', 'Standard'], ['sm', 'Eckig'], ['md', 'Rund'], ['lg', 'Extra rund']], L.radius)}
+      <div class="lkl">Kartenstil</div>${seg('cards', [['', 'Passend zum Thema'], ['flat', 'Flach'], ['soft', 'Weich'], ['glass', 'Glas']], L.cards)}
+      <div class="lkl">Abstand</div>${seg('gap', [['', 'Standard'], ['s', 'Eng'], ['m', 'Normal'], ['l', 'Weit']], L.gap)}
+      <div class="lkl">Schrift</div>${seg('font', [['', 'Standard'], ['round', 'Rund'], ['serif', 'Serif']], L.font)}
+      <h4>Texte (Kacheln)</h4>${inp('title', 'Titel', 'Zuhause')}${inp('sub', 'Untertitel', 'Willkommen daheim ♡')}${inp('greet', 'Grußkachel (mit {name} und {gruss})', 'Schön, dass du da bist!')}${inp('greetImg', 'Grußkachel Hintergrundbild (Adresse, z. B. /local/bild.jpg)', 'https://…')}${inp('statusOk', 'Hausstatus, wenn alles passt', 'Alles in Ordnung')}${inp('statusSub', 'Hausstatus Zusatzzeile', 'leer = Anwesenheit')}
+      <h4>Kopfzeile (Kacheln)</h4><div class="row"><div class="t"><b>Datum und Uhrzeit</b></div>${tg('showClock')}</div><div class="row"><div class="t"><b>Wetter</b></div>${tg('showWeather')}</div>
+      <h4>Blöcke und Reihenfolge (Kacheln)</h4>${blocks}<div class="hint" style="margin-top:8px">Die Breite wird in zwölf Spalten gerechnet: ¼, ⅓, ½, ⅔ oder voll. Auf dem Handy stehen die Blöcke untereinander.</div>
+      <h4>Kennzahlen (Kacheln)</h4>${kpis}
+      <h4>Räume (Kacheln)</h4>${step('roomMax', 'Anzahl bei Automatik', 'Die ersten Räume nach Etage')}<div class="row"><div class="t"><b>Raumfoto</b><span>Bild aus dem Bereich in Home Assistant</span></div>${tg('roomImg')}</div><div class="lkl">Eigene Auswahl und Reihenfolge</div>${rooms}
+      <h4>Termine (Kacheln)</h4>${step('evMax', 'Anzahl Termine', 'In der Kachel')}<div class="lkl">Kalender</div>${calh}
+      <div class="row" style="border:0;margin-top:10px"><button data-act="lkreset">Zurücksetzen</button><button class="sel" data-act="close">Fertig</button></div>`;
   }
   _fillList() {
     this._fillList0(); this._a11y();
@@ -3741,6 +4059,23 @@ _more() {
       case 'ponly': { const q = s.pinned.find((x) => x.entity === id); if (q) q.only = !q.only; this._save(); break; }
       case 'unpin': s.pinned = s.pinned.filter((p) => p.entity !== id); this._save(); break;
       case 'edit': this._edit = !this._edit; break;
+      case 'look': this._sheet = 'look'; break;
+      case 'evall': this._sheet = 'events'; break;
+      case 'gotoroom': this._view = 'rooms'; this._floor = t.dataset.f; this._area = id; this._sheet = null; this._edit = false; break;
+      case 'lkpre': { const pr = LOOK_PRESETS[t.dataset.k]; if (pr) Object.assign(s.look, pr); this._save(); break; }
+      case 'lk': { const k = t.dataset.k; if (['layout', 'theme', 'radius', 'cards', 'gap', 'font'].includes(k)) { s.look[k] = t.dataset.v; this._save(); } break; }
+      case 'lkt': { const k = t.dataset.k; if (['showClock', 'showWeather', 'roomImg'].includes(k)) { s.look[k] = !s.look[k]; this._save(); } break; }
+      case 'lkclr': { const k = t.dataset.k; if (['accent', 'bg1', 'bg2'].includes(k)) { s.look[k] = ''; this._save(); } break; }
+      case 'lkn': { const k = t.dataset.k; const mx = k === 'roomMax' ? 12 : k === 'evMax' ? 8 : 0; if (mx) { s.look[k] = Math.max(1, Math.min(mx, s.look[k] + Number(t.dataset.d))); this._save(); } break; }
+      case 'kpi': { const k = t.dataset.k; if (KPI_DEF[k]) { s.look.kpis = s.look.kpis.includes(k) ? s.look.kpis.filter((x) => x !== k) : [...s.look.kpis, k].slice(0, 6); this._save(); } break; }
+      case 'blk': { const b = s.look.blocks; const i = b.findIndex((x) => x.id === id); const j = i + Number(t.dataset.d); if (i >= 0 && j >= 0 && j < b.length) { [b[i], b[j]] = [b[j], b[i]]; this._save(); } break; }
+      case 'blkw': { const b = s.look.blocks.find((x) => x.id === id); if (b) { const i = BLOCK_W.findIndex((x) => x[0] === b.w); b.w = BLOCK_W[(i + 1) % BLOCK_W.length][0]; this._save(); } break; }
+      case 'blkon': { const b = s.look.blocks.find((x) => x.id === id); if (b) { b.on = !b.on; this._save(); } break; }
+      case 'lkroom': s.look.rooms = s.look.rooms.includes(id) ? s.look.rooms.filter((x) => x !== id) : [...s.look.rooms, id]; this._save(); break;
+      case 'lkrooms0': s.look.rooms = []; this._save(); break;
+      case 'lkcal': s.look.cals = s.look.cals.includes(id) ? s.look.cals.filter((x) => x !== id) : [...s.look.cals, id]; this._evc = {}; this._save(); break;
+      case 'lkcals0': s.look.cals = []; this._evc = {}; this._save(); break;
+      case 'lkreset': s.look = mergeLook({}); this._save(); break;
       case 'publish': this._publish(); return;
       case 'mv': {
         const sc = t.dataset.s; const dd = Number(t.dataset.d);

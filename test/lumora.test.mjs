@@ -718,3 +718,71 @@ test('Abfall: Rausstellen am Abholtag bis mittags und am Vorabend ab 16 Uhr', ()
   assert.equal(L.WC.due(1, 8), false); assert.equal(L.WC.due(1, 16), true);
   assert.equal(L.WC.due(2, 18), false);
 });
+
+test('Design: mergeLook ergänzt fehlende Blöcke und verwirft Ungültiges', () => {
+  const d = L.mergeLook({});
+  assert.equal(d.blocks.map((b) => b.id).join(), L.BLOCK_DEF.map((b) => b[0]).join());
+  assert.equal(d.layout, 'classic');
+  const m = L.mergeLook({ blocks: [{ id: 'greeting', w: 6, on: true }, { id: 'unbekannt', w: 4 }, { id: 'head', w: 99, on: false }], kpis: ['temp', 'quatsch'], roomMax: 99, evMax: 0 });
+  assert.equal(JSON.stringify(m.blocks.slice(0, 2).map((b) => [b.id, b.w, b.on])), JSON.stringify([['greeting', 6, true], ['head', 12, false]]));
+  assert.equal(m.blocks.length, L.BLOCK_DEF.length);
+  assert.equal(m.kpis.join(), 'temp');
+  assert.equal(m.roomMax, 12);
+  assert.equal(m.evMax, 3);
+});
+
+test('Design: Vorlage Salbei schaltet auf Kacheln', () => {
+  assert.equal(L.LOOK_PRESETS.sage.layout, 'tiles');
+  assert.equal(L.LOOK_PRESETS.sage.theme, 'sage');
+  assert.equal(L.LOOK_PRESETS.sand.layout, 'classic');
+});
+
+test('Design: eigene Themenwahl hat Vorrang vor der Karten-YAML, Kartenstil folgt dem Thema', () => {
+  const c = new L.card();
+  c.setConfig({ theme: 'forest' });
+  assert.equal(c.getAttribute('theme'), 'forest');
+  assert.equal(c.getAttribute('data-cs'), 'flat');
+  c._set.look.theme = 'sage'; c._applyLook();
+  assert.equal(c.getAttribute('theme'), 'sage');
+  assert.equal(c.getAttribute('data-cs'), 'soft');
+  c._set.look.cards = 'glass'; c._applyLook();
+  assert.equal(c.getAttribute('data-cs'), 'glass');
+});
+
+test('Raumsymbole nach Namen', () => {
+  assert.equal(L.roomIcon('Wohnzimmer'), 'mdi:sofa-outline');
+  assert.equal(L.roomIcon('Büro'), 'mdi:briefcase-outline');
+  assert.equal(L.roomIcon('Irgendwas'), 'mdi:door-open');
+});
+
+test('Kachel-Startseite: Blöcke, Kennzahlen, Räume, Termine und Reihenfolge', async () => {
+  const c = new L.card(); c.setConfig({});
+  const st = (id, state, attributes = {}) => ({ entity_id: id, state, attributes });
+  const states = {
+    'light.a': st('light.a', 'on', { friendly_name: 'A' }), 'light.b': st('light.b', 'off', { friendly_name: 'B' }),
+    'climate.w': st('climate.w', 'heat', { friendly_name: 'Wohnzimmer', current_temperature: 20, temperature: 21.5, hvac_action: 'heating' }),
+    'weather.h': st('weather.h', 'cloudy', { temperature: 18 }), 'person.s': st('person.s', 'home', { friendly_name: 'S' }), 'calendar.k': st('calendar.k', 'off', { friendly_name: 'Familie' }),
+  };
+  const day = new Date(Date.now() + 3600e3).toISOString();
+  c._hass = { states, entities: { 'light.a': { area_id: 'wz' }, 'light.b': { area_id: 'wz' }, 'climate.w': { area_id: 'wz' } }, devices: {}, areas: { wz: { name: 'Wohnzimmer', floor_id: 'eg' } }, floors: { eg: { name: 'EG', level: 0 } },
+    locale: { language: 'de' }, user: { id: 'u', is_admin: true }, callApi: async () => [],
+    callWS: async () => ({ response: { 'calendar.k': { events: [{ start: day, end: day, summary: 'Training' }] } } }) };
+  c._loaded = true; c._set.look.layout = 'tiles';
+  c._home(); await new Promise((r) => setTimeout(r, 30));
+  let html = c._home();
+  assert.match(html, /class="b w12"><div class="hd2"/);
+  assert.match(html, /class="kp lights"[\s\S]*1<small> \/ 2<\/small>/);
+  assert.match(html, /class="kp heat"[\s\S]*21,5°/);
+  assert.match(html, /class="rm "[\s\S]*Wohnzimmer[\s\S]*>AN</);
+  assert.match(html, /Training/);
+  assert.match(html, /Alles in Ordnung/);
+  /* Block ausblenden und Reihenfolge ändern */
+  c._set.look.blocks.find((b) => b.id === 'greeting').on = false;
+  const sw = c._set.look.blocks; [sw[0], sw[1]] = [sw[1], sw[0]];
+  html = c._home();
+  assert.ok(!html.includes('class="gt'));
+  assert.ok(html.indexOf('class="kps"') < html.indexOf('class="hd2"'));
+  /* Klassisch bleibt unverändert */
+  c._set.look.layout = 'classic';
+  assert.match(c._home(), /class="hello"/);
+});
