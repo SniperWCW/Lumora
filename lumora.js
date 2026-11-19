@@ -599,6 +599,7 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .dbc{width:100%;max-width:720px;max-height:100%;overflow:auto;background:var(--sheet);color:var(--fg);border-radius:24px;padding:14px;box-sizing:border-box}
 .dbh{display:flex;align-items:center;gap:12px;margin-bottom:10px}.dbh>div{flex:1;min-width:0}.dbh b{display:block;font-size:18px}.dbh span{font-size:12.5px;color:var(--fg2)}.dbh>ha-icon{--mdc-icon-size:28px;color:var(--accent)}
 .dbv{position:relative;height:0;padding-top:56.25%;border-radius:16px;overflow:hidden;background:#000}.dbv img,.dbv ha-camera-stream{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block}
+.dbs{position:absolute;left:10px;bottom:10px;z-index:2;padding:3px 10px;border-radius:99px;font-size:11.5px;font-weight:600;background:rgba(0,0,0,.55);color:#fff;pointer-events:none}.dbs.live{background:rgba(200,40,40,.85)}.dbs.old{background:rgba(190,110,0,.9)}
 .dbbar{height:4px;border-radius:2px;background:var(--line);margin:10px 0;overflow:hidden}.dbbar i{display:block;height:100%;background:var(--accent);animation:dbbar linear forwards}
 @keyframes dbbar{from{width:100%}to{width:0}}
 .dbf{display:flex;gap:8px;justify-content:flex-end}
@@ -912,8 +913,10 @@ const Fx = (() => {
   const get = (k) => S[k] || (S[k] = { a: 0, t0: 0, on: false, p: [], v: '', tm: 0 });
   const resize = () => {
     if (!cv) return;
-    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    W = window.innerWidth; H = window.innerHeight;
+    /* nur bei echter Größenänderung neu anlegen (iOS meldet beim Scrollen/Leistenwechsel ständig resize; jedes Neuanlegen kostet und flackert) */
+    const nd = Math.min(window.devicePixelRatio || 1, 1.5); const nw = window.innerWidth; const nh = window.innerHeight;
+    if (cv.width && Math.abs(nw - W) < 2 && Math.abs(nh - H) < 2 && nd === dpr) return;
+    dpr = nd; W = nw; H = nh;
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   };
@@ -933,7 +936,7 @@ const Fx = (() => {
   const unmount = () => {
     cancelAnimationFrame(raf); raf = 0;
     window.removeEventListener('resize', resize); document.removeEventListener('visibilitychange', vis);
-    if (cv) cv.remove(); cv = null; ctx = null; FX_KEYS.forEach((k) => delete S[k]);
+    if (cv) cv.remove(); cv = null; ctx = null; blobs.clear(); FX_KEYS.forEach((k) => delete S[k]);
   };
   const kick = () => { if (!raf && cv && !document.hidden) { last = 0; raf = requestAnimationFrame(frame); } };
 
@@ -989,24 +992,30 @@ const Fx = (() => {
       ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 6.283); ctx.fill();
     });
   };
+  /* Weiche Kreise einmal vorrendern und nur noch zeichnen: pro Frame neue Radialverläufe (Nebel 6, Wolken 20) waren auf älteren iPads der Hauptgrund fürs Ruckeln */
+  const blobs = new Map();
+  const blob = (r, rgb) => {
+    const rr = Math.max(10, Math.round(r / 10) * 10); const key = `${rr}|${rgb}`; let c = blobs.get(key);
+    if (!c) {
+      c = document.createElement('canvas'); c.width = c.height = rr * 2; const x = c.getContext('2d');
+      const g = x.createRadialGradient(rr, rr, 0, rr, rr, rr); g.addColorStop(0, `rgba(${rgb},0.2)`); g.addColorStop(1, `rgba(${rgb},0)`);
+      x.fillStyle = g; x.fillRect(0, 0, rr * 2, rr * 2); blobs.set(key, c);
+    }
+    return c;
+  };
+  const drawBlob = (x, y, r, rgb, a) => { if (!Number.isFinite(x + y + r + a)) return; ctx.globalAlpha = a; ctx.drawImage(blob(r, rgb), x - r, y - r, r * 2, r * 2); ctx.globalAlpha = 1; };
   const fogs = (st, dt, a) => {
     fill(st.p, 6, () => ({ x: R(0, W), y: R(H * 0.1, H * 0.95), r: R(220, 420), s: R(6, 18) * (Math.random() < 0.5 ? 1 : -1) }));
     st.p.forEach((f) => {
       f.x += f.s * dt; if (f.x > W + f.r) f.x = -f.r; if (f.x < -f.r) f.x = W + f.r;
-      const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
-      g.addColorStop(0, `rgba(200,208,215,${0.2 * a})`); g.addColorStop(1, 'rgba(200,208,215,0)');
-      ctx.fillStyle = g; ctx.fillRect(f.x - f.r, f.y - f.r, f.r * 2, f.r * 2);
+      drawBlob(f.x, f.y, f.r, '200,208,215', a);
     });
   };
   const clouds = (st, dt, a) => {
     fill(st.p, 5, () => ({ x: R(0, W), y: R(20, H * 0.35), r: R(120, 220), s: R(4, 10) }));
     st.p.forEach((c) => {
       c.x += c.s * dt; if (c.x > W + c.r * 2) c.x = -c.r * 2;
-      [[0, 0, 1], [0.7, 0.15, 0.75], [-0.7, 0.2, 0.7], [0.3, -0.25, 0.7]].forEach(([dx, dy, k]) => {
-        const g = ctx.createRadialGradient(c.x + dx * c.r, c.y + dy * c.r, 0, c.x + dx * c.r, c.y + dy * c.r, c.r * k);
-        g.addColorStop(0, `rgba(205,212,222,${0.2 * a})`); g.addColorStop(1, 'rgba(205,212,222,0)');
-        ctx.fillStyle = g; ctx.fillRect(c.x + dx * c.r - c.r, c.y + dy * c.r - c.r, c.r * 2, c.r * 2);
-      });
+      [[0, 0, 1], [0.7, 0.15, 0.75], [-0.7, 0.2, 0.7], [0.3, -0.25, 0.7]].forEach(([dx, dy, k]) => drawBlob(c.x + dx * c.r, c.y + dy * c.r, c.r * k, '205,212,222', a));
     });
   };
   const bolt = (st, dt, a) => {
@@ -1129,10 +1138,13 @@ const Fx = (() => {
 
   const frame = (ts) => {
     raf = 0; if (!cv) return;
-    const dt = Math.min(0.05, last ? (ts - last) / 1000 : 0.016); last = ts; const t = ts / 1000; const now = Date.now();
+    if (!Number.isFinite(ts)) ts = performance.now();
+    /* 30 fps reichen für Stimmungseffekte und halbieren die Last (Scrollen bleibt flüssig) */
+    if (last && ts - last < 30) { raf = requestAnimationFrame(frame); return; }
+    let dt = last ? (ts - last) / 1000 : 0.016; if (!Number.isFinite(dt) || dt <= 0) dt = 0.016; dt = Math.min(0.05, dt); last = ts; const t = ts / 1000; const now = Date.now();
     ctx.clearRect(0, 0, W, H);
     let busy = false;
-    FX_KEYS.forEach((k) => {
+    FX_KEYS.forEach((k) => { try {
       const st = get(k); const c = conf.act[k]; let want = 0;
       if (c) { if (!st.on) { st.on = true; st.t0 = now; } want = (!c.dur || (now - st.t0) / 1000 < c.dur) ? 1 : 0; } else st.on = false;
       st.a += Math.max(-1, Math.min(1, (want - st.a))) * Math.min(1, dt * 1.2);
@@ -1153,7 +1165,11 @@ const Fx = (() => {
       else if (k === 'autumn') autumn(st, dt, a, t);
       else if (k === 'halloween') halloween(st, dt, a, t);
       else if (k === 'christmas') christmas(st, dt, a, t);
-    });
+    } catch (_) {
+      /* ein Fehler in einem Effekt darf die Animationsschleife nicht beenden (sonst Ruckeln/Neustart alle paar Sekunden) */
+      const s = S[k]; if (s) { s.p = []; s.pd = null; s.g = null; s.sh = null; s.sp = null; s.sl = null; s.bolt = null; }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0; busy = true;
+    } });
     if (busy) raf = requestAnimationFrame(frame);
     else if (!Object.keys(conf.act).length) unmount();
   };
@@ -1182,6 +1198,7 @@ class LumoraCard extends HTMLElement {
     this._edit = false; this._q = ''; this._flt = 'all'; this._only = false; this._chipMode = false; this._ai = 0;
     this._set = merge({}); this._loaded = false; this._sig = '';
     this.shadowRoot.addEventListener('click', (e) => this._click(e));
+    this.shadowRoot.addEventListener('scroll', () => { this._scAt = Date.now(); }, true);
     this.shadowRoot.addEventListener('pointerdown', (e) => {
       this._down = true;
       if (this._edit) { this._dgStart(e); return; }
@@ -1292,8 +1309,13 @@ class LumoraCard extends HTMLElement {
     if (sig !== this._sig) {
       this._sig = sig;
       clearTimeout(this._rt);
-      this._rt = setTimeout(() => this._render(), 200);
+      this._rt = setTimeout(() => this._renderIdle(), 200);
     }
+  }
+  /* Automatische Neuaufbauten (Sensor-Änderung, Minutentakt) warten, bis nicht mehr gescrollt oder getippt wird, sonst springt die Ansicht */
+  _renderIdle() {
+    if (Date.now() - (this._scAt || 0) < 600 && (this._idleTries = (this._idleTries || 0) + 1) < 25) { clearTimeout(this._rt); this._rt = setTimeout(() => this._renderIdle(), 400); return; }
+    this._idleTries = 0; this._render();
   }
   _signature() {
     const h = this._hass;
@@ -1710,29 +1732,51 @@ class LumoraCard extends HTMLElement {
   _doorMedia() {
     const v = this._dbEl && this._dbEl.querySelector('.dbv'); const st = this._db && this._hass.states[this._db.cam]; if (!v || !st) return;
     /* Standbild immer als Grundlage (auch für Kameras ohne Stream oder bei Stream-Fehlern); der Livestream liegt unsichtbar darüber und wird erst eingeblendet, wenn wirklich Video läuft */
-    const live = this._db.live;
+    const db = this._db; const live = db.live; const now = Date.now();
     const base = st.attributes.entity_picture;
+    const canStream = !!((Number(st.attributes.supported_features) & 2) && customElements.get('ha-camera-stream'));
     let img = v.querySelector('img');
     if (!img) {
       img = document.createElement('img'); img.alt = ''; v.insertBefore(img, v.firstChild);
-      img.addEventListener('load', () => { img._busy = false; img._fail = 0; });
-      img.addEventListener('error', () => { img._busy = false; img._fail = (img._fail || 0) + 1; });
+      img.addEventListener('load', () => { img._busy = false; img._fail = 0; img._at = Date.now(); this._doorBadge(); });
+      img.addEventListener('error', () => { img._busy = false; img._fail = (img._fail || 0) + 1; this._doorBadge(); });
     }
-    if (base && !live && !img._busy) {
-      /* nach wiederholten Fehlern auf ein anderes Standbild (z. B. Viseron-Snapshot) in diesem Bereich ausweichen */
-      let src = base; const alts = this._doorAlts(this._db.cam);
-      if ((img._fail || 0) >= 2 && alts.length) { const a = this._hass.states[alts[(img._fail - 2) % alts.length]]; if (a && a.attributes.entity_picture) src = a.attributes.entity_picture; }
-      img._busy = true; img.src = `${src}${src.includes('?') ? '&' : '?'}_t=${Date.now()}`;
+    if (img._busy && now - (img._try || 0) > 10000) { img._busy = false; img._fail = (img._fail || 0) + 1; }
+    /* Jeder Standbild-Abruf lässt Home Assistant eine RTSP-Verbindung zur Kamera öffnen und konkurriert mit dem Livestream (Kameras erlauben nur wenige Sitzungen, sonst „Operation not permitted“). Darum: sofort ein Standbild, danach bei Stream-Kameras nur selten. */
+    if (base && !live && !img._busy && now - (img._try || 0) >= (canStream ? 6000 : 2000)) {
+      /* nach wiederholten Fehlern auf ein anderes Standbild (z. B. Viseron-Snapshot) in diesem Bereich ausweichen; das wird im Popup als ältere Aufnahme gekennzeichnet */
+      let src = base; let altId = ''; const alts = this._doorAlts(db.cam);
+      if ((img._fail || 0) >= 2 && alts.length) { altId = alts[(img._fail - 2) % alts.length]; const a = this._hass.states[altId]; if (a && a.attributes.entity_picture) src = a.attributes.entity_picture; else altId = ''; }
+      img._alt = src !== base; db.altId = img._alt ? altId : '';
+      img._busy = true; img._try = now; img.src = `${src}${src.includes('?') ? '&' : '?'}_t=${now}`;
     }
-    const canStream = (Number(st.attributes.supported_features) & 2) && customElements.get('ha-camera-stream');
     if (canStream) {
       let s = v.querySelector('ha-camera-stream');
-      if (!s) { s = document.createElement('ha-camera-stream'); s.muted = true; s.controls = false; s.setAttribute('muted', ''); s.style.opacity = '0'; s.style.pointerEvents = 'none'; v.appendChild(s); }
+      /* Kommt nach 15 s kein Video, Stream-Element neu aufbauen (höchstens 3-mal) */
+      if (s && !live && now - (db.sAt || now) > 15000 && (db.retry || 0) < 3) { db.retry = (db.retry || 0) + 1; s.remove(); s = null; db.sAt = 0; }
+      if (!s) { s = document.createElement('ha-camera-stream'); s.muted = true; s.controls = false; s.setAttribute('muted', ''); s.setAttribute('playsinline', ''); s.style.opacity = '0'; s.style.pointerEvents = 'none'; v.appendChild(s); db.sAt = now; }
       if (s.stateObj !== st || !s.hass) { s.hass = this._hass; s.stateObj = st; }
       const ok = this._deepPlaying(s.shadowRoot);
-      this._db.live = ok;
+      db.live = ok;
       s.style.opacity = ok ? '1' : '0'; s.style.pointerEvents = ok ? '' : 'none';
     }
+    db.canStream = canStream; this._doorBadge();
+  }
+
+  /* Statusanzeige im Popup: Live, aktuelles Standbild oder ältere Aufnahme (mit Uhrzeit), damit ein altes Bild nicht für Live gehalten wird */
+  _doorBadge() {
+    const v = this._dbEl && this._dbEl.querySelector('.dbv'); const db = this._db; if (!v || !db) return;
+    let b = v.querySelector('.dbs'); if (!b) { b = document.createElement('span'); b.className = 'dbs'; v.appendChild(b); }
+    const img = v.querySelector('img'); const hm = (d) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    let txt = 'Verbinde …'; let cls = '';
+    if (db.live) { txt = 'Live'; cls = 'live'; }
+    else if (img && img._at && img._alt && db.altId) {
+      const a = this._hass.states[db.altId]; const iso = a && (a.attributes.updated_at || a.attributes.start_time || a.last_updated); const d = iso ? new Date(iso) : null;
+      txt = d && !isNaN(d) ? `Ältere Aufnahme · ${d.toDateString() === new Date().toDateString() ? '' : `${d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} `}${hm(d)}` : 'Ältere Aufnahme'; cls = 'old';
+    } else if (img && img._at) {
+      txt = `Standbild · ${new Date(img._at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}${db.canStream ? (Date.now() - (db.sAt || Date.now()) > 15000 ? ' · kein Live-Bild' : ' · Live verbindet …') : ''}`; cls = 'still';
+    }
+    if (b.textContent !== txt) b.textContent = txt; b.className = `dbs ${cls}`;
   }
 
   _doorAlts(cam) {
@@ -1788,9 +1832,15 @@ class LumoraCard extends HTMLElement {
       const ae = this.shadowRoot.activeElement; if (ae && ae.dataset && ae.dataset.pk) { fk = { k: ae.dataset.pk }; try { fk.s = ae.selectionStart; fk.e = ae.selectionEnd; } catch (_) { /* number-Felder */ } }
     }
     if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((i) => { (keep[i.dataset.b] || (keep[i.dataset.b] = [])).push(i); });
-    this.shadowRoot.innerHTML = `<style>${CSS}</style><div class="app" style="position:relative"><div class="body">${body}</div><div class="nav">${nav}</div>${this._sheetHtml()}</div>`;
+    const html = `<style>${CSS}</style><div class="app" style="position:relative"><div class="body">${body}</div><div class="nav">${nav}</div>${this._sheetHtml()}</div>`;
+    /* Das Kamera-Popup bleibt beim Neuaufbau im DOM: Wird es entfernt und wieder eingehängt, startet ha-camera-stream den Livestream jedes Mal neu (zusätzliche RTSP-Verbindung, Bild bleibt schwarz oder alt) */
+    const pop = this._dbEl && this._dbEl.parentNode === this.shadowRoot ? this._dbEl : null;
+    if (pop) {
+      Array.from(this.shadowRoot.childNodes).forEach((c) => { if (c !== pop) this.shadowRoot.removeChild(c); });
+      const tpl = document.createElement('template'); tpl.innerHTML = html; this.shadowRoot.insertBefore(tpl.content, pop);
+    } else this.shadowRoot.innerHTML = html;
     this._a11y(); this._advBind(); this._embMount();
-    if (this._dbEl) this.shadowRoot.appendChild(this._dbEl);
+    if (this._dbEl && this._dbEl.parentNode !== this.shadowRoot) this.shadowRoot.appendChild(this._dbEl);
     if (qa) this.shadowRoot.querySelectorAll('img[data-b]').forEach((n) => { const o = (keep[n.dataset.b] || []).shift(); if (o && o !== n) n.replaceWith(o); });
     const nb = this.shadowRoot.querySelector('.body'); if (nb) nb.scrollTop = top;
     if (ftop) { const ns = this.shadowRoot.querySelector('.sheet'); if (ns) ns.scrollTop = ftop; }

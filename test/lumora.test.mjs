@@ -1176,3 +1176,24 @@ test('Angebotskarte: Anzahl pro Markt begrenzt, ohne Angebote und ohne Daten sin
   assert.match(mgHtml(mgCard('offers', 'sensor.o', { offers: [] })), /keine Angebote/);
   assert.match(mgHtml(mgCard('offers', 'sensor.o', {})), /Warte auf Daten/);
 });
+
+test('Neuaufbau wartet, solange gescrollt wird (kein Springen der Ansicht)', () => {
+  const c = Object.create(L.card.prototype);
+  let renders = 0; c._render = () => { renders++; };
+  c._scAt = 0; c._renderIdle(); assert.equal(renders, 1);
+  c._scAt = Date.now(); c._renderIdle(); assert.equal(renders, 1, 'beim Scrollen verschoben');
+  clearTimeout(c._rt);
+});
+
+test('Kamera-Popup: Statusanzeige unterscheidet Live, Standbild und ältere Aufnahme', () => {
+  const mk = (db, img, states = {}) => {
+    const badge = { className: '', textContent: '' };
+    const v = { querySelector: (q) => (q === '.dbs' ? badge : q === 'img' ? img : null), appendChild() {} };
+    const c = Object.create(L.card.prototype); c._dbEl = { querySelector: () => v }; c._db = db; c._hass = { states };
+    c._doorBadge(); return badge;
+  };
+  assert.equal(mk({ live: true }, null).textContent, 'Live');
+  assert.match(mk({ live: false }, { _at: Date.now() }).textContent, /^Standbild/);
+  const old = mk({ live: false, altId: 'camera.x' }, { _at: Date.now(), _alt: true }, { 'camera.x': { last_updated: '2026-11-19T06:20:55+00:00', attributes: { updated_at: '2026-11-19T06:20:55+00:00' } } });
+  assert.match(old.textContent, /^Ältere Aufnahme/); assert.match(old.className, /old/);
+});
