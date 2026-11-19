@@ -1210,3 +1210,90 @@ test('Startseiten-Kameras: Breite je Kamera (Auto, ¼ bis Voll), ungültige Wert
   assert.match(html, /data-w="3"/);
   assert.doesNotMatch(c._camHtml({ entity_id: 'camera.b', attributes: {} }, 'homecams'), /data-w/);
 });
+
+/* ---------- Dreo (hass-dreo) ---------- */
+function dreoCard(states, main, reg = {}) {
+  const c = Object.create(L.card.prototype);
+  c._set = { devices: [{ id: 'dvD', type: 'dreo', main, map: {}, title: '' }], sources: {}, size: {}, hidden: [], place: {}, custom: [], pinned: [], quick: [] };
+  Object.keys(states).forEach((k) => { states[k].entity_id = k; });
+  const entities = { [main]: { platform: 'dreo', device_id: 'dev1' } };
+  Object.keys(states).forEach((k) => { if (k !== main) entities[k] = { platform: 'dreo', device_id: 'dev1' }; });
+  c._hass = { states, entities: { ...entities, ...reg }, devices: {} };
+  c._cfg = {};
+  return c;
+}
+const DREO_HUM = () => ({
+  'humidifier.schlafzimmer': st('on', { attributes: { friendly_name: 'Schlafzimmer Befeuchter', humidity: 55, min_humidity: 30, max_humidity: 90, available_modes: ['auto', 'manual', 'sleep'], mode: 'auto' } }),
+  'sensor.schlafzimmer_luftfeuchte': st('48', { attributes: { friendly_name: 'Schlafzimmer Luftfeuchte', device_class: 'humidity', unit_of_measurement: '%' } }),
+  'sensor.schlafzimmer_temperatur': st('21.5', { attributes: { friendly_name: 'Schlafzimmer Temperatur', device_class: 'temperature', unit_of_measurement: '°C' } }),
+  'binary_sensor.schlafzimmer_wasser_leer': st('on', { attributes: { friendly_name: 'Schlafzimmer Wasser leer' } }),
+  'switch.schlafzimmer_kindersicherung': st('off', { attributes: { friendly_name: 'Schlafzimmer Kindersicherung' } }),
+  'light.schlafzimmer_nachtlicht': st('on', { attributes: { friendly_name: 'Schlafzimmer Nachtlicht' } }),
+});
+
+test('Dreo-Gerätekarte: Vorlage ist registriert, Auswahl nur Dreo-Geräte, Felder am selben Gerät gefunden', () => {
+  assert.ok(L.win.LumoraDevices.list().some((x) => x.type === 'dreo'));
+  const s = DREO_HUM(); s['fan.fremd'] = st('on'); 
+  const c = dreoCard(s, 'humidifier.schlafzimmer', { 'fan.fremd': { platform: 'andere' } });
+  assert.deepEqual([...c._dvMains(L.DEVTPL.dreo).map((x) => x.id)], ['humidifier.schlafzimmer']);
+  const F = c._dvMap(c._set.devices[0]);
+  assert.equal(F.hum, 'sensor.schlafzimmer_luftfeuchte');
+  assert.equal(F.temp, 'sensor.schlafzimmer_temperatur');
+  assert.equal(F.water, 'binary_sensor.schlafzimmer_wasser_leer');
+  assert.equal(F.lock, 'switch.schlafzimmer_kindersicherung');
+  assert.equal(F.light, 'light.schlafzimmer_nachtlicht');
+});
+
+test('Dreo-Gerätekarte: Befeuchter zeigt Feuchte, Zielwert, Modi, Wasserwarnung und Schalter', () => {
+  const c = dreoCard(DREO_HUM(), 'humidifier.schlafzimmer'); const iv = c._set.devices[0];
+  const html = L.DEVTPL.dreo.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
+  assert.match(html, /An · Auto/);
+  assert.match(html, /48 %/);
+  assert.match(html, /data-act="drh" data-id="humidifier.schlafzimmer" data-d="5"/);
+  assert.match(html, /<b>55 %<\/b>/);
+  assert.match(html, /data-act="drm"[^>]*data-v="sleep"/);
+  assert.match(html, /Wassertank leer oder fehlt/);
+  assert.match(html, /data-act="toggle" data-id="switch.schlafzimmer_kindersicherung"/);
+  assert.match(html, /class="dvc run"/);
+});
+
+test('Dreo-Gerätekarte: Klicks rufen die passenden Dienste mit Grenzen auf', () => {
+  const calls = [];
+  const s = {
+    'humidifier.h': st('on', { attributes: { humidity: 88, max_humidity: 90, min_humidity: 30 } }),
+    'fan.f': st('on', { attributes: { percentage: 5, oscillating: false } }),
+    'climate.k': st('heat', { attributes: {} }),
+  };
+  const c = dreoCard(s, 'humidifier.h'); c._hass.callService = (d, sv, data) => calls.push([d, sv, data]); c._edit = false;
+  const click = (act, id, ds = {}) => c._click({ target: { closest: () => ({ dataset: { act, id, ...ds } }) }, stopPropagation() {} });
+  click('drh', 'humidifier.h', { d: '5' });
+  click('drm', 'humidifier.h', { v: 'sleep' });
+  click('drp', 'fan.f', { d: '-10' });
+  click('drp', 'fan.f', { d: '10' });
+  click('dro', 'fan.f');
+  click('drm', 'fan.f', { v: 'turbo' });
+  click('drc', 'climate.k', { v: 'off' });
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    ['humidifier', 'set_humidity', { entity_id: 'humidifier.h', humidity: 90 }],
+    ['humidifier', 'set_mode', { entity_id: 'humidifier.h', mode: 'sleep' }],
+    ['fan', 'turn_off', { entity_id: 'fan.f' }],
+    ['fan', 'set_percentage', { entity_id: 'fan.f', percentage: 15 }],
+    ['fan', 'oscillate', { entity_id: 'fan.f', oscillating: true }],
+    ['fan', 'set_preset_mode', { entity_id: 'fan.f', preset_mode: 'turbo' }],
+    ['climate', 'set_hvac_mode', { entity_id: 'climate.k', hvac_mode: 'off' }],
+  ]);
+});
+
+test('Dreo-Gerätekarte: Heizung mit Soll-Tasten und Modi, nicht verfügbares Gerät bleibt ruhig', () => {
+  const s = { 'climate.heizer': st('heat', { attributes: { friendly_name: 'Heizlüfter', temperature: 22, current_temperature: 19.5, target_temp_step: 1, hvac_modes: ['off', 'heat'], hvac_action: 'heating', preset_modes: ['eco', 'normal'], preset_mode: 'eco' } }) };
+  const c = dreoCard(s, 'climate.heizer'); const iv = c._set.devices[0];
+  const html = L.DEVTPL.dreo.render(c, iv, c._dvMap(iv), s['climate.heizer']);
+  assert.match(html, /19,5 °/);
+  assert.match(html, /data-act="sdt" data-id="climate.heizer" data-d="1"/);
+  assert.match(html, /data-act="drc"[^>]*data-v="heat"/);
+  assert.match(html, /Heizen/);
+  s['climate.heizer'] = st('unavailable', { attributes: { friendly_name: 'Heizlüfter' } }); s['climate.heizer'].entity_id = 'climate.heizer';
+  const off = L.DEVTPL.dreo.render(c, iv, c._dvMap(iv), s['climate.heizer']);
+  assert.match(off, /Nicht verfügbar/);
+  assert.doesNotMatch(off, /data-act="drc"/);
+});

@@ -4107,7 +4107,7 @@ _more() {
     if (act === 'noop') return;
     e.stopPropagation();
     if (Date.now() - (this._dgAt || 0) < 450) return;
-    if (this._edit && ['info', 'toggle', 'vstart', 'vdock', 'vlocate', 'vfan', 'qrun', 'knum', 'gotoroom', 'evall', 'heatall', 'lights'].includes(act)) return;
+    if (this._edit && ['info', 'toggle', 'vstart', 'vdock', 'vlocate', 'vfan', 'qrun', 'knum', 'drh', 'drp', 'dro', 'drm', 'drc', 'gotoroom', 'evall', 'heatall', 'lights'].includes(act)) return;
     if (act.startsWith('pr-')) { if (this._edit) return; if (this._printClick(t, act)) { this._sig = ''; this._render(); } return; }
     if (act.startsWith('pl-')) { if (this._edit) return; if (this._poolClick(t, act)) { this._sig = ''; this._render(); } return; }
     if (act.startsWith('fp-')) { if (this._edit) return; if (this._fpClick(t, act)) { this._sig = ''; this._render(); } return; }
@@ -4170,6 +4170,24 @@ _more() {
         const v = Math.round(Math.max(mn, Math.min(mx, base + Number(t.dataset.d))) * 10) / 10;
         h.callService('climate', 'set_temperature', { entity_id: id, temperature: v }); return;
       }
+      case 'drh': { /* Dreo Befeuchter: Zielfeuchte ± */
+        const n = h.states[id]; if (!n) return; const a = n.attributes;
+        const mn = Number.isFinite(Number(a.min_humidity)) ? Number(a.min_humidity) : 30; const mx = Number.isFinite(Number(a.max_humidity)) ? Number(a.max_humidity) : 90;
+        const cur = Number(a.humidity); const base = Number.isFinite(cur) && a.humidity !== null ? cur : Number(a.current_humidity);
+        if (!Number.isFinite(base)) return;
+        h.callService('humidifier', 'set_humidity', { entity_id: id, humidity: Math.round(Math.max(mn, Math.min(mx, base + Number(t.dataset.d)))) }); return;
+      }
+      case 'drp': { /* Dreo Ventilator: Stufe ± (unter 1 % = aus) */
+        const n = h.states[id]; if (!n) return; const cur = Number(n.attributes.percentage) || 0;
+        const v = Math.max(0, Math.min(100, cur + Number(t.dataset.d)));
+        if (v <= 0) h.callService('fan', 'turn_off', { entity_id: id }); else h.callService('fan', 'set_percentage', { entity_id: id, percentage: v }); return;
+      }
+      case 'dro': { const n = h.states[id]; if (!n) return; h.callService('fan', 'oscillate', { entity_id: id, oscillating: !n.attributes.oscillating }); return; }
+      case 'drm': { /* Modus: Befeuchter = mode, Ventilator und Klima = Preset */
+        const d = dom(id); if (d === 'humidifier') h.callService('humidifier', 'set_mode', { entity_id: id, mode: t.dataset.v });
+        else if (d === 'fan' || d === 'climate') h.callService(d, 'set_preset_mode', { entity_id: id, preset_mode: t.dataset.v }); return;
+      }
+      case 'drc': h.callService('climate', 'set_hvac_mode', { entity_id: id, hvac_mode: t.dataset.v }); return;
       case 'sdm': { const n = h.states[id]; if (!n) return; h.callService('climate', 'set_hvac_mode', { entity_id: id, hvac_mode: n.state === 'off' ? 'heat' : 'off' }); return; }
       case 'vdock': h.callService('vacuum', 'return_to_base', { entity_id: id }); return;
       case 'rsens': this._sheet = 'rs'; this._rsArea = id; break;
@@ -5328,6 +5346,85 @@ registerDevice({
     const body = list.map(([store, l]) => { l.sort((x, y) => rank(x) - rank(y) || (y.pct || 0) - (x.pct || 0)); return `<div class="ofc"><div class="ofs"><ha-icon icon="mdi:storefront-outline"></ha-icon>${esc(store)}<span>${l.length}</span></div>${l.slice(0, per).map(row).join('')}${l.length > per ? `<div class="mge">${l.length - per} weitere in der Preisdienst-App</div>` : ''}</div>`; }).join('');
     return `<div class="dvc mg">${mgHead(iv.main, 'mdi:tag-multiple-outline', iv.title || 'Angebote', sub, all.length ? `<div class="big">${all.length}</div>` : '')}
       <div class="ofr">${body || '<div class="mge">Aktuell gibt es keine Angebote.</div>'}</div></div>`;
+  },
+});
+
+/* ---------- Dreo (hass-dreo): Gerätekarte ----------
+   Integration JeffSteinbok/hass-dreo (Domain dreo): Luftbefeuchter, Ventilatoren, Heizungen, Klimageräte, Luftreiniger.
+   Haupt-Entität ist humidifier, fan oder climate des Geräts. Gibt es am selben Gerät weitere dieser Arten (z. B. Turmventilator mit Heizung),
+   werden sie ebenfalls gesteuert. Sensoren und Schalter (Kindersicherung, Display, Ton, Schwenken, Licht, Nebelstufe, Wassertank)
+   werden am selben Gerät gesucht und lassen sich im Zahnrad ändern. */
+const DR_MODE = { auto: 'Auto', manual: 'Manuell', sleep: 'Schlaf', normal: 'Normal', low: 'Niedrig', medium: 'Mittel', high: 'Hoch', turbo: 'Turbo', natural: 'Natürlich', baby: 'Baby', eco: 'Eco', comfort: 'Komfort', boost: 'Boost', none: 'Keine', hotair: 'Heißluft', coolair: 'Kaltluft', fan: 'Lüften', dry: 'Entfeuchten' };
+const DR_HVAC = { off: 'Aus', heat: 'Heizen', cool: 'Kühlen', auto: 'Auto', heat_cool: 'Auto', dry: 'Entfeuchten', fan_only: 'Lüften' };
+const drLabel = (m) => { const k = String(m).toLowerCase(); return DR_MODE[k] || (k.charAt(0).toUpperCase() + k.slice(1)).replace(/_/g, ' '); };
+registerDevice({
+  type: 'dreo', label: 'Dreo (Befeuchter, Ventilator, Heizung, Klima)', icon: 'mdi:air-humidifier', desc: 'Dreo-Geräte (Integration hass-dreo): Ein/Aus, Zielwert, Modi, Luftfeuchte, Temperatur, Wassertank, Kindersicherung und mehr', size: 'w',
+  main: { dom: ['humidifier', 'fan', 'climate'], platform: 'dreo' },
+  fields: {
+    humid: { l: 'Befeuchter (Steuerung)', dom: 'humidifier' },
+    fanent: { l: 'Ventilator (Steuerung)', dom: 'fan' },
+    climate: { l: 'Heizung / Klima (Steuerung)', dom: 'climate' },
+    hum: { l: 'Luftfeuchte', dom: 'sensor', dc: 'humidity' },
+    temp: { l: 'Temperatur', dom: 'sensor', dc: 'temperature' },
+    pm: { l: 'Luftqualität (PM2.5)', dom: 'sensor', re: /pm_?2|pm25|air.?quality|luftqual/ },
+    filter: { l: 'Filter', dom: 'sensor', re: /filter/ },
+    water: { l: 'Wassertank', dom: ['binary_sensor', 'sensor'], re: /water|wasser|tank|reservoir/ },
+    fog: { l: 'Nebelstufe', dom: 'number', re: /fog|mist|nebel/ },
+    lock: { l: 'Kindersicherung', dom: 'switch', re: /child|kinder|lock|sperre/ },
+    display: { l: 'Display', dom: 'switch', re: /display|screen|anzeige|led/, not: /light|licht/ },
+    mute: { l: 'Ton aus', dom: 'switch', re: /mute|sound|beep|buzzer|stumm|ton/ },
+    osc: { l: 'Schwenken', dom: 'switch', re: /oscill|schwenk|swing/ },
+    light: { l: 'Licht', dom: 'light' },
+  },
+  render: (c, iv, F, st) => {
+    const id = iv.main; const a = st.attributes; const d0 = dom(id); const S = (k) => c._dvS(F[k]);
+    const gone = ['unavailable', 'unknown'].includes(st.state);
+    const hv = d0 === 'climate' ? a.hvac_action : null;
+    const on = !gone && st.state !== 'off';
+    const run = on && (d0 !== 'climate' || ['heating', 'cooling', 'drying', 'fan'].includes(hv) || !hv);
+    const ents = [id, F.humid, F.fanent, F.climate].filter((x, i, l) => x && c._hass.states[x] && l.indexOf(x) === i);
+    const hs = S('hum'); const ts = S('temp'); const num = (v) => { const n = Number(v); return v !== null && v !== '' && Number.isFinite(n) ? n : null; };
+    const curHum = hs ? num(hs.state) : num(a.current_humidity);
+    const curTemp = ts ? num(ts.state) : num(a.current_temperature);
+    let big = '';
+    if (d0 === 'humidifier' && curHum !== null) big = `${c._de(curHum, 0)} %`;
+    else if (d0 === 'climate' && curTemp !== null) big = `${c._de(curTemp, 1)} °`;
+    else if (d0 === 'fan' && on && num(a.percentage) !== null) big = `${c._de(num(a.percentage), 0)} %`;
+    const mode = d0 === 'humidifier' ? a.mode : a.preset_mode;
+    const sub = gone ? 'Nicht verfügbar' : [d0 === 'climate' ? (DR_HVAC[st.state] || st.state) : on ? 'An' : 'Aus', on && mode ? drLabel(mode) : ''].filter(Boolean).join(' · ');
+    const icon = d0 === 'humidifier' ? 'mdi:air-humidifier' : d0 === 'climate' ? (hv === 'cooling' ? 'mdi:snowflake' : 'mdi:heat-wave') : on ? 'mdi:fan' : 'mdi:fan-off';
+    const ws = S('water'); const wLow = ws && dom(ws.entity_id) === 'binary_sensor' && ws.state === 'on';
+    const warn = wLow ? '<div class="dverr"><ha-icon icon="mdi:water-alert-outline"></ha-icon><div>Wassertank leer oder fehlt</div></div>' : '';
+    const pills = (eid, list, cur, act, lab) => (Array.isArray(list) && list.length ? `<div class="dvf">${list.map((m) => `<button class="pill ${String(m) === String(cur) ? 'sel' : ''}" data-act="${act}" data-id="${eid}" data-v="${esc(m)}">${esc(lab(m))}</button>`).join('')}</div>` : '');
+    const row = (l, eid, act, step, val) => `<div class="kxr"><span>${l}</span><div><button class="pill" data-act="${act}" data-id="${eid}" data-d="${-step}" aria-label="Weniger">−</button><b>${val}</b><button class="pill" data-act="${act}" data-id="${eid}" data-d="${step}" aria-label="Mehr">+</button></div></div>`;
+    const ctl = (eid) => {
+      const e = c._hass.states[eid]; const ea = e.attributes; const d = dom(eid); const off = e.state === 'off'; let h = '';
+      const pw = d === 'climate' ? '' : `<button class="pill ${off ? '' : 'sel'}" data-act="toggle" data-id="${eid}"><ha-icon icon="mdi:power"></ha-icon>${off ? 'Einschalten' : 'Ausschalten'}</button>`;
+      if (d === 'humidifier') {
+        const t = num(ea.humidity); const stp = num(ea.target_humidity_step) > 0 ? num(ea.target_humidity_step) : 5;
+        h += row('Zielfeuchte', eid, 'drh', stp, t !== null && !off ? `${c._de(t, 0)} %` : '–');
+        h += pills(eid, ea.available_modes, ea.mode, 'drm', drLabel);
+      } else if (d === 'fan') {
+        const p = num(ea.percentage); const stp = num(ea.percentage_step) > 0 ? Math.max(1, Math.round(num(ea.percentage_step))) : 10;
+        if (ea.percentage !== undefined) h += row('Stufe', eid, 'drp', stp, p !== null && !off ? `${c._de(p, 0)} %` : 'Aus');
+        h += pills(eid, ea.preset_modes, ea.preset_mode, 'drm', drLabel);
+        if (ea.oscillating !== undefined && !F.osc) h += `<div class="dvf"><button class="pill ${ea.oscillating ? 'sel' : ''}" data-act="dro" data-id="${eid}"><ha-icon icon="mdi:rotate-3d-variant"></ha-icon>Schwenken</button></div>`;
+      } else if (d === 'climate') {
+        const t = num(ea.temperature); const stp = num(ea.target_temp_step) > 0 ? num(ea.target_temp_step) : (ea.temperature_unit === '°F' ? 1 : 0.5);
+        if (t !== null && !off) h += row('Soll', eid, 'sdt', stp, `${c._de(t, 1)} °C`);
+        h += pills(eid, ea.hvac_modes, e.state, 'drc', (m) => DR_HVAC[m] || drLabel(m));
+        h += pills(eid, ea.preset_modes, ea.preset_mode, 'drm', drLabel);
+      }
+      return `${pw ? `<div class="dvf">${pw}</div>` : ''}${h}`;
+    };
+    const stat = (l, s2, d) => dvStat(c, l, s2, d);
+    const tiles = [d0 !== 'humidifier' ? stat('Luftfeuchte', hs, 0) : '', d0 !== 'climate' ? stat('Temperatur', ts, 1) : '', stat('Luftqualität', S('pm'), 0), stat('Filter', S('filter'), 0), ws && !wLow && dom(ws.entity_id) === 'sensor' ? stat('Wassertank', ws, 0) : ''].join('');
+    const fg = S('fog'); const fogRow = fg ? row('Nebelstufe', fg.entity_id, 'knum', 1, c._dvVal(fg, 0)).replace(/data-d=/g, 'data-s="1" data-d=') : '';
+    const sw = [['lock', 'mdi:lock-outline', 'Kindersicherung'], ['display', 'mdi:monitor-shimmer', 'Display'], ['mute', 'mdi:volume-off', 'Ton aus'], ['osc', 'mdi:rotate-3d-variant', 'Schwenken'], ['light', 'mdi:lightbulb-outline', 'Licht']].map(([k, ic, l]) => {
+      const s2 = S(k); return s2 ? `<button class="pill ${s2.state === 'on' ? 'sel' : ''}" data-act="toggle" data-id="${s2.entity_id}"><ha-icon icon="${ic}"></ha-icon>${l}</button>` : '';
+    }).join('');
+    return `<div class="dvc ${run ? 'run' : ''}"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="${icon}"></ha-icon></div><div class="tt"><b>${esc(iv.title || a.friendly_name || id)}</b><span>${esc(sub)}</span></div>${big ? `<div class="big">${esc(big)}</div>` : ''}</div>
+      ${warn}${gone ? '' : ents.map(ctl).join('')}${fogRow ? `<div class="dvm kxc">${fogRow}</div>` : ''}${tiles ? `<div class="dvs">${tiles}</div>` : ''}${sw ? `<div class="dvf">${sw}</div>` : ''}</div>`;
   },
 });
 
