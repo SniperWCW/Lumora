@@ -769,6 +769,9 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .mgi{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:5px 6px 5px 26px;font-size:13px}.mgi>div{min-width:0}.mgi b{font-weight:500;overflow-wrap:anywhere}.mgi small{display:block;font-size:11px;color:var(--fg2)}.mgi>span{flex:none;color:var(--fg2);white-space:nowrap}
 .mgi em,.dvs b.ex,.dvs b.wn{font-style:normal;font-size:11px;font-weight:600;margin-left:6px}.mgi em.ex,.dvs b.ex{color:#c9694f}.mgi em.wn,.dvs b.wn{color:#c27a1f}.dvs b.ex,.dvs b.wn{margin:0;font-size:15px}
 .dvm.mgv>div{cursor:pointer}.dvm.mgv b{display:flex;align-items:center;gap:6px;min-width:0;font-weight:500}.dvm.mgv b ha-icon{--mdc-icon-size:18px;flex:none}.dvm i.mid u{background:#d9a441}
+.ofr{display:flex;flex-direction:column}.ofr .ofs{display:flex;align-items:center;gap:6px;padding:8px 2px 4px;border-top:1px solid var(--line);font-size:13px;font-weight:600}.ofr .ofs span{margin-left:auto;font-size:12px;font-weight:400;color:var(--fg2)}
+.ofi{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:5px 2px;font-size:13px}.ofi>div{min-width:0}.ofi b{font-weight:500;overflow-wrap:anywhere}.ofi small{display:block;font-size:11px;color:var(--fg2)}.ofi>span{flex:none;text-align:right;white-space:nowrap;font-weight:600}.ofi>span s{display:block;font-size:11px;font-weight:400;color:var(--fg2)}
+.ofi em{font-style:normal;font-size:11px;font-weight:600;margin-left:6px;border-radius:99px;padding:1px 7px;background:var(--okbg)}.ofi.lst b{font-weight:700}
 .mgx{grid-column:1/-1;display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--fg2);padding-top:2px}
 .wc .wch{display:flex;align-items:center;gap:12px;background:var(--line);border-radius:18px;padding:12px 14px;box-shadow:inset 4px 0 0 var(--wc);min-width:0;cursor:pointer}
 .wc .wci{position:relative;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;flex:none;color:var(--fg);overflow:hidden}
@@ -5242,6 +5245,35 @@ registerCard({ id: 'advent', label: 'Adventskalender', icon: 'mdi:gift-outline',
   const h = c._advHtml();
   return h ? [{ id: 'advent', html: h, size: 'w' }] : [];
 } });
+
+/* ---------- Angebote (Preisdienst): Gerätekarte ----------
+   Liest die Attribute eines Sensors, z. B. per MQTT Discovery aus dem Preisdienst: `offers` = Liste mit name, store, price,
+   optional regular_price (Normalpreis), hint (z. B. „günstiger als sonst“), valid_until, on_list (steht auf Einkaufsliste oder im Bestand). */
+const ofNum = (v) => { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : null; };
+const ofEur = (n) => `${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+registerDevice({
+  type: 'offers', label: 'Angebote (Preisdienst)', icon: 'mdi:tag-multiple-outline', desc: 'Aktuelle Angebotsartikel je Markt (z. B. Lidl, Selgros) mit Preis, Ersparnis und Hinweis auf Artikel der Einkaufsliste', size: 'w', attrSig: true,
+  main: { dom: 'sensor', attr: 'offers', prefer: /angebot|preisdienst|offers/ },
+  fields: {},
+  opts: [{ k: 'count', l: 'Angebote pro Markt', def: 8, min: 3, max: 30, step: 1 }],
+  render: (c, iv, F, st) => {
+    const a = st.attributes; if (!Array.isArray(a.offers)) return mgWait(iv, st, 'mdi:tag-multiple-outline', 'Angebote');
+    const per = dvOpt(iv, 'count'); const all = a.offers.filter((x) => x && (x.name || x.title)).map((x) => {
+      const price = ofNum(x.price ?? x.preis); const reg = ofNum(x.regular_price ?? x.normal_price ?? x.old_price);
+      const pct = price !== null && reg !== null && reg > price ? Math.round((1 - price / reg) * 100) : null;
+      return { name: String(x.name || x.title), store: String(x.store || x.shop || x.market || 'Sonstige'), price, reg, pct, hint: String(x.hint || ''), until: x.valid_until || x.until || '', note: String(x.note || x.unit || ''), lst: !!(x.on_list ?? x.match) };
+    });
+    const groups = new Map(); all.forEach((x) => { (groups.get(x.store) || groups.set(x.store, []).get(x.store)).push(x); });
+    const rank = (x) => (x.lst ? 0 : 1);
+    const list = [...groups.entries()].sort((x, y) => x[0].localeCompare(y[0], 'de'));
+    const hits = all.filter((x) => x.lst).length; const until = all.map((x) => String(x.until || '')).filter(Boolean).sort()[0];
+    const sub = `${all.length} ${all.length === 1 ? 'Angebot' : 'Angebote'}${hits ? ` · ${hits} von deiner Liste` : ''}${until ? ` · bis ${mgDate(until)}` : ''}`;
+    const row = (x) => `<div class="ofi ${x.lst ? 'lst' : ''}"><div><b>${esc(mgCap(x.name))}</b>${x.hint ? `<em>${esc(x.hint)}</em>` : x.pct ? `<em>−${x.pct} %</em>` : ''}${x.note ? `<small>${esc(x.note)}</small>` : ''}</div><span>${x.price !== null ? esc(ofEur(x.price)) : ''}${x.reg !== null && x.reg > (x.price ?? 0) ? `<s>${esc(ofEur(x.reg))}</s>` : ''}</span></div>`;
+    const body = list.map(([store, l]) => { l.sort((x, y) => rank(x) - rank(y) || (y.pct || 0) - (x.pct || 0)); return `<div class="ofs"><ha-icon icon="mdi:storefront-outline"></ha-icon>${esc(store)}<span>${l.length}</span></div>${l.slice(0, per).map(row).join('')}${l.length > per ? `<div class="mge">${l.length - per} weitere in der Preisdienst-App</div>` : ''}`; }).join('');
+    return `<div class="dvc mg">${mgHead(iv.main, 'mdi:tag-multiple-outline', iv.title || 'Angebote', sub, all.length ? `<div class="big">${all.length}</div>` : '')}
+      <div class="ofr">${body || '<div class="mge">Aktuell gibt es keine Angebote.</div>'}</div></div>`;
+  },
+});
 
 window.LumoraCards = { register: registerCard, list: () => REG.map((x) => ({ id: x.id, label: x.label })) };
 window.LumoraDevices = { register: registerDevice, list: () => Object.values(DEVTPL).map((x) => ({ type: x.type, label: x.label })) };

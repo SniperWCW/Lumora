@@ -1147,3 +1147,32 @@ test('Gerätekarten mit Attributdaten zeichnen bei jeder Sensor-Aktualisierung n
   ['mgrecipe', 'mgstock', 'mgreserve'].forEach((t) => assert.equal(L.DEVTPL[t].attrSig, true, t));
   assert.ok(!L.DEVTPL.kobrax.attrSig);
 });
+
+/* ---------- Angebote (Preisdienst): Gerätekarte ---------- */
+const OFFERS = [
+  { name: 'zitronen', store: 'Lidl', price: 1.29, valid_until: '2026-11-22', note: '500 g Netz' },
+  { name: 'bananen', store: 'Lidl', price: 1.09, regular_price: 1.49, hint: 'günstiger als sonst', on_list: true },
+  { name: 'Hähnchenbrust', store: 'Selgros', price: '7,99', regular_price: '9,99', valid_until: '2026-11-25' },
+];
+
+test('Angebotskarte: Vorlage ist registriert und findet ihren Sensor über das Attribut offers', () => {
+  assert.ok(L.win.LumoraDevices.list().some((x) => x.type === 'offers'));
+  const c = mgCard('offers', 'sensor.preisdienst_angebote', { offers: [] });
+  c._hass.states['sensor.haus_nur_wenn_im_angebot'] = st('0', { entity_id: 'sensor.haus_nur_wenn_im_angebot', attributes: {} });
+  assert.equal(JSON.stringify(c._dvMains(L.DEVTPL.offers).map((x) => x.id)), JSON.stringify(['sensor.preisdienst_angebote']));
+});
+
+test('Angebotskarte: Artikel je Markt, Preis, Normalpreis, Ersparnis, Hinweis und Listen-Treffer zuerst', () => {
+  const html = mgHtml(mgCard('offers', 'sensor.preisdienst_angebote', { offers: OFFERS }));
+  assert.match(html, /3 Angebote/); assert.match(html, /1 von deiner Liste/); assert.match(html, /bis 22\.11\.2026/);
+  assert.match(html, /Lidl/); assert.match(html, /Selgros/); assert.match(html, /Zitronen/); assert.match(html, /1,29 €/);
+  assert.match(html, /günstiger als sonst/); assert.match(html, /1,49 €/); assert.match(html, /−20 %/);
+  assert.ok(html.indexOf('Bananen') < html.indexOf('Zitronen'), 'Treffer der Liste stehen oben');
+});
+
+test('Angebotskarte: Anzahl pro Markt begrenzt, ohne Angebote und ohne Daten sinnvolle Texte', () => {
+  const many = Array.from({ length: 5 }, (_, i) => ({ name: `Artikel ${i}`, store: 'Lidl', price: 1 + i }));
+  assert.match(mgHtml(mgCard('offers', 'sensor.o', { offers: many }, { count: 3 })), /2 weitere in der Preisdienst-App/);
+  assert.match(mgHtml(mgCard('offers', 'sensor.o', { offers: [] })), /keine Angebote/);
+  assert.match(mgHtml(mgCard('offers', 'sensor.o', {})), /Warte auf Daten/);
+});
