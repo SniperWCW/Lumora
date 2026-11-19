@@ -979,3 +979,171 @@ test('Gerätekarten: Pakete zeigt Sendungen des gewählten Sensors, automatische
   c._set.devices = [{ id: 'p1', type: 'pkg', main: st.entity_id, map: {}, title: '' }];
   assert.equal(c._allReg().filter((x) => x.def.id === 'pkg').length, 0);
 });
+
+/* ---------- Mealie Grocy Bridge: drei Gerätekarten ---------- */
+function mgCard(type, id, attrs, opts) {
+  const states = { [id]: st('3', { entity_id: id, last_updated: 'u1', attributes: { friendly_name: 'Mealie Grocy Bridge', ...attrs } }) };
+  const c = Object.create(L.card.prototype);
+  c._set = { devices: [{ id: 'dvm', type, main: id, map: {}, title: '', opts }], sources: {}, size: {}, hidden: [], place: {}, custom: [], pinned: [], quick: [], embeds: [] };
+  c._hass = { states, entities: { [id]: { platform: 'mealie_grocy_bridge', device_id: 'dm' } }, devices: { dm: { name: 'Mealie Grocy Bridge' } } };
+  c._cfg = {}; c._edit = false; c.shadowRoot = { querySelectorAll: () => [], querySelector: () => null };
+  c._render = () => {};
+  return c;
+}
+const mgHtml = (c) => { const iv = c._set.devices[0]; return L.DEVTPL[iv.type].render(c, iv, c._dvMap(iv), c._hass.states[iv.main]); };
+const RECIPES = [
+  { recipeId: 'r-1', recipeName: 'Spaghetti Bolognese', url: 'https://mealie.local/g/home/r/spaghetti', matchScore: 80, hasExpiring: true, matchingIngredients: [{ name: 'nudeln', status: 'normal' }, { name: 'hackfleisch', status: 'expiring' }, { name: 'zwiebel', status: 'expired' }], missingIngredients: ['parmesan'], basicIngredients: ['salz'] },
+  { recipeId: 'r-2', recipeName: 'Linsensuppe', matchScore: 35, hasExpiring: false, matchingIngredients: [], missingIngredients: [], basicIngredients: [] },
+  { recipeId: 'r-3', recipeName: 'Pfannkuchen', matchScore: 60, matchingIngredients: [], missingIngredients: ['eier'], basicIngredients: [] },
+  { recipeId: 'r-4', recipeName: 'Gulasch', matchScore: 50, matchingIngredients: [], missingIngredients: [], basicIngredients: [] },
+];
+
+test('Mealie Grocy Bridge: drei Vorlagen sind registriert und finden ihren Sensor über das Attribut', () => {
+  const t = L.win.LumoraDevices.list().map((x) => x.type);
+  ['mgrecipe', 'mgstock', 'mgreserve'].forEach((x) => assert.ok(t.includes(x), x));
+  const c = mgCard('mgrecipe', 'sensor.mealie_grocy_kochvorschlage', { recipes: [] });
+  const add = (id, attrs) => { c._hass.states[id] = st('1', { entity_id: id, attributes: attrs }); c._hass.entities[id] = { platform: 'mealie_grocy_bridge' }; };
+  add('sensor.mealie_grocy_bestand', { items: [] }); add('sensor.mealie_grocy_vorrat', { stock_items: [] });
+  const ids = (type) => c._dvMains(L.DEVTPL[type]).map((x) => x.id);
+  const J = (v) => JSON.stringify(v);
+  assert.equal(J(ids('mgrecipe')), J(['sensor.mealie_grocy_kochvorschlage']));
+  assert.equal(J(ids('mgstock')), J(['sensor.mealie_grocy_bestand']));
+  assert.equal(J(ids('mgreserve')), J(['sensor.mealie_grocy_vorrat']));
+});
+
+test('Rezeptkarte: Score, Zutaten mit MHD-Farben, Einkauf und Seitenwechsel', () => {
+  const c = mgCard('mgrecipe', 'sensor.k', { recipes: RECIPES, mealplan: [], mealplan_range: {} }, { count: 2 });
+  let html = mgHtml(c);
+  assert.match(html, /4 Vorschläge/); assert.match(html, />80<span class="mgu"> %/);
+  assert.match(html, /Spaghetti Bolognese/); assert.match(html, /href="https:\/\/mealie\.local\/g\/home\/r\/spaghetti"/);
+  assert.match(html, /class="mgc ex">Zwiebel/); assert.match(html, /class="mgc wn">Hackfleisch/); assert.match(html, /class="mgc mi">Parmesan/);
+  assert.match(html, /mdi:fire/); assert.match(html, /Seite 1 von 2/);
+  assert.doesNotMatch(html, /Pfannkuchen/);
+  c._mgClick({ dataset: { id: 'dvm', d: '1' } }, 'mg-page');
+  html = mgHtml(c);
+  assert.match(html, /Pfannkuchen/); assert.match(html, /Seite 2 von 2/); assert.doesNotMatch(html, /Spaghetti Bolognese/);
+  c._mgClick({ dataset: { id: 'dvm', d: '5' } }, 'mg-page'); assert.match(mgHtml(c), /Seite 2 von 2/);
+});
+
+test('Rezeptkarte: Einplanen und Einkaufsliste rufen die Dienste der Integration mit Rezept-ID, Datum und Mahlzeit', async () => {
+  const calls = [];
+  const c = mgCard('mgrecipe', 'sensor.k', { recipes: RECIPES });
+  c._hass.callService = (d, s, data) => { calls.push([d, s, data]); return Promise.resolve(); };
+  c.shadowRoot = { querySelectorAll: () => [{ dataset: { pk: 'mgd|dvm|r-1' }, value: '2026-11-25' }, { dataset: { pk: 'mgd|dvm|r-3' }, value: '2026-11-26' }] };
+  c._mgClick({ dataset: { id: 'dvm', r: 'r-1', n: '0', t: 'lunch' } }, 'mg-type');
+  c._mgClick({ dataset: { id: 'dvm', r: 'r-1', n: '0' } }, 'mg-plan');
+  c._mgClick({ dataset: { id: 'dvm', r: 'r-3', n: '2' } }, 'mg-plan');
+  c._mgClick({ dataset: { id: 'dvm', r: 'r-1', n: '0' } }, 'mg-cart');
+  c._mgClick({ dataset: { id: 'dvm', r: '', n: '7' } }, 'mg-cart');
+  assert.deepEqual(calls.map((x) => [x[0], x[1]]), [['mealie_grocy_bridge', 'set_to_next_free_day'], ['mealie_grocy_bridge', 'set_to_next_free_day'], ['mealie_grocy_bridge', 'add_missing_ingredients'], ['mealie_grocy_bridge', 'add_missing_ingredients']]);
+  const J = (v) => JSON.stringify(v);
+  assert.equal(J(calls[0][2]), J({ recipe_id: 'r-1', selected_date: '2026-11-25', entry_type: 'lunch' }));
+  assert.equal(J(calls[1][2]), J({ recipe_id: 'r-3', selected_date: '2026-11-26', entry_type: 'dinner' }));
+  assert.equal(J(calls[2][2]), J({ recipe_id: 'r-1' }));
+  assert.equal(J(calls[3][2]), J({ recipe_index: 7 }));
+  c._mgClick({ dataset: { id: 'dvm', r: 'r-1', n: '0' } }, 'mg-cart');
+  await new Promise((r) => setTimeout(r, 0));
+  assert.match(mgHtml(c), /mgk[^>]*><ha-icon icon="mdi:check-circle"><\/ha-icon>Auf die Einkaufsliste gesetzt/); // Rückmeldung unter dem Rezept
+  c._hass.callService = () => Promise.reject(new Error('x'));
+  c._mgClick({ dataset: { id: 'dvm', r: 'r-1', n: '0' } }, 'mg-plan');
+  await new Promise((r) => setTimeout(r, 0));
+  assert.match(mgHtml(c), /mgk bad/);
+});
+
+test('Rezeptkarte: im Bearbeiten-Modus passiert beim Tippen nichts, Speiseplan lässt sich abschalten', () => {
+  const calls = [];
+  const c = mgCard('mgrecipe', 'sensor.k', { recipes: RECIPES, mealplan: [{ date: '2026-11-21', entryType: 'dinner', recipeName: 'Gulasch', totalTime: '1 Std' }], mealplan_range: { start: '2026-11-21', end: '2026-11-28', label: 'Aktuelle Woche' } });
+  c._hass.callService = (...a) => calls.push(a); c._edit = true;
+  c._click({ target: { closest: () => ({ dataset: { act: 'mg-plan', id: 'dvm', r: 'r-1', n: '0' } }) }, stopPropagation() {} });
+  assert.equal(calls.length, 0);
+  const html = mgHtml(c);
+  assert.match(html, /Aktuelle Woche: 21\.11\.2026 bis 28\.11\.2026/); assert.match(html, /Abendessen/); assert.match(html, /1 Std/);
+  c._set.devices[0].opts = { plan: 0 }; assert.doesNotMatch(mgHtml(c), /Speiseplan ·/);
+});
+
+const MG_ITEMS = [
+  { name: 'Spaghetti', amount: 3, unit: 'Packung', status: 'normal', location: 'Vorratsschrank', product_group: 'Nudeln', best_before_date: '2999-12-31' },
+  { name: 'Joghurt', amount: 2, unit: 'Stück', status: 'expiring', location: 'Kühlschrank', best_before_date: '2026-11-22' },
+  { name: 'Milch', amount: 1.5, unit: 'l', status: 'expired', location: 'Kühlschrank', best_before_date: '2026-11-10' },
+  { name: 'Schraubenzieher', amount: 1, unit: 'Stück', status: 'normal', location: 'Nicht zugeordnet' },
+];
+const MG_STOCK = { items: MG_ITEMS, product_count: 4, location_count: 3, expiring_count: 1, expired_count: 1 };
+
+test('Bestandskarte: Lagerorte eingeklappt, Antippen klappt auf, MHD und Status werden gezeigt', () => {
+  const c = mgCard('mgstock', 'sensor.b', MG_STOCK);
+  let html = mgHtml(c);
+  assert.match(html, /4 Positionen/); assert.match(html, /Kühlschrank/); assert.match(html, /Vorratsschrank/);
+  assert.doesNotMatch(html, /Joghurt/);
+  c._mgClick({ dataset: { id: 'dvm', k: 'Kühlschrank' } }, 'mg-loc');
+  html = mgHtml(c);
+  assert.match(html, /Joghurt/); assert.match(html, /läuft bald ab/); assert.match(html, /MHD 22\.11\.2026/); assert.match(html, /abgelaufen/); assert.match(html, /1,5 l/);
+  assert.doesNotMatch(html, /Spaghetti/);
+  c._mgClick({ dataset: { id: 'dvm', k: 'Vorratsschrank' } }, 'mg-loc');
+  assert.doesNotMatch(mgHtml(c), /MHD 31\.12\.2999/); // „kein MHD“ bleibt unsichtbar
+});
+
+test('Bestandskarte: Suche über Name, Lagerort und Status klappt alle Treffer auf; nicht zugeordnet lässt sich ausblenden', () => {
+  const c = mgCard('mgstock', 'sensor.b', MG_STOCK);
+  mgS_set(c, 'milch');
+  let html = mgHtml(c);
+  assert.match(html, /Milch/); assert.doesNotMatch(html, /Joghurt/); assert.match(html, />1<\/div>/);
+  mgS_set(c, 'abgelaufen'); assert.match(mgHtml(c), /Milch/);
+  mgS_set(c, 'kuehlschrank'); mgS_set(c, 'kühlschrank'); assert.match(mgHtml(c), /Joghurt/);
+  mgS_set(c, 'zzz'); assert.match(mgHtml(c), /Keine Artikel für „zzz“ gefunden/);
+  mgS_set(c, ''); assert.match(mgHtml(c), /Nicht zugeordnet/);
+  c._set.devices[0].opts = { empty: 0 }; assert.doesNotMatch(mgHtml(c), /Nicht zugeordnet/);
+});
+function mgS_set(c, v) { L.mgS(c).q.dvm = v; }
+
+const MG_RESERVE = [
+  { name: 'Spaghetti', amount: 4, unit: 'Stück', status: 'normal', product_group: 'Nudeln', calories: 3.5 },
+  { name: 'Reis', amount: 2, unit: 'kg', status: 'normal', calories: 3.6 },
+  { name: 'Mineralwasser', amount: 12, unit: 'l', status: 'normal' },
+  { name: 'Eier', amount: 10, unit: 'Stück', status: 'expired' },
+  { name: 'Spülmittel', amount: 2, unit: 'Stück', status: 'normal' },
+];
+
+test('Vorratskarte: rechnet wie die Karte der Integration (Gruppen, Packungsgrößen, Kalorien, abgelaufene zählen nicht)', () => {
+  const r = L.vrBuild(MG_RESERVE, { adults: 2, children: 0, days: 10, water: 0, kcal: 2200 });
+  const g = (id) => r.cats.find((x) => x.id === id);
+  assert.equal(Math.round(g('grain').actual), 4000); // 4 x 500 g Nudeln + 2 kg Reis
+  assert.equal(Math.round(g('grain').target), 6600);
+  assert.equal(Math.round(g('grain').score), 61);
+  assert.equal(g('drinks').actual, 12); assert.equal(g('drinks').target, 40);
+  assert.equal(g('protein').actual, 0); // abgelaufene Eier zählen nicht
+  assert.equal(r.expired, 1); assert.equal(r.zero.length, 5); // Spülmittel zählt nirgends
+  assert.equal(Math.round(r.kcal.total), 21); // Menge x kcal je Lagereinheit: 4 x 3,5 + 2 x 3,6
+  assert.equal(r.kcal.counted, 2);
+});
+
+test('Vorratskarte: Wasser extern, Kinder mit 70 %, Einstellungen mit Grenzen und Zahnrad-Schalter', () => {
+  const a = L.vrBuild(MG_RESERVE, { adults: 2, children: 1, days: 10, water: 0, kcal: 2200 });
+  const w = L.vrBuild(MG_RESERVE, { adults: 2, children: 1, days: 10, water: 30, kcal: 2200 });
+  assert.equal(a.cats.find((x) => x.id === 'grain').target, 330 * 2 * 10 + 330 * 0.7 * 10);
+  assert.equal(a.cats.find((x) => x.id === 'drinks').target, 2 * 2 * 10 + 1 * 10);
+  assert.equal(w.cats.find((x) => x.id === 'drinks').actual, 42);
+  const c = mgCard('mgreserve', 'sensor.v', { stock_items: MG_RESERVE });
+  const iv = c._set.devices[0];
+  assert.equal(L.dvOpt(iv, 'days'), 10); assert.equal(L.dvOpt(iv, 'adults'), 2); assert.equal(L.dvOpt(iv, 'kcal'), 2200);
+  iv.opts = { days: 999, adults: 0, children: 'x' }; assert.equal(L.dvOpt(iv, 'days'), 60); assert.equal(L.dvOpt(iv, 'adults'), 1); assert.equal(L.dvOpt(iv, 'children'), 0);
+  iv.opts = {}; c._set.devices[0].opts = undefined; c._dvId = 'dvm'; c._save = () => {};
+  const click = (k, d) => c._click({ target: { closest: () => ({ dataset: { act: 'dvopt', k, d } }) }, stopPropagation() {} });
+  click('children', '1'); click('children', '1'); click('days', '-1'); click('adults', '-5');
+  assert.equal(JSON.stringify(c._set.devices[0].opts), JSON.stringify({ children: 2, days: 9, adults: 1 }));
+  assert.match(mgHtml(c), /1 Erwachsener, 2 Kinder, 9 Tage/);
+});
+
+test('Vorratskarte: Anzeige mit Reichweite, Gruppen, Warnungen und aufklappbarer Gruppe', () => {
+  const c = mgCard('mgreserve', 'sensor.v', { stock_items: MG_RESERVE });
+  let html = mgHtml(c);
+  assert.match(html, /Notvorrat/); assert.match(html, /2 Erwachsene, 10 Tage/); assert.match(html, /Kein Vorrat erkannt bei: .*Fleisch, Fisch, Eier, Ersatz/);
+  assert.match(html, /1 abgelaufene Artikel werden nicht mitgezählt/); assert.match(html, /Gruppen im Ziel/); assert.match(html, /61 %/);
+  assert.doesNotMatch(html, /Ist 4,0 kg von 6,6 kg/);
+  c._mgClick({ dataset: { id: 'dvm', k: 'grain' } }, 'mg-cat');
+  html = mgHtml(c); assert.match(html, /Ist 4,0 kg von 6,6 kg/); assert.match(html, /Reis/);
+});
+
+test('Gerätekarten mit Attributdaten zeichnen bei jeder Sensor-Aktualisierung neu (Signatur)', () => {
+  ['mgrecipe', 'mgstock', 'mgreserve'].forEach((t) => assert.equal(L.DEVTPL[t].attrSig, true, t));
+  assert.ok(!L.DEVTPL.kobrax.attrSig);
+});

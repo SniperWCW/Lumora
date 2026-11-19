@@ -752,6 +752,24 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .px>ha-icon{--mdc-icon-size:22px}.px .t{min-width:0}.px .t b{display:block;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.px .t span{font-size:12px;color:var(--fg2)}
 .px>span{font-size:12.5px;text-align:right;white-space:nowrap}.px.off>ha-icon,.px.off .st{color:#c9694f}.px.na{opacity:.55}.px .st{grid-column:span 2;font-weight:600}
 .dvc.pxoff{opacity:.85}
+.mg .mgu{font-size:14px;font-weight:500}.mg .mge{font-size:13px;color:var(--fg2);padding:4px 2px}.mgz{font-size:12px;color:var(--fg2)}
+.mgr{background:var(--line);border-radius:16px;padding:10px 12px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.mgt{display:flex;align-items:center;gap:8px;min-width:0}.mgt b{flex:1;min-width:0;font-size:14.5px;font-weight:600;overflow-wrap:anywhere}.mgt a{color:inherit;text-decoration:none}.mgf{--mdc-icon-size:18px;color:#d98a2b;flex:none}
+.mgs{flex:none;border-radius:99px;padding:2px 9px;font-size:12.5px;font-weight:600;background:var(--a)}.mgs.ok{background:var(--okbg)}.mgs.mid{background:var(--warn)}.mgs.lo{background:var(--bad);color:var(--badfg)}
+.mgl{display:flex;flex-direction:column;gap:3px;font-size:13px}.mgl small{font-size:11px;color:var(--fg2)}.mgl>span{display:flex;flex-wrap:wrap;gap:4px}.mgl .mgb{color:var(--fg2)}
+.mgc{font-style:normal;background:var(--a);border-radius:99px;padding:2px 9px;font-size:12.5px}.mgc.ex{color:#c9694f;font-weight:700}.mgc.wn{color:#c27a1f;font-weight:700}.mgc.mi{background:var(--warn)}
+.mga{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.mga .pill{padding:6px 12px;font-size:13px}.mga .pill ha-icon{--mdc-icon-size:16px}.mga .pill[disabled]{opacity:.45;cursor:default}
+.mgd{font:inherit;font-size:13px;color:inherit;background:var(--a);border:0;border-radius:99px;padding:5px 10px;min-width:0;max-width:100%}
+.mgk{display:flex;gap:6px;align-items:center;font-size:12.5px;background:var(--okbg);border-radius:10px;padding:6px 9px}.mgk.bad{background:var(--bad);color:var(--badfg)}.mgk ha-icon{--mdc-icon-size:16px;flex:none}
+.mgn{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--fg2)}.mgn .pill{padding:6px 12px;font-size:13px}.mgn .pill[disabled]{opacity:.45;cursor:default}
+.mgp{display:flex;flex-direction:column;gap:2px}.mgp>small{font-size:11px;color:var(--fg2);margin-bottom:2px}.mgp>div{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:6px 0;border-top:1px solid var(--line);font-size:13px}.mgp>div.mge{display:block}
+.mgp span em{display:block;font-style:normal;font-size:11px;color:var(--fg2)}.mgp b{font-weight:500;overflow-wrap:anywhere}.mgp i{font-style:normal;font-size:11.5px;color:var(--fg2)}
+.mgq{display:flex;align-items:center;gap:8px;background:var(--line);border-radius:99px;padding:0 12px}.mgq ha-icon{--mdc-icon-size:18px;flex:none}.mgq input{flex:1;min-width:0;border:0;background:transparent;color:inherit;font:inherit;font-size:14px;padding:9px 0;outline:0}
+.mgg{display:flex;flex-direction:column}.mgh{display:flex;align-items:center;gap:6px;padding:8px 2px;border-top:1px solid var(--line);cursor:pointer}.mgh ha-icon{--mdc-icon-size:20px;flex:none}.mgh b{flex:1;min-width:0;font-size:14px;font-weight:600}.mgh span{font-size:12.5px;color:var(--fg2)}
+.mgi{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:5px 6px 5px 26px;font-size:13px}.mgi>div{min-width:0}.mgi b{font-weight:500;overflow-wrap:anywhere}.mgi small{display:block;font-size:11px;color:var(--fg2)}.mgi>span{flex:none;color:var(--fg2);white-space:nowrap}
+.mgi em,.dvs b.ex,.dvs b.wn{font-style:normal;font-size:11px;font-weight:600;margin-left:6px}.mgi em.ex,.dvs b.ex{color:#c9694f}.mgi em.wn,.dvs b.wn{color:#c27a1f}.dvs b.ex,.dvs b.wn{margin:0;font-size:15px}
+.dvm.mgv>div{cursor:pointer}.dvm.mgv b{display:flex;align-items:center;gap:6px;min-width:0;font-weight:500}.dvm.mgv b ha-icon{--mdc-icon-size:18px;flex:none}.dvm i.mid u{background:#d9a441}
+.mgx{grid-column:1/-1;display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--fg2);padding-top:2px}
 .wc .wch{display:flex;align-items:center;gap:12px;background:var(--line);border-radius:18px;padding:12px 14px;box-shadow:inset 4px 0 0 var(--wc);min-width:0;cursor:pointer}
 .wc .wci{position:relative;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;flex:none;color:var(--fg);overflow:hidden}
 .wc .wci::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:var(--wc);opacity:.35}
@@ -1207,6 +1225,8 @@ class LumoraCard extends HTMLElement {
         const k = e.target.dataset.k;
         if (e.target.dataset.i !== undefined) { const x = this._set.look.kpis[Number(e.target.dataset.i)]; if (x) x.title = e.target.value; } else if (LOOK_IN.includes(k)) this._set.look[k] = e.target.value; else return;
         this._applyLook(); clearTimeout(this._ct); this._ct = setTimeout(() => this._save(), 500);
+      } else if (e.target.classList.contains('mgsrch')) {
+        mgS(this).q[e.target.dataset.id] = e.target.value; this._sig = ''; clearTimeout(this._mgt); this._mgt = setTimeout(() => this._render(), 150);
       } else if (e.target.classList.contains('dvin')) {
         const iv = this._set.devices.find((x) => x.id === this._dvId); if (!iv) return;
         iv.title = e.target.value; clearTimeout(this._ct); this._ct = setTimeout(() => { this._save(); this._sig = ''; }, 600);
@@ -1288,7 +1308,7 @@ class LumoraCard extends HTMLElement {
       else if (this._auto().tracked.has(id)) parts.push(id + h.states[id].state);
       else if (cuSet.has(id) || this._set.pinned.some((p) => p.entity === id)) parts.push(id + h.states[id].state);
     }
-    for (const iv of this._dvAll()) { try { const m = this._dvMap(iv); parts.push(iv.main + (h.states[iv.main] ? h.states[iv.main].state + (h.states[iv.main].attributes.fan_speed || '') : '')); Object.values(m).forEach((x) => { if (x && h.states[x]) parts.push(x + h.states[x].state + (h.states[x].attributes.color_hex || '')); }); } catch (_) { /* ignore */ } }
+    for (const iv of this._dvAll()) { try { const m = this._dvMap(iv); parts.push(iv.main + (h.states[iv.main] ? h.states[iv.main].state + (h.states[iv.main].attributes.fan_speed || '') + (DEVTPL[iv.type].attrSig ? h.states[iv.main].last_updated : '') : '')); Object.values(m).forEach((x) => { if (x && h.states[x]) parts.push(x + h.states[x].state + (h.states[x].attributes.color_hex || '')); }); } catch (_) { /* ignore */ } }
     if (this._dvAll().some((x) => x.type === 'packstation')) { for (const id in h.states) if (PS_RE.test(id)) parts.push(id + h.states[id].state); }
     if (this._dvAll().some((x) => x.type === 'waste')) parts.push(`wc${new Date().toDateString()}${new Date().getHours()}`);
     if (['home', 'more', 'rooms'].includes(this._view)) { parts.push(this._plSig()); parts.push(this._prSig()); }
@@ -3003,6 +3023,7 @@ _more() {
           const sub = ch === '-' ? 'Nicht verwendet' : st ? `${st.attributes.friendly_name || F[k]}${ch ? ' · manuell' : ' · automatisch'}` : F[k] ? `${F[k]} (nicht verfügbar)` : 'Nicht gefunden';
           return `<div class="row"><div class="t"><b>${esc(tp.fields[k].l)}</b><span>${esc(sub)}</span></div><button data-act="dvpick" data-k="${k}">Ändern</button></div>`;
         }).join('')}
+          ${tp.opts ? `<h4>Einstellungen</h4>${tp.opts.map((o) => { const v = dvOpt(iv, o.k); return `<div class="row"><div class="t"><b>${esc(o.l)}</b><span>${o.bool ? (v ? 'An' : 'Aus') : v}</span></div>${o.bool ? `<button class="${v ? 'sel' : ''}" data-act="dvopt" data-k="${o.k}">${v ? 'An' : 'Aus'}</button>` : `<button data-act="dvopt" data-k="${o.k}" data-d="${-o.step}" aria-label="Weniger">−</button><button data-act="dvopt" data-k="${o.k}" data-d="${o.step}" aria-label="Mehr">+</button>`}</div>`; }).join('')}` : ''}
           <div class="row" style="border:0"><button data-act="dvdel">Karte löschen</button><button class="sel" data-act="close">Fertig</button></div>`;
       }
     } else if (this._sheet === 'dvpick') {
@@ -3194,6 +3215,7 @@ _more() {
       if (![].concat(sp.dom).includes(dom(id))) return false;
       if (usePl && !(reg0[id] && pls.includes(reg0[id].platform))) return false;
       if (sp.dc && a.device_class !== sp.dc) return false;
+      if (sp.attr && a[sp.attr] === undefined) return false;
       if (sp.unit && !sp.unit.includes(a.unit_of_measurement)) return false;
       if (sp.re && !usePl && !sp.re.test(id)) return false;
       const r = this._hass.entities && this._hass.entities[id]; return !(r && r.hidden);
@@ -3288,6 +3310,27 @@ _more() {
   /* ---------- Pool: Smart Pool Assistant + LayzSpa ---------- */
   _P() { return this._pl || (this._pl = { open: {}, wx: {}, wxBusy: {}, eta: {}, etaBusy: {}, fetching: false, fetchErr: null, opt: {}, optAt: 0 }); }
   _plCfg() { return (this._cfg && this._cfg.pool) || {}; }
+  /* Mealie Grocy Bridge: Klicks der drei Gerätekarten. true = neu zeichnen */
+  _mgClick(t, act) {
+    const S = mgS(this); const iv = this._set.devices.find((x) => x.id === t.dataset.id); if (!iv) return false;
+    const rid = t.dataset.r || ''; const key = `${iv.id}|${rid || `i${t.dataset.n}`}`;
+    const say = (m) => { S.msg[iv.id] = { k: key, ...m }; clearTimeout(this._mgm); this._mgm = setTimeout(() => { if (S.msg[iv.id] && S.msg[iv.id].k === key) { delete S.msg[iv.id]; if (!this._edit) { this._sig = ''; this._render(); } } }, 6000); this._sig = ''; this._render(); };
+    switch (act) {
+      case 'mg-type': S.sched[key] = { ...(S.sched[key] || {}), type: t.dataset.t }; return true;
+      case 'mg-page': S.page[iv.id] = Math.max(0, (S.page[iv.id] || 0) + Number(t.dataset.d)); return true;
+      case 'mg-loc': { const k = `${iv.id}|${t.dataset.k}`; S.open[k] = !S.open[k]; return true; }
+      case 'mg-cat': { const k = `${iv.id}|c:${t.dataset.k}`; S.open[k] = !S.open[k]; return true; }
+      case 'mg-plan': case 'mg-cart': {
+        const pk = `mgd|${key}`; let date = ''; this.shadowRoot.querySelectorAll('[data-pk]').forEach((i) => { if (i.dataset.pk === pk) date = i.value; });
+        const plan = act === 'mg-plan'; const data = rid ? { recipe_id: rid } : { recipe_index: Number(t.dataset.n) };
+        if (plan) { if (date) data.selected_date = date; data.entry_type = (S.sched[key] && S.sched[key].type) || 'dinner'; }
+        Promise.resolve(this._hass.callService('mealie_grocy_bridge', plan ? 'set_to_next_free_day' : 'add_missing_ingredients', data))
+          .then(() => say({ t: plan ? 'Zum Speiseplan hinzugefügt' : 'Auf die Einkaufsliste gesetzt' }), () => say({ t: 'Das hat nicht geklappt, Details im HA-Protokoll', bad: true }));
+        return false;
+      }
+      default: return false;
+    }
+  }
   _plFocus() { const r = this.shadowRoot; const a = r && r.activeElement; return !!(a && a.dataset && a.dataset.pk); }
   _plRefresh() {
     if (this._edit || this._dg || this._sheet || this._plFocus()) return;
@@ -4010,6 +4053,7 @@ _more() {
     if (act.startsWith('pr-')) { if (this._edit) return; if (this._printClick(t, act)) { this._sig = ''; this._render(); } return; }
     if (act.startsWith('pl-')) { if (this._edit) return; if (this._poolClick(t, act)) { this._sig = ''; this._render(); } return; }
     if (act.startsWith('fp-')) { if (this._edit) return; if (this._fpClick(t, act)) { this._sig = ''; this._render(); } return; }
+    if (act.startsWith('mg-')) { if (this._edit) return; if (this._mgClick(t, act)) { this._sig = ''; this._render(); } return; }
     switch (act) {
       case 'nav': this._view = t.dataset.v; this._sheet = null; this._edit = false; break;
       case 'floor': this._floor = id; this._area = null; break;
@@ -4036,6 +4080,11 @@ _more() {
         this._dvId = iv.id; this._sheet = 'dv'; this._save(); break;
       }
       case 'dvpick': this._sheet = 'dvpick'; this._dvK = t.dataset.k; this._q = ''; break;
+      case 'dvopt': {
+        const iv = s.devices.find((x) => x.id === this._dvId); const tp = iv && DEVTPL[iv.type]; const o = tp && (tp.opts || []).find((x) => x.k === t.dataset.k);
+        if (o) { const cur = dvOpt(iv, o.k); iv.opts = { ...(iv.opts || {}), [o.k]: o.bool ? (cur ? 0 : 1) : Math.max(o.min, Math.min(o.max, cur + Number(t.dataset.d))) }; this._save(); }
+        break;
+      }
       case 'dvset': {
         const iv = s.devices.find((x) => x.id === this._dvId);
         if (iv) { if (id) iv.map[t.dataset.k] = id; else delete iv.map[t.dataset.k]; this._save(); }
@@ -4789,6 +4838,396 @@ registerDevice({
   render: (c, iv, F, st) => {
     const pk = c._pkgs(st);
     return pk ? c._pkgPanel(pk) : (c._edit ? '<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="mdi:package-variant-closed"></ha-icon></div><div class="tt"><b>Pakete</b><span>Keine Sendungsdaten an diesem Sensor</span></div></div></div>' : '');
+  },
+});
+/* Mealie Grocy Bridge, Vorrat: Richtwerte und Zuordnungstabellen (Quelle: BLE) */
+const VR_CHILD = 0.7;
+const VR_KCAL = 2200; // BLE/DGE-Richtwert für den Notvorrat, Kinder wie bei den Mengen mit 70 %
+const VR_CHILD_DRINK = 1;
+const VR_OIL = 0.92;
+
+// Reihenfolge = Priorität: passt ein Produkt auf mehrere Gruppen, zählt es nur in der ersten.
+// Suchbegriffe sind normalisiert (klein, ohne Umlaute, ß = ss). Bis 2 Zeichen zählt nur das
+// ganze Wort, 3 Zeichen der Wortanfang, ab 4 Zeichen auch ein Wortteil ('Glasnudeln' → 'nudel').
+const VR_CATS = [
+  {
+    id: 'grain',
+    title: 'Getreide, Brot, Kartoffeln',
+    icon: 'mdi:bread-slice-outline',
+    measurement: 'grams',
+    adultDailyTarget: 330,
+    alternatives: ['Vollkornbrot', 'Knäckebrot', 'Zwieback', 'Reis', 'Nudeln', 'Haferflocken', 'Kartoffeln'],
+    keywords: [
+      'brot', 'zwieback', 'reis', 'nudel', 'noodle', 'ramen', 'ramyun', 'udon', 'chapaghetti',
+      'spaghetti', 'fusilli', 'farfalle', 'penne', 'tortiglioni', 'lasagne', 'spatzle', 'spaetzle',
+      'gnocchi', 'hafer', 'getreide', 'muesli', 'musli', 'griess', 'semola', 'mehl', 'couscous',
+      'bulgur', 'quinoa', 'polenta', 'graupen', 'kartoffel',
+    ],
+  },
+  {
+    id: 'vegetables',
+    title: 'Gemüse und Hülsenfrüchte',
+    icon: 'mdi:carrot',
+    measurement: 'grams',
+    adultDailyTarget: 400,
+    alternatives: ['Tomaten', 'Erbsen', 'Mais', 'Karotten', 'Sauerkraut', 'Linsen', 'Bohnen'],
+    keywords: [
+      'gemuse', 'gemuese', 'tomat', 'passata', 'erbs', 'mais', 'bohn', 'linse', 'karott', 'mohre',
+      'paprika', 'gurk', 'zucchini', 'sauerkraut', 'rotkohl', 'rotkraut', 'pilz', 'champignon',
+      'kichererb', 'spinat', 'mangold', 'brokkoli', 'blumenkohl', 'kohlrabi', 'eintopf',
+    ],
+  },
+  {
+    id: 'fruit',
+    title: 'Obst, Nüsse',
+    icon: 'mdi:fruit-cherries',
+    measurement: 'grams',
+    adultDailyTarget: 250,
+    alternatives: ['Apfelmus', 'Trockenobst', 'Birnen', 'Pfirsiche', 'Rosinen', 'Nüsse'],
+    keywords: [
+      'obst', 'apfel', 'birn', 'pfirs', 'aprik', 'mandarin', 'orange', 'ananas', 'beere', 'rosin',
+      'pflaum', 'mango', 'banan', 'kirsch', 'nuss', 'nusse', 'mandel', 'cashew', 'pistazie',
+    ],
+  },
+  {
+    id: 'milk',
+    title: 'Milch und Milchprodukte',
+    icon: 'mdi:cow',
+    measurement: 'grams',
+    adultDailyTarget: 260,
+    alternatives: ['H-Milch', 'Joghurt', 'Hartkäse', 'Kondensmilch', 'Pflanzendrinks'],
+    keywords: [
+      'milch', 'joghurt', 'kase', 'quark', 'skyr', 'kefir', 'sahne', 'mozzarella', 'mozarella',
+      'feta', 'pflanzendrink', 'haferdrink', 'sojadrink',
+    ],
+  },
+  {
+    id: 'protein',
+    title: 'Fleisch, Fisch, Eier, Ersatz',
+    icon: 'mdi:food-drumstick-outline',
+    measurement: 'grams',
+    adultDailyTarget: 120,
+    alternatives: ['Fischkonserven', 'Wurst', 'Eier', 'Tofu', 'Lupinen', 'Veggie-Ersatz'],
+    keywords: [
+      'fleisch', 'fisch', 'ei', 'eier', 'wurst', 'wiener', 'schinken', 'thunfisch', 'makrele',
+      'sardine', 'huhn', 'hahnchen', 'chicken', 'nugget', 'pute', 'rind', 'schwein', 'beef',
+      'corned', 'gulasch', 'hack', 'salami', 'frikadell', 'schnitzel', 'terrine', 'garnele',
+      'prawn', 'muschel', 'tofu', 'tempeh', 'lupine', 'seitan', 'protein',
+    ],
+  },
+  {
+    id: 'fats',
+    title: 'Fette und Öle',
+    icon: 'mdi:bottle-tonic-plus-outline',
+    measurement: 'grams',
+    adultDailyTarget: 35,
+    alternatives: ['Olivenöl', 'Sonnenblumenöl', 'Rapsöl', 'Butter', 'Margarine', 'Nussmus'],
+    keywords: [
+      'ol', 'oel', 'olivenol', 'rapsol', 'sonnenblumenol', 'speiseol', 'kokosol', 'butter',
+      'margarine', 'schmalz', 'ghee', 'nussmus',
+    ],
+  },
+  {
+    id: 'drinks',
+    title: 'Getränke',
+    icon: 'mdi:cup-water',
+    measurement: 'liters',
+    adultDailyTarget: 2,
+    childDailyTarget: VR_CHILD_DRINK,
+    alternatives: ['Mineralwasser', 'Saft', 'Tee', 'Kaffee', 'Haltbare Schorlen'],
+    keywords: ['wasser', 'saft', 'nektar', 'cola', 'limonade', 'schorle', 'getrank', 'sirup'],
+  },
+];
+
+const VR_CAT_IDS = VR_CATS.map((category) => category.id);
+const VR_IGNORE = ['none', 'ignore', 'keine', 'ignorieren'];
+
+// Feste Regeln vor der Suchbegriff-Zuordnung, erste Regel gewinnt. category: null = zählt nie.
+// Geprüft wird der normalisierte Produktname.
+const VR_RULES = [
+  // Haushalt und Drogerie
+  { pattern: /(reinig|spray|seife|tabs|spuler|spulmittel|pfleger|putzmittel|schimmel|backpapier|natron|zitronensaure|lebensmittelfarbe)/, category: null },
+  // Gemüseprodukte, die sonst an 'sosse' oder 'essig' hängen bleiben
+  { pattern: /(tomatensosse|tomatensauce|passierte tomaten|tomaten gehackt|gehackte tomaten|tomatenmark|paprikamark|essiggurk|gewurzgurk)/, category: 'vegetables' },
+  // Fisch im eigenen Saft ist kein Getränk
+  { pattern: /(thunfisch|makrele|sardine|fischfilet)/, category: 'protein' },
+  // Mehrdeutige Namen, die sonst in der falschen Gruppe landen
+  { pattern: /(haferdrink|hafermilch|sojadrink|mandeldrink|pflanzendrink)/, category: 'milk' },
+  { pattern: /(nussmus|erdnussbutter)/, category: 'fats' },
+  { pattern: /preiselbeer/, category: 'fruit' },
+  { pattern: /(saft|nektar|schorle)\b/, category: 'drinks' },
+  // Würzmittel, Saucen, Backzutaten, Süßes, Snacks, Kaffee – laut BLE kein Teil der Grundgruppen
+  { pattern: /(sauce|sosse|senf|pesto|ketchup|mayo|dressing|gewurz|\brub\b|maggi|bruhe|fond|bouillon|paste|sriracha|chilli|chili|essig|salz\b|pfeffer|zucker\b|backpulver|starke\b|schoko|tropfchen|creme|chips|snack|croki|\bpico\b|picco|apero|truffel|kaffee|kokosmilch|\btee\b|pancake)/, category: null },
+  // Oliven sind kein Speiseöl
+  { pattern: /\boliven?\b(?! ?ol)/, category: null },
+];
+
+// Produktgruppen aus Grocy, die ohne Konfiguration erkannt werden (normalisierter Gruppenname).
+const VR_GROUPS = [
+  { pattern: /(reinig|haushalt|drogerie|hygiene|kosmetik|tierbedarf)/, category: null },
+  { pattern: /(gewurz|sossen|saucen|snack|sussigkeit|susswaren|backzutat|kaffee)/, category: null },
+  { pattern: /(nudel|teigwar|getreide|reis|mehl|brot|backwar|kartoffel)/, category: 'grain' },
+  { pattern: /(gemuse|hulsenfrucht)/, category: 'vegetables' },
+  { pattern: /(obst|nuss|nusse|trockenfrucht)/, category: 'fruit' },
+  { pattern: /(milch|molkerei|kase)/, category: 'milk' },
+  { pattern: /(fleisch|fisch|wurst|eier|meeresfrucht)/, category: 'protein' },
+  { pattern: /\b(ol|ole|oel|oele|fett|fette)\b/, category: 'fats' },
+  { pattern: /(getrank|wasser|saft)/, category: 'drinks' },
+];
+
+// Typische Packungsgrößen für Artikel in 'Stück' oder ohne Einheit. Erste passende Zeile gewinnt.
+const VR_UNITLESS = {
+  grain: [
+    { pattern: /paniermehl/, grams: 400 },
+    { pattern: /mehl/, grams: 1000 },
+    { pattern: /(express reis|reis mediterran|djuvec)/, grams: 250 },
+    { pattern: /(ramen|ramyun|yumyum|yum yum|chapaghetti|neoguri|jjajang|asia nudeln|instant)/, grams: 75 },
+    { pattern: /udon/, grams: 200 },
+    { pattern: /wan tan/, grams: 250 },
+    { pattern: /kartoffelpuree|kartoffelbrei/, grams: 250 },
+    { pattern: /kartoffel/, grams: 1000 },
+    { pattern: /(reis|graupen|griess|hafer|getreide|muesli|musli|semola|couscous|bulgur|quinoa|polenta)/, grams: 500 },
+    { pattern: /(nudel|noodle|spaghetti|fusilli|farfalle|penne|tortiglioni|lasagne|spatzle|spaetzle|gnocchi)/, grams: 500 },
+    { pattern: /(brot|zwieback)/, grams: 250 },
+  ],
+  vegetables: [
+    { pattern: /(tomatenmark|paprikamark)/, grams: 200 },
+    { pattern: /(passierte tomaten|tomaten gehackt|gehackte tomaten|tomatensosse|tomatensauce|passata)/, grams: 400 },
+    { pattern: /linse/, grams: 500 },
+    { pattern: /gurk/, grams: 300 },
+  ],
+  fruit: [
+    { pattern: /apfelmus/, grams: 360 },
+    { pattern: /(mandarin|orange|pfirs|aprik|ananas|kirsch)/, grams: 300 },
+    { pattern: /(nuss|mandel|cashew|pistazie)/, grams: 200 },
+  ],
+  milk: [
+    { pattern: /kondensmilch/, grams: 170 },
+    { pattern: /milch/, grams: 1000 },
+    { pattern: /sahne/, grams: 200 },
+    { pattern: /kase/, grams: 200 },
+  ],
+  protein: [
+    { pattern: /\beier?\b/, grams: 53 },
+    { pattern: /(thunfisch|makrele|sardine|fischfilet|corned beef|terrine)/, grams: 180 },
+    { pattern: /(tofu|tempeh|protein)/, grams: 200 },
+  ],
+  fats: [
+    { pattern: /(butter|margarine|schmalz)/, grams: 250 },
+    { pattern: /(ol|oel)\b/, grams: 500 },
+  ],
+  drinks: [
+    { pattern: /wasser/, liters: 1.5 },
+    { pattern: /(saft|nektar|cola|limonade|schorle|getrank)/, liters: 1 },
+  ],
+};
+
+// Rückfall, wenn keine Zeile oben passt (Liter-Gruppen schätzen nie).
+const VR_FALLBACK = {
+  grain: 500,
+  vegetables: 400,
+  fruit: 250,
+  milk: 250,
+  protein: 250,
+  fats: 500,
+};
+
+function vrNorm(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/ß/g, 'ss')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function vrKw(tokens, keyword) {
+  if (keyword.length <= 2) return tokens.some((token) => token === keyword);
+  if (keyword.length === 3) return tokens.some((token) => token.startsWith(keyword));
+  return tokens.some((token) => token.includes(keyword));
+}
+
+/* ---------- Vorrat: Berechnung (aus der Karte der Integration übernommen, damit die Zahlen gleich bleiben) ---------- */
+const vrUnit = (v) => {
+  const raw = vrNorm(v);
+  return ({ g: 'g', gram: 'g', gramm: 'g', gr: 'g', kg: 'kg', mg: 'mg', ml: 'ml', l: 'l', liter: 'l', cl: 'cl', dl: 'dl', st: 'piece', stk: 'piece', stck: 'piece', stueck: 'piece', stuck: 'piece', piece: 'piece', pcs: 'piece', portion: 'piece' })[raw] || raw;
+};
+/* Liefert die eine Gruppe, in der ein Artikel zählt, oder null: Grocy-Produktgruppe, feste Regeln, Suchbegriffe */
+const vrCat = (item) => {
+  const group = vrNorm(item && item.product_group);
+  if (group) { const gr = VR_GROUPS.find((r) => r.pattern.test(group)); if (gr) return gr.category; }
+  const name = vrNorm(item && item.name); if (!name) return null;
+  const rule = VR_RULES.find((r) => r.pattern.test(name)); if (rule) return rule.category;
+  const tokens = name.split(' ');
+  const cat = VR_CATS.find((x) => x.keywords.some((k) => vrKw(tokens, k)));
+  return cat ? cat.id : null;
+};
+const vrEst = (item, cat) => {
+  const amount = Number(item.amount) || 0; if (amount <= 0) return 0;
+  const name = vrNorm(item.name); const est = (VR_UNITLESS[cat.id] || []).find((e) => e.pattern.test(name));
+  if (cat.measurement === 'liters') return est && est.liters ? amount * est.liters : 0;
+  if (est && est.grams) return amount * est.grams;
+  return amount * (VR_FALLBACK[cat.id] || 0);
+};
+const vrConv = (item, cat) => {
+  const amount = Number(item.amount) || 0; const unit = vrUnit(item.unit); if (amount <= 0) return 0;
+  if (cat.measurement === 'liters') {
+    if (unit === 'l') return amount; if (unit === 'ml') return amount / 1000; if (unit === 'cl') return amount / 100; if (unit === 'dl') return amount / 10;
+    return vrEst(item, cat);
+  }
+  const dens = cat.id === 'fats' ? VR_OIL : 1;
+  if (unit === 'kg') return amount * 1000; if (unit === 'g') return amount; if (unit === 'mg') return amount / 1000;
+  if (unit === 'ml') return amount * dens; if (unit === 'cl') return amount * 10 * dens; if (unit === 'dl') return amount * 100 * dens; if (unit === 'l') return amount * 1000 * dens;
+  return vrEst(item, cat); /* Stück, Packungen, unbekannte Einheiten: typische Packungsgröße */
+};
+const vrTarget = (cat, adults, children, days) => cat.adultDailyTarget * adults * days + (cat.childDailyTarget !== undefined ? cat.childDailyTarget : cat.adultDailyTarget * VR_CHILD) * children * days;
+const vrAmt = (v, m) => (m === 'liters' ? `${v.toFixed(v >= 10 ? 0 : 1).replace('.', ',')} l` : v >= 1000 ? `${(v / 1000).toFixed(v >= 10000 ? 0 : 1).replace('.', ',')} kg` : `${Math.round(v)} g`);
+const vrDays = (v) => (!Number.isFinite(v) || v <= 0 ? '0' : v >= 10 ? `${Math.floor(v)}` : v.toFixed(1).replace('.', ','));
+const vrReach = (v) => (!Number.isFinite(v) || v <= 0 ? 'Nicht abgedeckt' : v < 1 ? '< 1 Tag' : v >= 10 ? `${Math.floor(v)} Tage` : `${v.toFixed(1).replace('.', ',')} Tage`);
+/* Kalorien-Reichweite: Menge mal kcal je Lagereinheit (Grocy-Feld „Kalorien“) über alle Artikel, die in einer Gruppe zählen */
+const vrKcal = (usable, adults, children, kcalPer) => {
+  const need = kcalPer * adults + kcalPer * VR_CHILD * children; let total = 0; let counted = 0; const missing = [];
+  usable.forEach((it) => {
+    if (!vrCat(it)) return;
+    const cal = Number(it.calories); const am = Number(it.amount);
+    if (Number.isFinite(cal) && cal > 0 && Number.isFinite(am) && am > 0) { total += cal * am; counted += 1; } else missing.push(it.name || '?');
+  });
+  const days = need > 0 ? total / need : 0; const fmt = (n) => Math.round(n).toLocaleString('de-DE');
+  return {
+    total, days, need, counted, missing: missing.length,
+    label: counted === 0 ? 'Keine Daten' : vrReach(days),
+    detail: counted === 0 ? 'In Grocy sind für diese Artikel keine Kalorien gepflegt' : `${fmt(total)} kcal · Bedarf ${fmt(need)} kcal/Tag`,
+    warning: missing.length > 0 && counted > 0 ? `${missing.length} Artikel ohne Kalorien in Grocy, nicht mitgezählt: ${missing.slice(0, 8).join(', ')}${missing.length > 8 ? ' …' : ''}` : '',
+  };
+};
+const vrBuild = (stock, o) => {
+  const usable = stock.filter((it) => it && it.status !== 'expired');
+  const by = new Map(VR_CAT_IDS.map((id) => [id, []]));
+  usable.forEach((it) => { const id = vrCat(it); if (id) by.get(id).push(it); });
+  const cats = VR_CATS.map((cat) => {
+    const target = vrTarget(cat, o.adults, o.children, o.days); const daily = vrTarget(cat, o.adults, o.children, 1);
+    const hit = by.get(cat.id).map((item) => ({ item, v: vrConv(item, cat) })).filter((x) => x.v > 0).sort((a, b) => b.v - a.v);
+    const ext = cat.id === 'drinks' ? o.water : 0;
+    const actual = hit.reduce((s, x) => s + x.v, 0) + ext;
+    const score = Math.max(0, Math.min(100, target > 0 ? (actual / target) * 100 : 0));
+    const names = hit.map((x) => x.item.name); if (ext > 0) names.unshift(`Wasser extern (${vrAmt(ext, 'liters')})`);
+    return { ...cat, actual, target, reach: daily > 0 ? actual / daily : 0, score, tone: score >= 100 ? '' : score >= 50 ? 'mid' : 'lo', names, est: hit.some((x) => !['kg', 'g', 'mg', 'l', 'ml', 'cl', 'dl'].includes(vrUnit(x.item.unit)) && vrEst(x.item, cat) > 0) };
+  });
+  const low = cats.reduce((l, c) => (!l || c.reach < l.reach ? c : l), null);
+  return {
+    cats, low, expired: stock.length - usable.length,
+    atTarget: cats.filter((c) => c.actual >= c.target).length,
+    avg: cats.length ? cats.reduce((s, c) => s + c.score, 0) / cats.length : 0,
+    zero: cats.filter((c) => c.score === 0),
+    kcal: vrKcal(usable, o.adults, o.children, o.kcal),
+  };
+};
+
+/* ---------- Mealie Grocy Bridge: Gerätekarten ----------
+   Die drei Sensoren der Integration (SniperWCW/Grocy-Mealie_Bridge) werden je eine Gerätekarte: Rezepte und Essensplanung
+   (Einplanen und Einkaufsliste per Dienst), Bestand nach Lagerort mit Suche und Vorrat (Krisenvorsorge nach BLE-Richtwerten).
+   Alle Daten stehen in den Attributen der Sensoren, eine Zuordnung weiterer Entitäten ist nicht nötig. Einstellungen je Karte
+   (`opts` der Vorlage) erscheinen im Zahnrad unter „Einstellungen“. */
+const MG_PLAN = [['breakfast', 'Frühstück', 'mdi:coffee'], ['lunch', 'Mittag', 'mdi:white-balance-sunny'], ['dinner', 'Abend', 'mdi:weather-night']];
+const MG_ENTRY = { breakfast: 'Frühstück', lunch: 'Mittagessen', dinner: 'Abendessen', side: 'Beilage', snack: 'Snack', dessert: 'Dessert', meal: 'Mahlzeit' };
+const MG_STATUS = { expired: 'abgelaufen', expiring: 'läuft bald ab' };
+const mgS = (c) => c._mg || (c._mg = { page: {}, sched: {}, q: {}, open: {}, msg: {} });
+const dvOpt = (iv, k) => {
+  const o = (DEVTPL[iv.type].opts || []).find((x) => x.k === k); if (!o) return undefined;
+  const v = iv.opts && iv.opts[k]; return v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v)) ? Math.max(o.min, Math.min(o.max, Number(v))) : o.def;
+};
+const mgCap = (s) => { const t = String(s || '').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
+const mgDate = (s) => { const p = String(s || '').slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : String(s || ''); };
+const mgDay = (s) => { const d = new Date(`${String(s).slice(0, 10)}T12:00:00`); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }); };
+const mgHead = (id, ic, name, sub, big) => `<div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="${ic}"></ha-icon></div><div class="tt"><b>${esc(name)}</b><span>${esc(sub)}</span></div>${big || ''}</div>`;
+const mgWait = (iv, st, ic, label) => `<div class="dvc"><div class="dvh" data-act="info" data-id="${iv.main}"><div class="ib"><ha-icon icon="${ic}"></ha-icon></div><div class="tt"><b>${esc(iv.title || label)}</b><span>${esc(st && ['unavailable', 'unknown'].includes(st.state) ? 'Sensor nicht verfügbar' : 'Warte auf Daten')}</span></div></div></div>`;
+const MG_MAIN = (attr, prefer) => ({ dom: 'sensor', platform: 'mealie_grocy_bridge', attr, prefer });
+
+registerDevice({
+  type: 'mgrecipe', label: 'Rezepte & Essensplanung', icon: 'mdi:chef-hat', desc: 'Kochvorschläge aus Mealie passend zum Grocy-Bestand mit Einplanen, Einkaufsliste und Speiseplan (Integration Mealie Grocy Bridge)', size: 'w', attrSig: true,
+  main: MG_MAIN('recipes', /kochvorschl/),
+  fields: {},
+  opts: [{ k: 'count', l: 'Rezepte pro Seite', def: 3, min: 1, max: 10, step: 1 }, { k: 'plan', l: 'Speiseplan anzeigen', def: 1, bool: true }],
+  render: (c, iv, F, st) => {
+    const a = st.attributes; if (!Array.isArray(a.recipes)) return mgWait(iv, st, 'mdi:chef-hat', 'Rezepte & Essensplanung');
+    const S = mgS(c); const all = a.recipes; const per = dvOpt(iv, 'count'); const pages = Math.max(1, Math.ceil(all.length / per));
+    const pg = Math.max(0, Math.min(S.page[iv.id] || 0, pages - 1)); const plan = Array.isArray(a.mealplan) ? a.mealplan : [];
+    const best = all.reduce((m, r) => Math.max(m, Number(r.matchScore) || 0), 0);
+    const sub = `${all.length} ${all.length === 1 ? 'Vorschlag' : 'Vorschläge'}${plan.length ? ` · ${plan.length} im Speiseplan` : ''}`;
+    const rec = (r, n) => {
+      const rid = r.recipeId ? String(r.recipeId) : ''; const key = `${iv.id}|${rid || `i${n}`}`; const sc = (S.sched[key] && S.sched[key].type) || 'dinner';
+      const score = Number(r.matchScore) || 0; const have = Array.isArray(r.matchingIngredients) ? r.matchingIngredients : []; const miss = Array.isArray(r.missingIngredients) ? r.missingIngredients.filter((x) => String(x).trim()) : []; const basic = Array.isArray(r.basicIngredients) ? r.basicIngredients : [];
+      const ds = `data-id="${esc(iv.id)}" data-r="${esc(rid)}" data-n="${n}"`; const m = S.msg[iv.id] && S.msg[iv.id].k === key ? S.msg[iv.id] : null;
+      return `<div class="mgr"><div class="mgt"><b>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noreferrer">${esc(r.recipeName || 'Rezept')}</a>` : esc(r.recipeName || 'Rezept')}</b>${r.hasExpiring ? '<ha-icon class="mgf" icon="mdi:fire" title="Zutat läuft bald ab oder ist abgelaufen"></ha-icon>' : ''}<span class="mgs ${score >= 70 ? 'ok' : score >= 40 ? 'mid' : 'lo'}">${Math.round(score)} %</span></div>
+        <div class="mgl"><small>Vorhanden</small><span>${have.length ? have.map((x) => `<i class="mgc ${x.status === 'expired' ? 'ex' : x.status === 'expiring' ? 'wn' : ''}">${esc(mgCap(x.name || 'Unbekannt'))}</i>`).join('') : 'Keine'}</span></div>
+        <div class="mgl"><small>Einkaufen</small><span>${miss.length ? miss.map((x) => `<i class="mgc mi">${esc(mgCap(x))}</i>`).join('') : 'Nichts'}</span></div>
+        ${basic.length ? `<div class="mgl"><small>Basics</small><span class="mgb">${esc(basic.map(mgCap).join(', '))}</span></div>` : ''}
+        <div class="mga"><input type="date" class="mgd" data-pk="${esc(`mgd|${key}`)}" aria-label="Datum wählen">${MG_PLAN.map(([v, l, ic]) => `<button class="pill ${sc === v ? 'sel' : ''}" data-act="mg-type" data-t="${v}" ${ds}><ha-icon icon="${ic}"></ha-icon>${l}</button>`).join('')}</div>
+        <div class="mga"><button class="pill" data-act="mg-plan" ${ds}><ha-icon icon="mdi:calendar-plus"></ha-icon>Einplanen</button><button class="pill ${miss.length ? '' : 'hid'}" data-act="mg-cart" ${ds}><ha-icon icon="mdi:cart-plus"></ha-icon>Einkaufsliste</button></div>
+        ${m ? `<div class="mgk ${m.bad ? 'bad' : ''}"><ha-icon icon="${m.bad ? 'mdi:alert-circle' : 'mdi:check-circle'}"></ha-icon>${esc(m.t)}</div>` : ''}</div>`;
+    };
+    const nav = pages > 1 ? `<div class="mgn"><button class="pill" data-act="mg-page" data-id="${esc(iv.id)}" data-d="-1" ${pg === 0 ? 'disabled' : ''}>Zurück</button><span>Seite ${pg + 1} von ${pages}</span><button class="pill" data-act="mg-page" data-id="${esc(iv.id)}" data-d="1" ${pg >= pages - 1 ? 'disabled' : ''}>Weiter</button></div>` : '';
+    const rg = a.mealplan_range || {}; const rng = rg.start && rg.end ? `${rg.label ? `${rg.label}: ` : ''}${mgDate(rg.start)} bis ${mgDate(rg.end)}` : '';
+    const pl = dvOpt(iv, 'plan') ? `<div class="mgp"><small>Speiseplan${rng ? ` · ${esc(rng)}` : ''}</small>${plan.length ? plan.map((e) => `<div><span>${esc(e.date ? mgDay(e.date) : e.dateLabel || 'Ohne Datum')}<em>${esc(MG_ENTRY[e.entryType] || e.entryType || 'Eintrag')}</em></span><b>${esc(e.recipeName || '')}</b>${e.totalTime ? `<i>${esc(e.totalTime)}</i>` : ''}</div>`).join('') : '<div class="mge">Für den Zeitraum sind keine Einträge vorhanden.</div>'}</div>` : '';
+    return `<div class="dvc mg">${mgHead(iv.main, 'mdi:chef-hat', iv.title || 'Kochvorschläge', sub, all.length ? `<div class="big">${Math.round(best)}<span class="mgu"> %</span></div>` : '')}
+      ${all.length ? all.slice(pg * per, pg * per + per).map((r, i) => rec(r, pg * per + i)).join('') : '<div class="mge">Aktuell gibt es keine Kochvorschläge.</div>'}${nav}${pl}</div>`;
+  },
+});
+
+registerDevice({
+  type: 'mgstock', label: 'Bestand (Grocy)', icon: 'mdi:warehouse', desc: 'Grocy-Bestand nach Lagerort mit Suche, Menge und Mindesthaltbarkeit (Integration Mealie Grocy Bridge)', size: 'w', attrSig: true,
+  main: MG_MAIN('items', /bestand/),
+  fields: {},
+  opts: [{ k: 'empty', l: 'Nicht zugeordnete Artikel zeigen', def: 1, bool: true }],
+  render: (c, iv, F, st) => {
+    const a = st.attributes; if (!Array.isArray(a.items)) return mgWait(iv, st, 'mdi:warehouse', 'Bestand');
+    const S = mgS(c); const raw = S.q[iv.id] || ''; const q = norm(raw).trim();
+    const items = a.items.filter((x) => dvOpt(iv, 'empty') || x.location !== 'Nicht zugeordnet');
+    const txt = (x) => norm([x.name, x.location, x.product_group, x.unit, x.status, MG_STATUS[x.status], x.best_before_date, x.best_before_date ? mgDate(x.best_before_date) : '', x.amount].filter((v) => v !== undefined && v !== null).join(' '));
+    const hit = q ? items.filter((x) => txt(x).includes(q)) : items; const groups = new Map();
+    hit.forEach((x) => { const l = String(x.location || 'Nicht zugeordnet').trim() || 'Nicht zugeordnet'; (groups.get(l) || groups.set(l, []).get(l)).push(x); });
+    const list = [...groups.entries()].sort((x, y) => x[0].localeCompare(y[0], 'de'));
+    const am = (v) => { const n = Number(v); return Number.isFinite(n) ? n.toLocaleString('de-DE', { maximumFractionDigits: 2 }) : '0'; };
+    let shown = 0;
+    const loc = ([name, l]) => {
+      const open = q ? true : !!S.open[`${iv.id}|${name}`]; l.sort((x, y) => String(x.name || '').localeCompare(String(y.name || ''), 'de'));
+      const rows = open ? l.map((x) => (shown++ >= 150 ? '' : `<div class="mgi"><div><b>${esc(x.name || 'Unbekannter Artikel')}</b>${MG_STATUS[x.status] ? `<em class="${x.status === 'expired' ? 'ex' : 'wn'}">${MG_STATUS[x.status]}</em>` : ''}${x.best_before_date && !String(x.best_before_date).startsWith('2999') ? `<small>MHD ${esc(mgDate(x.best_before_date))}</small>` : ''}</div><span>${esc(am(x.amount))} ${esc(x.unit || '')}</span></div>`)).join('') : '';
+      return `<div class="mgg"><div class="mgh" data-act="mg-loc" data-id="${esc(iv.id)}" data-k="${esc(name)}" role="button" aria-expanded="${open}"><ha-icon icon="${open ? 'mdi:chevron-down' : 'mdi:chevron-right'}"></ha-icon><b>${esc(name)}</b><span>${l.length}</span></div>${rows}</div>`;
+    };
+    const body = list.map(loc).join('');
+    const more = shown > 150 ? `<div class="mge">${shown - 150} weitere Treffer, bitte die Suche eingrenzen.</div>` : '';
+    const tiles = [['Produkte', a.product_count, ''], ['Lagerorte', a.location_count, ''], ['Läuft bald ab', a.expiring_count, 'wn'], ['Abgelaufen', a.expired_count, 'ex']].filter((x) => x[1] !== undefined).map(([l, v, k]) => `<div data-act="info" data-id="${iv.main}"><small>${l}</small><b class="${Number(v) > 0 ? k : ''}">${esc(v)}</b></div>`).join('');
+    return `<div class="dvc mg">${mgHead(iv.main, 'mdi:warehouse', iv.title || 'Bestand nach Lagerort', `${items.length} Positionen`, `<div class="big">${q ? hit.length : items.length}</div>`)}
+      ${tiles ? `<div class="dvs">${tiles}</div>` : ''}
+      <div class="mgq"><ha-icon icon="mdi:magnify"></ha-icon><input type="search" class="mgsrch" data-pk="${esc(`mgq|${iv.id}`)}" data-id="${esc(iv.id)}" placeholder="Artikel, Lagerort oder Status suchen" aria-label="Bestand durchsuchen" value="${esc(raw)}"></div>
+      ${body || `<div class="mge">${q ? `Keine Artikel für „${esc(raw.trim())}“ gefunden.` : 'Aktuell ist kein Bestand verfügbar.'}</div>`}${more}</div>`;
+  },
+});
+
+registerDevice({
+  type: 'mgreserve', label: 'Vorrat (Krisenvorsorge)', icon: 'mdi:shield-check-outline', desc: 'Notvorrat aus dem Grocy-Bestand nach BLE-Richtwerten: Reichweite in Tagen, Kalorien und Gruppen (Integration Mealie Grocy Bridge)', size: 'w', attrSig: true,
+  main: MG_MAIN('stock_items', /vorrat/),
+  fields: {},
+  opts: [{ k: 'adults', l: 'Erwachsene', def: 2, min: 1, max: 12, step: 1 }, { k: 'children', l: 'Kinder', def: 0, min: 0, max: 12, step: 1 }, { k: 'days', l: 'Tage', def: 10, min: 1, max: 60, step: 1 }, { k: 'water', l: 'Wasser extern (nicht in Grocy), Liter', def: 0, min: 0, max: 500, step: 5 }, { k: 'kcal', l: 'Kalorien je Erwachsener und Tag', def: VR_KCAL, min: 1000, max: 4000, step: 100 }],
+  render: (c, iv, F, st) => {
+    const a = st.attributes; if (!Array.isArray(a.stock_items)) return mgWait(iv, st, 'mdi:shield-check-outline', 'Notvorrat');
+    const S = mgS(c); const o = { adults: dvOpt(iv, 'adults'), children: dvOpt(iv, 'children'), days: dvOpt(iv, 'days'), water: dvOpt(iv, 'water'), kcal: dvOpt(iv, 'kcal') };
+    const r = vrBuild(a.stock_items, o); const reach = r.low ? r.low.reach : 0; const ok = reach >= o.days;
+    const sub = `${o.adults} ${o.adults === 1 ? 'Erwachsener' : 'Erwachsene'}${o.children ? `, ${o.children} ${o.children === 1 ? 'Kind' : 'Kinder'}` : ''}, ${o.days} Tage`;
+    const lim = !r.low ? '' : reach > 0 ? `begrenzt durch ${r.low.title} · ${ok ? 'Ziel erreicht' : `Ziel ${o.days} Tage`} · Ø Abdeckung ${Math.round(r.avg)} %` : `${r.low.title} fehlt · Ø Abdeckung ${Math.round(r.avg)} %`;
+    const row = (cat) => {
+      const open = !!S.open[`${iv.id}|c:${cat.id}`];
+      return `<div data-act="mg-cat" data-id="${esc(iv.id)}" data-k="${cat.id}" role="button" aria-expanded="${open}"><b><ha-icon icon="${cat.icon}"></ha-icon>${esc(cat.title)}</b><span>${Math.round(cat.score)} % · ${vrDays(cat.reach)} Tage</span><i class="${cat.tone}"><u style="width:${cat.score <= 0 ? 0 : Math.max(4, Math.min(100, Math.round(cat.score)))}%"></u></i>${open ? `<div class="mgx"><span>Ist ${vrAmt(cat.actual, cat.measurement)} von ${vrAmt(cat.target, cat.measurement)}</span>${cat.names.length ? `<span>${esc(cat.names.slice(0, 6).join(', '))}${cat.names.length > 6 ? ` und ${cat.names.length - 6} weitere` : ''}</span>` : '<span>Kein passendes Produkt in Grocy erkannt</span>'}${cat.est ? '<span>Artikel in Stück oder ohne Gewichtseinheit sind mit typischen Packungsgrößen geschätzt.</span>' : ''}</div>` : ''}</div>`;
+    };
+    const warn = (ic, t) => `<div class="dverr"><ha-icon icon="${ic}"></ha-icon><div>${esc(t)}</div></div>`;
+    return `<div class="dvc mg ${ok ? 'run' : ''}">${mgHead(iv.main, 'mdi:shield-check-outline', iv.title || 'Notvorrat', sub, `<div class="big">${vrDays(reach)}<span class="mgu"> Tage</span></div>`)}
+      ${lim ? `<div class="mgz">${esc(lim)}</div>` : ''}
+      <div class="dvs"><div data-act="info" data-id="${iv.main}"><small>Kalorien reichen für</small><b>${esc(r.kcal.label)}</b></div><div data-act="info" data-id="${iv.main}"><small>Gruppen im Ziel</small><b>${r.atTarget}/${r.cats.length}</b></div></div>
+      ${r.kcal.counted ? `<div class="mgz">${esc(r.kcal.detail)}</div>` : ''}
+      ${r.zero.length ? warn('mdi:alert-circle', `Kein Vorrat erkannt bei: ${r.zero.map((x) => x.title).join(', ')}`) : ''}${r.expired > 0 ? warn('mdi:calendar-alert', `${r.expired} abgelaufene Artikel werden nicht mitgezählt, bitte in Grocy prüfen.`) : ''}
+      <div class="dvm mgv">${r.cats.map(row).join('')}</div>${r.kcal.warning ? `<div class="mgz">${esc(r.kcal.warning)}</div>` : ''}
+      <div class="mgz">Richtwerte: Bundeszentrum für Ernährung (BLE), Kinder mit 70 %, Getränke 1 Liter je Kind und Tag.</div></div>`;
   },
 });
 registerCard({ id: 'dev', label: 'Gerätekarten', icon: 'mdi:view-grid-plus-outline', home: true, size: 'w', items: (c) => c._dvAll().map((iv) => {
