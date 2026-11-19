@@ -1197,3 +1197,16 @@ test('Kamera-Popup: Statusanzeige unterscheidet Live, Standbild und ältere Aufn
   const old = mk({ live: false, altId: 'camera.x' }, { _at: Date.now(), _alt: true }, { 'camera.x': { last_updated: '2026-11-19T06:20:55+00:00', attributes: { updated_at: '2026-11-19T06:20:55+00:00' } } });
   assert.match(old.textContent, /^Ältere Aufnahme/); assert.match(old.className, /old/);
 });
+
+test('Startseiten-Kameras: Breite je Kamera (Auto, ¼ bis Voll), ungültige Werte werden ignoriert', () => {
+  const c = Object.create(L.card.prototype);
+  c._set = { camW: { 'camera.a': 3, 'camera.b': 99 }, hidden: [], homeCams: ['camera.a', 'camera.b'], order: {} };
+  c._edit = false;
+  assert.equal(c._camW('camera.a'), 3);
+  assert.equal(c._camW('camera.b'), 0);
+  assert.equal(c._camWL('camera.a'), '¼');
+  assert.equal(c._camWL('camera.c'), 'Auto');
+  const html = c._camHtml({ entity_id: 'camera.a', attributes: { friendly_name: 'A' } }, 'homecams');
+  assert.match(html, /data-w="3"/);
+  assert.doesNotMatch(c._camHtml({ entity_id: 'camera.b', attributes: {} }, 'homecams'), /data-w/);
+});

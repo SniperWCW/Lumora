@@ -362,7 +362,7 @@ const embedConfig = (yaml) => {
 const merge = (v) => {
   v = v || {};
   const arr = (k) => [...(v[k] || DEF[k])];
-  const r = { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), embeds: JSON.parse(JSON.stringify(v.embeds || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify }, ptz: { ...DEF.ptz, ...v.ptz }, door: { ...DEF.door, ...v.door, bell: [...((v.door && v.door.bell) || [])], motion: [...((v.door && v.door.motion) || [])] }, look: mergeLook(v.look) };
+  const r = { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), embeds: JSON.parse(JSON.stringify(v.embeds || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, camW: { ...v.camW }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify }, ptz: { ...DEF.ptz, ...v.ptz }, door: { ...DEF.door, ...v.door, bell: [...((v.door && v.door.bell) || [])], motion: [...((v.door && v.door.motion) || [])] }, look: mergeLook(v.look) };
   if (((v.look && v.look.v) || 0) < LOOK_V) delete r.order.lookb;
   return r;
 };
@@ -547,7 +547,7 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .tile .tx{min-width:0;flex:1}
 .tile.on{background:var(--on);box-shadow:inset 0 0 0 1.5px var(--onring),var(--shadow)}.tile.bad{background:var(--bad);box-shadow:inset 0 0 0 1.5px rgba(205,65,50,.6)}.tile.bad .ic{background:rgba(205,65,50,.75);color:#fff}.tile.on .ic{background:var(--accent);color:var(--accentfg)}
 .tile.sens .ic{background:transparent}
-.cams.hc{grid-template-columns:repeat(2,minmax(0,1fr))}.cams.hc .cam:last-child:nth-child(odd){grid-column:1/-1}.grid .cam{grid-column:span 2}
+.cams.hc{grid-template-columns:repeat(12,minmax(0,1fr))}.cams.hc .cam{grid-column:span 6}.cams.hc:not(.cz) .cam:last-child:nth-child(odd){grid-column:1/-1}.cams.hc .cam[data-w="3"]{grid-column:span 3}.cams.hc .cam[data-w="4"]{grid-column:span 4}.cams.hc .cam[data-w="6"]{grid-column:span 6}.cams.hc .cam[data-w="8"]{grid-column:span 8}.cams.hc .cam[data-w="12"]{grid-column:1/-1}@media(max-width:560px){.cams.hc .cam[data-w="3"],.cams.hc .cam[data-w="4"]{grid-column:span 6}.cams.hc .cam[data-w="8"]{grid-column:1/-1}}.grid .cam{grid-column:span 2}
 .cams{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
 .ptz{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--a);border-radius:16px;padding:10px 14px;margin-bottom:10px}.ptz .ptzh{display:flex;align-items:center;gap:8px}.ptz .ptzn{opacity:.7;font-size:14px}.ptz .pills{margin:0;flex:1}
 .ptz .pad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px);gap:6px;margin-left:auto}.ptz .pb{border:0;border-radius:12px;background:var(--selbg);color:var(--selfg);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}.ptz .pb:active{filter:brightness(.85)}
@@ -1319,7 +1319,7 @@ class LumoraCard extends HTMLElement {
   }
   _signature() {
     const h = this._hass;
-    if (this._view === 'cams') return ['cams', this._sheet, this._edit, this._set.ptz.cam, this._ptzCam(), this._set.hidden.join(), (this._set.order.cams || []).join(), Object.values(h.states).filter((x) => dom(x.entity_id) === 'camera').map((x) => x.entity_id + (x.state === 'unavailable' ? 'x' : '') + (x.attributes.entity_picture || '')).join()].join('|'); const parts = [this._view, this._floor, this._area, this._sheet, this._edit, Math.floor(Date.now() / 60000), this._set.pinned.length, this._set.hidden.length, this._set.hiddenAreas.length, JSON.stringify(this._set.look)];
+    if (this._view === 'cams') return ['cams', this._sheet, this._edit, this._set.ptz.cam, this._ptzCam(), this._set.hidden.join(), (this._set.order.cams || []).join(), Object.values(h.states).filter((x) => dom(x.entity_id) === 'camera').map((x) => x.entity_id + (x.state === 'unavailable' ? 'x' : '') + (x.attributes.entity_picture || '')).join()].join('|'); const parts = [this._view, this._floor, this._area, this._sheet, this._edit, Math.floor(Date.now() / 60000), this._set.pinned.length, this._set.hidden.length, this._set.hiddenAreas.length, JSON.stringify(this._set.look), JSON.stringify(this._set.camW)];
     const cuSet = new Set(this._set.custom.map((x) => x.entity));
     const doms = ['weather', 'light', 'media_player', 'vacuum', 'person', 'alarm_control_panel', 'lock', 'binary_sensor', 'camera', 'switch', 'cover', 'climate', 'fan'];
     for (const id in h.states) {
@@ -2943,13 +2943,18 @@ _more() {
   _camHtml(st, scope, extra) {
     const src = st.attributes.entity_picture || '';
     const tools = extra !== undefined ? extra : this._tools(scope, st.entity_id, 'hidden');
-    return `<div class="cam ${this._set.hidden.includes(st.entity_id) ? 'hid' : ''}" data-act="info" data-id="${st.entity_id}">${src ? `<img data-b="${esc(src)}" src="${esc(src)}" alt="">` : ''}${tools}<span class="n">${esc(cleanName(st.attributes.friendly_name))}</span></div>`;
+    const w = scope === 'homecams' ? this._camW(st.entity_id) : 0;
+    return `<div class="cam ${this._set.hidden.includes(st.entity_id) ? 'hid' : ''}" ${w ? `data-w="${w}" ` : ''}data-act="info" data-id="${st.entity_id}">${src ? `<img data-b="${esc(src)}" src="${esc(src)}" alt="">` : ''}${tools}<span class="n">${esc(cleanName(st.attributes.friendly_name))}</span></div>`;
   }
   _homeCams() {
     const sts = this._set.homeCams.map((id) => this._hass.states[id]).filter((x) => x && x.state !== 'unavailable'); if (!sts.length) return '';
     const ord = this._ord('homecams', sts, (x) => x.entity_id);
-    return `<h3>Kameras</h3><div class="cams hc">${ord.map((x) => this._camHtml(x, 'homecams', this._edit ? `<span class="x" data-act="hcam" data-id="${x.entity_id}"><ha-icon icon="mdi:close"></ha-icon></span>${this._tools('homecams', x.entity_id, null)}` : '')).join('')}</div>`;
+    const cz = sts.some((x) => this._camW(x.entity_id));
+    return `<h3>Kameras</h3><div class="cams hc ${cz ? 'cz' : ''}">${ord.map((x) => this._camHtml(x, 'homecams', this._edit ? `<span class="x" data-act="hcam" data-id="${x.entity_id}"><ha-icon icon="mdi:close"></ha-icon></span><span class="tools" style="right:40px"><span class="mini t" data-act="camw" data-id="${x.entity_id}">${this._camWL(x.entity_id)}</span></span>${this._tools('homecams', x.entity_id, null)}` : '')).join('')}</div>`;
   }
+  /* Breite einer Kamera auf der Startseite (¼ ⅓ ½ ⅔ Voll); 0 = automatisch (zwei pro Zeile, eine einzelne letzte Kamera volle Breite) */
+  _camW(id) { const w = (this._set.camW || {})[id]; return BLOCK_W.some((x) => x[0] === w) ? w : 0; }
+  _camWL(id) { const w = this._camW(id); return w ? BLOCK_W.find((x) => x[0] === w)[1] : 'Auto'; }
   _refreshCams() {
     if (this._edit || this._dg || (typeof document !== 'undefined' && document.hidden)) return;
     const q = this.shadowRoot.querySelectorAll; if (!q) return;
@@ -3007,7 +3012,7 @@ _more() {
       c = `<h2>Sensoren · ${esc(this._aname(aid))}</h2>${mk('temperature', 'temp', 'Temperatur')}${mk('humidity', 'hum', 'Luftfeuchtigkeit')}`;
     } else if (this._sheet === 'hc') {
       const cams = (this._byDomain().camera || []).filter((x) => x.state !== 'unavailable'); const on = this._set.homeCams;
-      c = `<h2>Kameras auf der Startseite</h2>${cams.map((x) => `<div class="row"><ha-icon icon="mdi:cctv"></ha-icon><div class="t"><b>${esc(cleanName(x.attributes.friendly_name))}</b></div><button class="${on.includes(x.entity_id) ? 'sel' : ''}" data-act="hcam" data-id="${x.entity_id}">${on.includes(x.entity_id) ? 'An' : 'Aus'}</button></div>`).join('') || '<div class="empty">Keine Kameras gefunden.</div>'}`;
+      c = `<h2>Kameras auf der Startseite</h2>${cams.map((x) => `<div class="row"><ha-icon icon="mdi:cctv"></ha-icon><div class="t"><b>${esc(cleanName(x.attributes.friendly_name))}</b></div>${on.includes(x.entity_id) ? `<button data-act="camw" data-id="${x.entity_id}" aria-label="Breite">Breite: ${this._camWL(x.entity_id)}</button>` : ''}<button class="${on.includes(x.entity_id) ? 'sel' : ''}" data-act="hcam" data-id="${x.entity_id}">${on.includes(x.entity_id) ? 'An' : 'Aus'}</button></div>`).join('') || '<div class="empty">Keine Kameras gefunden.</div>'}`;
     } else if (this._sheet === 'src') {
       const h = this._hass; const gs = {}; Object.keys(SLOTS).forEach((k) => { (gs[SLOTS[k].g] || (gs[SLOTS[k].g] = [])).push(k); });
       c = `<h2>Sensoren und Quellen</h2><div class="hint">Was Lumora findet, ist schon eingetragen. Passt etwas nicht oder fehlt es, wähle es hier aus. Nicht Gefundenes bleibt einfach unsichtbar.</div>${Object.entries(gs).map(([g, ks]) => `<h4>${g}</h4>${ks.map((k) => {
@@ -4188,6 +4193,7 @@ _more() {
       case 'dbclose': this._doorHide(true); return;
       case 'dbopen': this._doorHide(); this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId: id }, bubbles: true, composed: true })); return;
       case 'hc': this._sheet = 'hc'; break;
+      case 'camw': { const o = [0, ...BLOCK_W.map((x) => x[0])]; const nx = o[(o.indexOf(this._camW(id)) + 1) % o.length]; s.camW = s.camW || {}; if (nx) s.camW[id] = nx; else delete s.camW[id]; this._save(); break; }
       case 'hcam': s.homeCams = s.homeCams.includes(id) ? s.homeCams.filter((x) => x !== id) : [...s.homeCams, id]; this._save(); break;
       case 'src': this._sheet = 'src'; this._ac = null; break;
       case 'srcpick': this._sheet = 'srcpick'; this._sk = t.dataset.k; this._q = ''; break;
