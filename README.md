@@ -7,7 +7,7 @@ Schnelles Home-Assistant-Dashboard als einzelne, abhängigkeitsfreie Karte (kein
 - Spezialkarten für Thermostate (Slider für die Solltemperatur) und Staubsauger (Start, Pause, Station)
 - Startseite mit gefilterten Meldungen: offene Türen und Fenster, Bewegung, Rauch, Wasser, Gas und Alarm
 - Meldungen sind konfigurierbar (Kategorien an oder aus, einzelne Sensoren ausblenden), gespeichert pro HA-Benutzer
-- "Aktiv jetzt" mit Lichtern, Medien und frei hinzufügbaren Karten, optional nur bei Aktivität
+- Eigene Chips: beliebige Entitäten als Chip, optional „nur bei aktiv“ (Design, Chips)
 - Steckdosen-Karten: Ein/Aus, aktuelle Leistung in Watt und Tagesspitze mit Uhrzeit (Leistungssensor am selben Gerät wird automatisch zugeordnet)
 - Räume je Etage und Area, Kameraübersicht; Temperatur und Luftfeuchte im Raumkopf automatisch aus der Area (abgeleitete Werte wie Taupunkt werden ignoriert), pro Raum wählbar unter Bearbeiten, Sensoren
 - Pool-Karte (Smart Pool Assistant + LayzSpa): Status, Badeampel, PoolLab-Abruf, Chlor-/pH-/CYA-Empfehlung mit Eintragen von Zugaben und Wasserwechsel, Berechnungsdetails, Wetter, Stabilität, Messwerte, LayzSpa (Pumpe, Heizung, Blubber, Zieltemperatur, Heizzeit-Prognose, Fehlercodes), Aktivitäten, Filterwartung, Abdeckung, Nutzung und Badeplan. Winterschlaf blendet sie aus. Ohne Integration bleibt die LayzSpa-Steuerung
@@ -63,7 +63,7 @@ Dashboard-Ansicht vom Typ `panel` mit folgender Karte:
 ```yaml
 type: custom:lumora-card
 # optional
-theme: sand        # Standard; alternativ: forest, sage (Salbei) oder auto (hell/dunkel nach Gerät)
+theme: sand        # Standard; alternativ: sage (Salbei) oder auto (hell/dunkel nach Gerät)
 name: Anna         # optional, sonst Name aus der Person des Benutzers
 energy:            # optional, überschreibt die automatische Erkennung
   pv: sensor.pv_leistung
@@ -88,8 +88,8 @@ color_to: "#d6c5a8"
 
 Über die Schaltfläche **Design** (Palette) auf der Startseite lässt sich das Aussehen pro Benutzer anpassen. Die Einstellungen liegen im Benutzerprofil und gehören zum Layout, das auch als Gruppenlayout veröffentlicht werden kann.
 
-- **Vorlagen:** Sand, Wald oder Salbei (Kacheln). Eine Vorlage setzt Startseite, Farbthema, Rundung, Kartenstil und Schrift auf einmal.
-- **Startseite:** *Klassisch* (wie bisher) oder *Kacheln*. Die Kachel-Startseite besteht aus Blöcken: Kopfzeile mit Uhr und Wetter, Kennzahlen, Räume mit Foto, Meldungen, Termine, Hausstatus, Grußkachel sowie Karten, Aktiv jetzt und Kameras.
+- **Vorlagen:** Sand oder Salbei (Kacheln). Eine Vorlage setzt Startseite, Farbthema, Rundung, Kartenstil und Schrift auf einmal.
+- **Startseite:** *Klassisch* (wie bisher) oder *Kacheln*. Die Kachel-Startseite besteht aus Blöcken: Kopfzeile mit Uhr und Wetter, Kennzahlen, Räume mit Foto, Meldungen, Termine, Hausstatus, Grußkachel sowie Karten und Kameras.
 - **Reihenfolge und Breite:** Jeder Block lässt sich nach oben oder unten schieben, ein- oder ausblenden und in der Breite wählen (¼, ⅓, ½, ⅔, voll; zwölf Spalten). Auf dem Handy stehen die Blöcke untereinander.
 - **Kennzahlen:** Beleuchtung, Heizung, Raumtemperatur Ø, Luftfeuchte Ø, Verbrauch, offene Fenster und Türen, Anwesenheit; Auswahl und Reihenfolge frei.
 - **Räume:** automatisch die ersten Bereiche je Etage oder eigene Auswahl in eigener Reihenfolge. Das Raumfoto kommt aus dem Bereich in Home Assistant (Einstellungen, Bereiche).

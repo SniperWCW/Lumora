@@ -746,8 +746,8 @@ test('Design: Vorlage Salbei schaltet auf Kacheln', () => {
 
 test('Design: eigene Themenwahl hat Vorrang vor der Karten-YAML, Kartenstil folgt dem Thema', () => {
   const c = new L.card();
-  c.setConfig({ theme: 'forest' });
-  assert.equal(c.getAttribute('theme'), 'forest');
+  c.setConfig({ theme: 'sand' });
+  assert.equal(c.getAttribute('theme'), 'sand');
   assert.equal(c.getAttribute('data-cs'), 'flat');
   c._set.look.theme = 'sage'; c._applyLook();
   assert.equal(c.getAttribute('theme'), 'sage');
@@ -812,15 +812,33 @@ test('Kachel-Startseite: Heizung automatisch als Durchschnitt, wählbarer Thermo
   assert.match(c._home(), /class="kp entity"[\s\S]*Wert X[\s\S]*42,5<small> kWh/);
 });
 
-test('Kachel-Startseite: Meldungen-Block nur bei Inhalt, keine doppelten Chips; Aktiv jetzt ohne Lichter-Duplikat', () => {
+test('Kachel-Startseite: Meldungen-Block nur bei Inhalt, keine doppelten Chips', () => {
   const c = tilesCard();
   let html = c._home();
   assert.ok(!html.includes('class="note'), 'kein "Alles in Ordnung"-Hinweis im Meldungsblock');
   assert.ok(!html.includes('data-act="lights"><ha-icon icon="mdi:lamp"'), 'Lichter-Chip entfällt (Kennzahl zeigt es)');
-  assert.ok(!html.includes('Aktiv jetzt'), 'leerer Block bleibt weg');
-  c._set.look.kpis = c._set.look.kpis.filter((x) => x.k !== 'lights');
-  html = c._home();
-  assert.match(html, /Aktiv jetzt/);
+  assert.ok(!html.includes('Aktiv jetzt'), 'den Bereich Aktiv jetzt gibt es nicht mehr');
+});
+
+test('Aktiv jetzt entfällt, Wald entfällt, eigene Chips mit „nur bei aktiv“', () => {
+  assert.ok(!L.BLOCK_DEF.some((d) => d[0] === 'active'));
+  assert.ok(!L.mergeLook({ v: 3, blocks: [{ id: 'active', w: 12, on: true }] }).blocks.some((b) => b.id === 'active'));
+  assert.ok(!L.LOOK_PRESETS.forest);
+  const c = new L.card(); c.setConfig({ theme: 'forest' });
+  assert.equal(c.getAttribute('theme'), 'sand', 'gespeichertes Wald-Thema fällt auf Sand zurück');
+  const c2 = tilesCard();
+  const S = (state, fn) => ({ entity_id: '', state, attributes: { friendly_name: fn } });
+  c2._hass.states['binary_sensor.waschmaschine'] = { ...S('off', 'Waschmaschine'), entity_id: 'binary_sensor.waschmaschine' };
+  c2._hass.states['sensor.aussen'] = { ...S('12', 'Außen'), entity_id: 'sensor.aussen' };
+  c2._set.pinned = [{ entity: 'binary_sensor.waschmaschine', only: true }, { entity: 'sensor.aussen', only: false }];
+  let chips = c2._pinChips();
+  assert.ok(!chips.includes('Waschmaschine'), 'inaktiv + nur bei aktiv: Chip bleibt weg');
+  assert.match(chips, /Außen/);
+  c2._hass.states['binary_sensor.waschmaschine'].state = 'on';
+  assert.match(c2._pinChips(), /Waschmaschine/);
+  c2._hass.states['binary_sensor.waschmaschine'].state = 'off'; c2._edit = true;
+  assert.match(c2._pinChips(), /class="pill hid"[^>]*binary_sensor\.waschmaschine/);
+  c2._sheet = 'chips'; assert.match(c2._sheetHtml(), /Eigene Chips[\s\S]*data-act="ponly"[\s\S]*data-act="chipadd"/);
 });
 
 test('Kachel-Startseite: Bearbeiten zeigt Werkzeuge an jedem Block, auch an ausgeblendeten', () => {

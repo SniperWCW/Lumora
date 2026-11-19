@@ -1,6 +1,6 @@
 /* Lumora
  * Schnelle, abhängigkeitsfreie Karte: Startseite mit gefilterten Meldungen + Räume je Etage/Area + Kameras.
- * Einbindung: Ressource /local/lumora/lumora.js (Typ: JavaScript-Modul), Karte: type: custom:lumora-card (Panel-Ansicht). Optional: theme: forest.
+ * Einbindung: Ressource /local/lumora/lumora.js (Typ: JavaScript-Modul), Karte: type: custom:lumora-card (Panel-Ansicht). Optional: theme: sand | sage | auto.
  */
 const VERSION = '0.0.0-dev';
 const KEY = 'lumora_panel';
@@ -42,17 +42,16 @@ const LOOK_V = 3;
 const BLOCK_DEF = [
   ['head', 'Kopfzeile', 12, 1], ['chips', 'Chips', 12, 1], ['alerts', 'Hinweise und Meldungen', 12, 1], ['kpis', 'Kennzahlen', 12, 1], ['rooms', 'Räume', 12, 1],
   ['termine', 'Termine', 4, 1], ['status', 'Hausstatus', 4, 1], ['greeting', 'Grußkachel', 4, 1],
-  ['reg', 'Karten (Energie, Familie …)', 12, 1], ['active', 'Aktiv jetzt', 12, 1], ['cams', 'Kameras', 12, 0],
+  ['reg', 'Karten (Energie, Familie …)', 12, 1], ['cams', 'Kameras', 12, 0],
 ];
 const BLOCK_W = [[3, '¼'], [4, '⅓'], [6, '½'], [8, '⅔'], [12, 'Voll']];
 const KPI_DEF = { lights: ['Beleuchtung', 'mdi:lightbulb-on-outline'], heat: ['Heizung', 'mdi:radiator'], temp: ['Raumtemperatur Ø', 'mdi:thermometer'], hum: ['Luftfeuchte Ø', 'mdi:water-percent'], power: ['Verbrauch', 'mdi:flash-outline'], open: ['Offene Fenster/Türen', 'mdi:window-open-variant'], persons: ['Zu Hause', 'mdi:account-multiple-outline'], entity: ['Eigene Kennzahl', 'mdi:gauge'] };
-const LOOK_THEMES = [['', 'Aus Karte'], ['sand', 'Sand'], ['forest', 'Wald'], ['sage', 'Salbei'], ['auto', 'Auto']];
+const LOOK_THEMES = [['', 'Aus Karte'], ['sand', 'Sand'], ['sage', 'Salbei'], ['auto', 'Auto']];
 const LOOK_RADIUS = { sm: '10px', md: '20px', lg: '30px' };
 const LOOK_GAP = { s: '6px', m: '10px', l: '16px' };
 const LOOK_FONT = { round: 'ui-rounded,"SF Pro Rounded","Varela Round",Nunito,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', serif: '"Iowan Old Style","Palatino Linotype",Georgia,"Times New Roman",serif' };
 const LOOK_PRESETS = {
   sand: { layout: 'classic', theme: 'sand', accent: '', bg1: '', bg2: '', radius: '', cards: 'flat', gap: '', font: '' },
-  forest: { layout: 'classic', theme: 'forest', accent: '', bg1: '', bg2: '', radius: '', cards: 'flat', gap: '', font: '' },
   sage: { layout: 'tiles', theme: 'sage', accent: '', bg1: '', bg2: '', radius: 'lg', cards: 'soft', gap: 'm', font: 'round' },
 };
 const EV_CALX = /abfall|muell|waste|tonne|entsorg|garbage|trash|holiday|feiertag|geburtstag.*feiertag/;
@@ -388,7 +387,7 @@ const cleanName = (n) => {
 const CARD_SEL = ['.en', '.cl', '.vc', '.pl:not(.on)', '.card', '.tile', '.ap', '.qs', '.dvc', '.pool', '.kp', '.tl', '.rm', '.gt'];
 const CARD_CSS = `${CARD_SEL.map((x) => `:host([data-cs=soft]) ${x}`).join(',')}{box-shadow:var(--shadow-soft,0 8px 22px rgba(90,70,40,.13),0 1px 2px rgba(90,70,40,.08))}
 ${CARD_SEL.map((x) => `:host([data-cs=glass]) ${x}`).join(',')}{background-color:var(--glass,rgba(255,255,255,.4));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
-:host([theme=forest]){--glass:rgba(255,255,255,.12)}
+:host([theme=dark]){--glass:rgba(255,255,255,.12)}
 .lkl{font-size:12.5px;color:var(--fg2);margin:8px 2px 4px}.lkc input[type=color]{margin:0}
 .lkb button{display:inline-flex;align-items:center;justify-content:center;min-width:34px}.lkb ha-icon{--mdc-icon-size:18px}.lkb button[disabled]{opacity:.35;cursor:default}
 `;
@@ -398,7 +397,7 @@ const CSS = `
  --sheet:#f6f0e4;--selbg:#4a3c2b;--selfg:#f6f0e4;--accent:#e6b655;--accentfg:#3a2a00;--on:rgba(238,176,52,.46);--onring:rgba(205,140,20,.6);--line:rgba(59,50,38,.12);--nav:rgba(255,255,255,.5);
  --bad:rgba(205,65,50,.25);--badfg:#7d1f16;--warn:rgba(224,160,40,.32);--okbg:rgba(100,150,80,.22);--scrim:rgba(40,30,15,.45);--shadow:0 1px 3px rgba(80,60,30,.14);
  color:var(--fg);font-family:var(--ff,Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif)}
-:host([theme=forest]){--on:rgba(255,190,70,.3);--onring:rgba(255,205,110,.65);--fg:#fff;--fg2:rgba(255,255,255,.72);--a:rgba(255,255,255,.12);--b:rgba(255,255,255,.2);--from:#5b7248;--to:#232f21;
+:host([theme=dark]){--on:rgba(255,190,70,.3);--onring:rgba(255,205,110,.65);--fg:#fff;--fg2:rgba(255,255,255,.72);--a:rgba(255,255,255,.12);--b:rgba(255,255,255,.2);--from:#5b7248;--to:#232f21;
  --sheet:#1f2a1e;--selbg:rgba(255,255,255,.88);--selfg:#223;--line:rgba(255,255,255,.1);--nav:rgba(0,0,0,.18);
  --bad:rgba(244,67,54,.5);--badfg:#fff;--warn:rgba(255,193,7,.28);--okbg:rgba(120,200,120,.25);--scrim:rgba(0,0,0,.55);--shadow:none}
 :host([theme=sage]){--fg:#2f3b2a;--fg2:rgba(47,59,42,.62);--a:rgba(255,253,247,.86);--b:rgba(107,143,78,.16);--from:#f8f0e4;--to:#ebdcc4;
@@ -465,6 +464,7 @@ const CSS = `
 .logo{width:48px;height:48px;border-radius:14px;background:var(--a);display:grid;place-items:center}
 .ttl{font-size:18px;font-weight:600;flex:1}
 [data-act]{cursor:pointer;-webkit-tap-highlight-color:transparent}[data-act=noop]{cursor:auto}
+.pill.hid{opacity:.5}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:99px;background:var(--a);cursor:pointer;border:0;color:inherit;font:inherit;font-size:14px}
 .pill.warn{background:var(--warn)}.pill.bad{background:var(--bad);color:var(--badfg)}.pill.ok{background:var(--okbg)}
 .pill ha-icon{--mdc-icon-size:18px}
@@ -626,7 +626,7 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .card.cu .spl{font-size:12px;color:var(--fg2)}
 .en .rw .spk{margin-top:6px}
 .pool{--ok:#3d8b40;--wn:#b4731a;--bd:#c0392b;--bl:#23729e;background:var(--a);border-radius:20px;padding:16px;min-width:0}
-:host([theme=forest]) .pool{--ok:#8fd18f;--wn:#ffcf66;--bd:#ff9a90;--bl:#8ccdf2}
+:host([theme=dark]) .pool{--ok:#8fd18f;--wn:#ffcf66;--bd:#ff9a90;--bl:#8ccdf2}
 .pool b{font-weight:600}
 .pool .s-ok{color:var(--ok)}.pool .s-wn{color:var(--wn)}.pool .s-bd{color:var(--bd)}.pool .s-bl{color:var(--bl)}
 .pool-hd{display:flex;align-items:center;gap:12px}
@@ -1158,7 +1158,7 @@ class LumoraCard extends HTMLElement {
     super();
     this.attachShadow({ mode: 'open' });
     this._view = 'home'; this._floor = null; this._area = null; this._sheet = null;
-    this._edit = false; this._q = ''; this._flt = 'all'; this._only = false; this._ai = 0;
+    this._edit = false; this._q = ''; this._flt = 'all'; this._only = false; this._chipMode = false; this._ai = 0;
     this._set = merge({}); this._loaded = false; this._sig = '';
     this.shadowRoot.addEventListener('click', (e) => this._click(e));
     this.shadowRoot.addEventListener('pointerdown', (e) => {
@@ -1221,10 +1221,11 @@ class LumoraCard extends HTMLElement {
   _applyLook() {
     const cfg = this._cfg || {}; const L = (this._set && this._set.look) || mergeLook({});
     if (this._mq && this._mqf) { try { this._mq.removeEventListener('change', this._mqf); } catch (_) { /* ältere Browser */ } this._mq = this._mqf = null; }
-    const th = L.theme || cfg.theme || '';
+    let th = L.theme || cfg.theme || '';
+    if (th === 'forest' || th === 'dark') th = 'sand'; /* Wald gibt es nicht mehr */
     if (th === 'auto' && window.matchMedia) {
       this._mq = window.matchMedia('(prefers-color-scheme: dark)');
-      this._mqf = () => { this.setAttribute('theme', this._mq.matches ? 'forest' : 'sand'); this._applyCs(); };
+      this._mqf = () => { this.setAttribute('theme', this._mq.matches ? 'dark' : 'sand'); this._applyCs(); };
       this._mqf();
       try { this._mq.addEventListener('change', this._mqf); } catch (_) { /* ältere Browser */ }
     } else if (th) this.setAttribute('theme', th);
@@ -1602,6 +1603,16 @@ class LumoraCard extends HTMLElement {
     if (ice && ice.warn && !s.excludeEntities.includes(ice.id)) out.push({ sev: 1, text: 'Eisgefahr', icon: 'mdi:snowflake-alert', k: ice.id, id: ice.id, since: this._hass.states[ice.id].last_changed });
     return out;
   }
+  /* Eigene Chips: frei gewählte Entitäten, optional nur sichtbar, solange sie aktiv sind (Einstellung unter Chips) */
+  _pinChips() {
+    const h = this._hass;
+    return this._set.pinned.map((p) => {
+      const st = h.states[p.entity]; if (!st) return '';
+      const idle = !!p.only && INACTIVE.includes(st.state);
+      if (idle && !this._edit) return '';
+      return `<button class="pill ${idle ? 'hid' : ''}" data-act="info" data-id="${esc(p.entity)}"><ha-icon icon="${this._icon(st)}"></ha-icon>${esc(st.attributes.friendly_name || p.entity)} · ${esc(this._state(st))}</button>`;
+    }).join('');
+  }
   _infoPills(al) {
     const h = this._hass; const inf = this._inf(); const out = []; const on = (k) => this._chipOn(k);
     if (on('warn')) this._warns().forEach((w) => out.push(`<button class="pill ${w.sev === 0 ? 'bad' : 'warn'}" data-act="warns"><ha-icon icon="${w.icon}"></ha-icon>${esc(w.title)}${w.sub ? ` · ${esc(w.sub)}` : ''}</button>`));
@@ -1802,43 +1813,27 @@ class LumoraCard extends HTMLElement {
       lights.length && !kLights && this._chipOn('lights') ? `<button class="pill" data-act="lights"><ha-icon icon="mdi:lamp"></ha-icon>${lights.length} an</button>` : '',
       this._chipOn('outdoor') && !(isTiles && Lk.showWeather) ? wpill : '',
       this._infoPills(al),
+      this._pinChips(),
       al.length && this._chipOn('count') && !isTiles ? `<button class="pill ${al.some((a) => a.sev === 0) ? 'bad' : 'warn'}" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>${al.length} Meldung${al.length > 1 ? 'en' : ''}</button>` : '',
     ].join('');
-    const cards = [];
-    if (lights.length && !kLights) {
-      const names = [...new Set(lights.map((l) => this._aname(this._areaOf(l.entity_id))).filter(Boolean))].slice(0, 3).join(', ');
-      cards.push(`<div class="card" data-act="lights"><ha-icon icon="mdi:lightbulb-group"></ha-icon><div><b>${lights.length} Licht${lights.length > 1 ? 'er' : ''} an</b><span>${esc(names)}</span></div></div>`);
-    }
-    (D.media_player || []).filter((m) => m.state === 'playing').forEach((m) => cards.push(this._card(m, m.attributes.media_title || 'Läuft')));
-    (D.vacuum || []).filter((v) => ['cleaning', 'returning'].includes(v.state)).forEach((v) => cards.push(this._card(v, '')));
-    this._appls().forEach((a) => { const i = this._applInfo(a); if (i && !i.off) cards.push(this._applCard(a)); });
-    const pk = this._pkgs(); if (pk && pk.n > 0) cards.push(this._pkgMini(pk));
-    const pr = this._printerInfo(); if (pr && pr.active) cards.push(`<div class="ap run" data-act="info" data-id="${this._xid('printer_progress')}"><div class="h"><ha-icon icon="mdi:printer-3d-nozzle"></ha-icon><div><b>3D-Druck</b><span>${Math.round(pr.prog || 0)} %${pr.left !== null ? ` · noch ${this._fmtMin(pr.left)}` : ''}</span></div></div><div class="bar"><i style="width:${Math.round(pr.prog || 0)}%"></i></div></div>`);
-    this._set.pinned.forEach((p) => {
-      const st = h.states[p.entity]; if (!st) return;
-      const idle = !!p.only && INACTIVE.includes(st.state);
-      if (idle && !this._edit) return;
-      cards.push(this._card(st, `${this._state(st)}${this._edit && p.only ? ' · nur wenn aktiv' : ''}`, p.entity, this._edit, `${idle ? 'hid' : ''} ${this._set.size[p.entity] ? `sz-${this._set.size[p.entity]}` : ''}`, p));
-    });
-    if (!isTiles || this._edit) cards.push(`<div class="card add" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</div>`);
     const placed = new Set(isTiles ? Lk.blocks.filter((b) => b.id.startsWith('c:')).map((b) => b.id.slice(2)) : []);
     const regItems = this._regItems('home').filter((x) => !placed.has(x.id));
     const regCells = this._ord('homereg', regItems, (x) => x.id).map((x) => this._cell(x, 'homereg')).filter(Boolean).join('');
     const dsg = '<button class="pill" style="padding:5px 10px;font-size:12px" data-act="look"><ha-icon icon="mdi:palette-outline"></ha-icon>Design</button>';
-    if (this._set.look.layout === 'tiles') return this._homeTiles({ D, al, persons, home, wx, temp, hum, me, nm, greet, lights, apill, note, pills, regCells, nCards: cards.length, cardsHtml: `<div class="grid">${cards.join('')}</div>` });
+    if (this._set.look.layout === 'tiles') return this._homeTiles({ D, al, persons, home, wx, temp, hum, me, nm, greet, lights, apill, note, pills, regCells });
     return `<div class="top"><div class="logo"><ha-icon icon="mdi:home-variant"></ha-icon></div><div class="ttl">Lumora.</div>${apill}</div>
       <div class="meta">${esc(meta)}</div>${this._vent()}
       <div class="hello">${this._avatar(me, true)}<div><h1>${greet}${nm ? `, ${esc(nm)}` : ''}</h1><div class="sub">${persons.length ? `${home}/${persons.length} zu Hause` : ''}</div></div></div>
-      ${note}<div class="pills">${pills}</div>${regCells ? `<div class="grid reg">${regCells}</div>` : ''}
+      ${note}<div class="pills">${pills}</div>${regCells || this._edit ? `<div class="grid reg">${regCells}${this._edit ? '<div class="card add" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</div>' : ''}</div>` : ''}
       ${this._homeCams()}
-      <h3>Aktiv jetzt<span style="display:flex;gap:6px">${dsg}<button class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button></span></h3>
-      ${this._hint()}<div class="grid">${cards.join('')}</div>`;
+      <h3><span></span><span style="display:flex;gap:6px">${dsg}<button class="pill" style="padding:5px 10px;font-size:12px" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button></span></h3>
+      ${this._hint()}`;
   }
 
   /* ---------- Kachel-Startseite: frei ordnbare Blöcke (Ziehen, Breite, Ein/Aus, Einstellungen je Block) ---------- */
   _homeTiles(f) {
     const L = this._set.look; const ed = this._edit;
-    const R = { head: () => this._bHead(f), chips: () => this._bChips(f), alerts: () => this._bAlerts(f), kpis: () => this._bKpis(f), rooms: () => this._bRooms(f), termine: () => this._bTermine(), status: () => this._bStatus(f), greeting: () => this._bGreeting(f), reg: () => (f.regCells ? `<div class="grid reg">${f.regCells}</div>` : ''), active: () => (f.nCards ? `<h3>Aktiv jetzt</h3>${f.cardsHtml}` : ''), cams: () => this._homeCams() };
+    const R = { head: () => this._bHead(f), chips: () => this._bChips(f), alerts: () => this._bAlerts(f), kpis: () => this._bKpis(f), rooms: () => this._bRooms(f), termine: () => this._bTermine(), status: () => this._bStatus(f), greeting: () => this._bGreeting(f), reg: () => (f.regCells ? `<div class="grid reg">${f.regCells}</div>` : ''), cams: () => this._homeCams() };
     const cat = this._cardCat(); const byId = {}; cat.forEach((x) => { byId[x.id] = x; }); const names = this._cardNames(cat);
     const out = this._ord('lookb', L.blocks, (b) => b.id).map((b) => {
       const isC = b.id.startsWith('c:'); const it = isC ? byId[b.id.slice(2)] : null;
@@ -1875,7 +1870,6 @@ class LumoraCard extends HTMLElement {
       <div class="row"><div class="t"><b>Gerätekarte</b><span>z. B. Heizung (Smartdome), Staubsauger, Pool</span></div><button data-act="adddv">Wählen</button></div>
       <div class="row"><div class="t"><b>Fremdkarte einbetten</b><span>Beliebige Karte (HACS, Mushroom, ApexCharts …) per YAML</span></div><button data-act="addemb">Einfügen</button></div>
       <div class="row"><div class="t"><b>Eigene Karte</b><span>Wert, Verlauf oder Schalter einer Entität</span></div><button data-act="addcustroom">Wählen</button></div>
-      <div class="row"><div class="t"><b>Entität anheften</b><span>Erscheint unter „Aktiv jetzt“</span></div><button data-act="add">Wählen</button></div>
       <h4>Vorhandene Karten</h4>${rows || '<div class="hint">Keine Karten verfügbar.</div>'}
       <div class="hint" style="margin-top:8px">Jede hinzugefügte Karte ist ein eigener Block. Sie lässt sich überall zwischen die anderen Blöcke ziehen und in der Breite ändern.</div>
       <div class="row" style="border:0"><span></span><button class="sel" data-act="close">Fertig</button></div>`;
@@ -2166,11 +2160,6 @@ class LumoraCard extends HTMLElement {
       if (!Number.isNaN(t.getTime())) d = t;
     }
     return !d || d.getTime() >= cut.getTime();
-  }
-  _pkgMini(pk) {
-    const first = pk.dhl.find((x) => !x.delivered) || pk.dhl[0] || pk.amz[0];
-    const sub = pk.today > 0 ? `${pk.today} heute in Zustellung` : (first && (first.short_status || first.status)) || '';
-    return `<div class="card" data-act="nav" data-v="more"><ha-icon icon="mdi:package-variant-closed"></ha-icon><div><b>${pk.n} Paket${pk.n === 1 ? '' : 'e'}</b><span>${esc(sub)}</span></div></div>`;
   }
   _pkgPanel(pk) {
     const rows = [...pk.dhl.map((x) => ({ t: `DHL ${x.tracking_id || ''}`, s: x.short_status || x.status, p: typeof x.progress === 'number' ? x.progress / 5 : null })),
@@ -2958,7 +2947,10 @@ _more() {
       c = `<h2>${esc(SLOTS[k].l)}</h2><input class="srch" placeholder="Entität suchen" value="${esc(this._q)}"><div class="row" data-act="srcset" data-k="${k}" data-id=""><div class="t"><b>Automatisch erkennen</b></div></div><div class="row" data-act="srcset" data-k="${k}" data-id="-"><div class="t"><b>Nicht verwenden</b></div></div><div class="list"></div>`;
     } else if (this._sheet === 'chips') {
       const CH = [['lights', 'Lampen an'], ['outdoor', 'Außentemperatur'], ['motion', 'Bewegung'], ['count', 'Zähler der Meldungen'], ['warn', 'Wetter- und NINA-Warnungen'], ['ice', 'Eiswarnung'], ['bike', 'Fahrrad'], ['pollen', 'Pollen'], ['trav', 'Fahrzeiten']];
-      c = `<h2>Chips</h2><div class="hint">Warnungen stehen schon in der Meldungszeile, deshalb sind sie hier standardmäßig aus.</div>${CH.map(([k, l]) => `<div class="row"><div class="t"><b>${l}</b></div><button class="${this._chipOn(k) ? 'sel' : ''}" data-act="chip" data-k="${k}">${this._chipOn(k) ? 'An' : 'Aus'}</button></div>`).join('')}`;
+      c = `<h2>Chips</h2><div class="hint">Warnungen stehen schon in der Meldungszeile, deshalb sind sie hier standardmäßig aus.</div>${CH.map(([k, l]) => `<div class="row"><div class="t"><b>${l}</b></div><button class="${this._chipOn(k) ? 'sel' : ''}" data-act="chip" data-k="${k}">${this._chipOn(k) ? 'An' : 'Aus'}</button></div>`).join('')}
+        <h4>Eigene Chips</h4><div class="hint">Beliebige Entität als Chip. „Nur bei aktiv“ blendet ihn aus, solange die Entität aus, zu oder inaktiv ist.</div>
+        ${this._set.pinned.map((p) => { const st = this._hass.states[p.entity]; return `<div class="row"><ha-icon icon="${st ? this._icon(st) : 'mdi:help-circle-outline'}"></ha-icon><div class="t"><b>${esc((st && st.attributes.friendly_name) || p.entity)}</b><span>${esc(p.entity)}</span></div><button class="${p.only ? 'sel' : ''}" data-act="ponly" data-id="${esc(p.entity)}">Nur bei aktiv</button><button data-act="unpin" data-id="${esc(p.entity)}">Entfernen</button></div>`; }).join('')}
+        <div class="row"><div class="t"><b>Chip hinzufügen</b><span>Entität wählen, optional nur bei aktiv</span></div><button data-act="chipadd">Wählen</button></div>`;
     } else if (this._sheet === 'warns') {
       const inf = this._inf(); const h = this._hass; const ice = this._ice(); const bk = h.states[inf.bike]; const pl = h.states[inf.pollen];
       const row = (ic, t, sub) => `<div class="row"><ha-icon icon="${ic}"></ha-icon><div class="t"><b>${esc(t)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div></div>`;
@@ -2977,12 +2969,13 @@ _more() {
       c = `<h2>Lichter an</h2>${l.map((x) => `<div class="row"><ha-icon icon="mdi:lightbulb"></ha-icon><div class="t"><b>${esc(x.attributes.friendly_name)}</b><span>${esc(this._aname(this._areaOf(x.entity_id)))}</span></div><button data-act="toggle" data-id="${x.entity_id}">Aus</button></div>`).join('') || '<div class="empty">Alle Lichter sind aus.</div>'}
         ${l.length ? '<div class="row" style="border:0"><button class="sel" data-act="lightsoff">Alle ausschalten</button></div>' : ''}`;
     } else if (this._sheet === 'add') {
-      c = `<h2>Karte hinzufügen</h2><input class="srch" placeholder="Entität suchen" value="${esc(this._q)}">
+      const cm = this._chipMode;
+      c = `<h2>${cm ? 'Chip hinzufügen' : 'Karte hinzufügen'}</h2><input class="srch" placeholder="Entität suchen" value="${esc(this._q)}">
         <div class="tabs">${Object.keys(FLT).map((k) => `<button class="pill ${this._flt === k ? 'sel' : ''}" data-act="flt" data-k="${k}">${FLT_LABEL[k]}</button>`).join('')}</div>
-        <div class="row"><div class="t"><b>Nur anzeigen, wenn aktiv</b><span>Karte erscheint nur bei Zustand an, offen oder läuft</span></div><button class="${this._only ? 'sel' : ''}" data-act="onlyact">${this._only ? 'An' : 'Aus'}</button></div>
+        ${cm ? `<div class="row"><div class="t"><b>Nur anzeigen, wenn aktiv</b><span>Chip erscheint nur bei Zustand an, offen oder läuft</span></div><button class="${this._only ? 'sel' : ''}" data-act="onlyact">${this._only ? 'An' : 'Aus'}</button></div>` : `<div class="hint">Eine gewählte Entität wird eine eigene Karte. Für Chips: Design, Chips.</div>
         <div class="row"><div class="t"><b>Gerätekarte</b><span>Staubsauger, PV-Übersicht und mehr: Entitäten werden automatisch gefunden</span></div><button data-act="adddv">Wählen</button></div>
         <div class="row"><div class="t"><b>Fremdkarte einbetten</b><span>Beliebige Karte (HACS, Mushroom, ApexCharts …) per YAML anzeigen</span></div><button data-act="addemb">Einfügen</button></div>
-        <div class="row"><div class="t"><b>Als eigene Karte</b><span>Wert, Verlauf oder Schalter statt Kachel</span></div><button class="${this._cust ? 'sel' : ''}" data-act="ascust">${this._cust ? 'An' : 'Aus'}</button></div>
+        `}
         <div class="list"></div>`;
     } else if (this._sheet === 'place') {
       const cur = this._allReg().find((x) => x.id === this._plId); const at = cur ? cur.pl : '';
@@ -3084,7 +3077,7 @@ _more() {
     const blocks = this._ord('lookb', L.blocks, (b) => b.id).map((b, i, a) => { const isC = b.id.startsWith('c:'); const d = [b.id, isC ? (cnames[b.id.slice(2)] || 'Karte nicht verfügbar') : (BLOCK_DEF.find((x) => x[0] === b.id) || [0, b.id])[1]]; const wl = (BLOCK_W.find((x) => x[0] === b.w) || [0, 'Voll'])[1];
       return `<div class="row"><div class="t"><b>${d[1]}</b></div><div class="lkb"><button data-act="mv" data-s="lookb" data-id="${esc(b.id)}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Nach oben"><ha-icon icon="mdi:arrow-up"></ha-icon></button><button data-act="mv" data-s="lookb" data-id="${esc(b.id)}" data-d="1" ${i === a.length - 1 ? 'disabled' : ''} aria-label="Nach unten"><ha-icon icon="mdi:arrow-down"></ha-icon></button><button data-act="blkw" data-id="${esc(b.id)}" aria-label="Breite">${wl}</button><button data-act="lkblk" data-id="${esc(b.id)}" aria-label="Einstellungen"><ha-icon icon="mdi:cog-outline"></ha-icon></button><button class="${b.on ? 'sel' : ''}" data-act="blkon" data-id="${esc(b.id)}">${b.on ? 'An' : 'Aus'}</button>${isC ? `<button data-act="lkcdel" data-id="${esc(b.id)}" aria-label="Entfernen"><ha-icon icon="mdi:close"></ha-icon></button>` : ''}</div></div>`; }).join('');
     return `<h2>Design</h2>
-      <h4>Vorlagen</h4><div class="lkc">${[['sand', 'Sand'], ['forest', 'Wald'], ['sage', 'Salbei (Kacheln)']].map(([k, l]) => `<button class="pill" data-act="lkpre" data-k="${k}">${l}</button>`).join('')}</div>
+      <h4>Vorlagen</h4><div class="lkc">${[['sand', 'Sand'], ['sage', 'Salbei (Kacheln)']].map(([k, l]) => `<button class="pill" data-act="lkpre" data-k="${k}">${l}</button>`).join('')}</div>
       <div class="hint" style="margin-top:8px">Eine Vorlage setzt Startseite, Farbthema, Rundung, Kartenstil und Schrift auf einmal. Danach lässt sich alles einzeln anpassen.</div>
       <h4>Startseite</h4>${this._lkSeg('layout', [['classic', 'Klassisch'], ['tiles', 'Kacheln']], L.layout)}
       <h4>Farben</h4>${this._lkSeg('theme', LOOK_THEMES, L.theme)}
@@ -3129,8 +3122,7 @@ _more() {
       const row = (name, sub, idc, size, hd, moveable) => `<div class="row"><div class="t"><b>${esc(name)}</b><span>${esc(sub)}${hd ? ' · ausgeblendet' : ''}</span></div><div class="lkb">${moveable ? `<button data-act="placeopen" data-id="${esc(idc)}">Ort</button>` : ''}<button data-act="size" data-id="${esc(idc)}" data-d="${size}" aria-label="Größe"><ha-icon icon="${SIZE_ICON[size]}"></ha-icon></button><button class="${hd ? '' : 'sel'}" data-act="hidee" data-id="${esc(idc)}">${hd ? 'Aus' : 'An'}</button></div></div>`;
       const rows = all.map((x) => { seen[x.def.id] = (seen[x.def.id] || 0) + 1; const nm = cnt[x.def.id] > 1 ? `${x.def.label} ${seen[x.def.id]}` : x.def.label; const pl = x.pl === 'home' ? 'Zuhause' : x.pl === 'more' ? 'Mehr' : String(x.pl).startsWith('area:') ? this._aname(String(x.pl).slice(5)) : x.pl; return row(nm, pl, x.id, x.size, s.hidden.includes(x.id), true); }).join('');
       c = `<div class="hint">Alle Karten mit ihrem Ort. „Ort“ legt eine Karte auf Zuhause, Mehr oder in einen Raum. Hier erscheinen nur Karten, die auf Zuhause liegen. Größe und Ein/Aus gelten für jede Karte einzeln, die Reihenfolge ändert sich im Bearbeiten-Modus per Ziehen.</div>${rows}`;
-    } else if (id === 'active') c = `<div class="hint">Zeigt, was gerade aktiv ist (laufende Geräte, Medien, Drucker, Pakete) und deine angehefteten Entitäten. Ohne Inhalt verschwindet der Block. Die Lichter-Karte entfällt, wenn die Kennzahl Beleuchtung aktiv ist. Anheften und Verschieben gehen im Bearbeiten-Modus.</div><div class="lkc"><button class="pill" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte anheften</button></div>`;
-    else if (id === 'cams') c = `<div class="hint">Kameras auf der Startseite. Welche, legst du hier fest.</div><div class="lkc"><button class="pill" data-act="hc"><ha-icon icon="mdi:cctv"></ha-icon>Kameras wählen</button></div>`;
+    } else if (id === 'cams') c = `<div class="hint">Kameras auf der Startseite. Welche, legst du hier fest.</div><div class="lkc"><button class="pill" data-act="hc"><ha-icon icon="mdi:cctv"></ha-icon>Kameras wählen</button></div>`;
     return `<div class="lkc" style="margin-bottom:6px"><button class="pill" data-act="look"><ha-icon icon="mdi:chevron-left"></ha-icon>Design</button></div><h2>${esc(d[1])}</h2>${c}<div class="row" style="border:0;margin-top:10px"><span></span><button class="sel" data-act="close">Fertig</button></div>`;
   }
   _fillList() {
@@ -4117,7 +4109,8 @@ _more() {
       case 'unsnooze': delete s.snooze[id]; this._save(); break;
       case 'ntf': { const k = t.dataset.k; const o = this._ntfOpts(k); const cur = k === 'min' ? s.notify.min : s.notify[k]; s.notify[k] = o[(Math.max(0, o.indexOf(cur)) + 1) % o.length]; this._ntAt = 0; this._save(); break; }
       case 'unhide': s.excludeEntities = s.excludeEntities.filter((x) => x !== id); this._save(); break;
-      case 'add': this._sheet = 'add'; this._q = ''; this._flt = 'all'; this._cust = false; break;
+      case 'add': this._sheet = 'add'; this._q = ''; this._flt = 'all'; this._cust = false; this._chipMode = false; break;
+      case 'chipadd': this._sheet = 'add'; this._q = ''; this._flt = 'all'; this._only = false; this._chipMode = true; break;
       case 'resetmine': this._resetMine(); break;
       case 'roomact': this._roomAct = !this._roomAct; break;
       case 'rmlight': { const l = this._areaEnts(id).filter((x) => dom(x.entity_id) === 'light'); h.callService('light', l.some((x) => x.state === 'on') ? 'turn_off' : 'turn_on', { entity_id: l.map((x) => x.entity_id) }); break; }
@@ -4155,15 +4148,17 @@ _more() {
       case 'flt': this._flt = t.dataset.k; this._render(); return;
       case 'onlyact': this._only = !this._only; this._render(); return;
       case 'pick': {
-        if (this._cust || this._view === 'rooms') {
+        if (this._chipMode) {
+          if (!s.pinned.some((p) => p.entity === id)) s.pinned.push({ entity: id, only: this._only });
+          this._chipMode = false; this._only = false; this._sheet = 'chips'; this._save(); break;
+        }
+        {
           const st = h.states[id]; const d = dom(id); const num = st && !isNaN(parseFloat(st.state));
           const cid = `cu${Date.now().toString(36)}`;
           s.custom.push({ id: cid, entity: id, kind: ['light', 'switch', 'fan', 'input_boolean', 'humidifier', 'cover'].includes(d) ? 'toggle' : num ? 'spark' : 'value', hours: 24, title: '' });
           this._placeNew(cid);
           this._sheet = 'cc'; this._ccId = cid; this._cust = false; this._save(); break;
         }
-        if (!s.pinned.some((p) => p.entity === id)) s.pinned.push({ entity: id, only: this._only });
-        this._save(); this._sheet = null; this._only = false; break;
       }
       case 'ponly': { const q = s.pinned.find((x) => x.entity === id); if (q) q.only = !q.only; this._save(); break; }
       case 'unpin': s.pinned = s.pinned.filter((p) => p.entity !== id); this._save(); break;
