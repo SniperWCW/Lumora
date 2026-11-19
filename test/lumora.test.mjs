@@ -1297,3 +1297,40 @@ test('Dreo-Gerätekarte: Heizung mit Soll-Tasten und Modi, nicht verfügbares Ge
   assert.match(off, /Nicht verfügbar/);
   assert.doesNotMatch(off, /data-act="drc"/);
 });
+
+test('Dreo-Gerätekarte: echte Entitäten des DR-HHM001S werden richtig zugeordnet', () => {
+  const P = 'luftbefeuchter_buro';
+  const s = {
+    [`humidifier.${P}`]: st('on', { attributes: { friendly_name: 'Luftbefeuchter Büro', min_humidity: 30, max_humidity: 90, available_modes: ['normal', 'auto', 'sleep'], current_humidity: 46, humidity: 60, mode: 'sleep' } }),
+    [`sensor.${P}_luftfeuchtigkeit`]: st('46', { attributes: { friendly_name: 'Luftbefeuchter Büro Luftfeuchtigkeit', device_class: 'humidity', unit_of_measurement: '%' } }),
+    [`sensor.${P}_filter_aktiv`]: st('inactive', { attributes: { friendly_name: 'Luftbefeuchter Büro Filter aktiv', device_class: 'enum' } }),
+    [`sensor.${P}_filterlebensdauer`]: st('100', { attributes: { friendly_name: 'Luftbefeuchter Büro Filterlebensdauer', unit_of_measurement: '%' } }),
+    [`sensor.${P}_nutzung_seit_reinigung`]: st('0', { attributes: { friendly_name: 'Luftbefeuchter Büro Nutzung seit Reinigung', device_class: 'duration', unit_of_measurement: 'h' } }),
+    [`sensor.${P}_ziel_luftfeuchtigkeit_erreicht`]: st('yes', { attributes: { friendly_name: 'Luftbefeuchter Büro Ziel-Luftfeuchtigkeit erreicht', device_class: 'enum' } }),
+    [`binary_sensor.${P}_wasserstand`]: st('off', { attributes: { friendly_name: 'Luftbefeuchter Büro Wasserstand', device_class: 'problem' } }),
+    [`number.${P}_nebelstufe`]: st('4', { attributes: { friendly_name: 'Luftbefeuchter Büro Nebelstufe', min: 0, max: 6 } }),
+    [`number.${P}_ziel_luftfeuchtigkeit_schlafmodus`]: st('70', { attributes: { friendly_name: 'Luftbefeuchter Büro Ziel-Luftfeuchtigkeit (Schlafmodus)', min: 30, max: 90 } }),
+    [`number.${P}_umgebungslicht_feuchtigkeitsschwelle_niedrig`]: st('30', { attributes: { friendly_name: 'Luftbefeuchter Büro Umgebungslicht Feuchtigkeitsschwelle niedrig' } }),
+    [`switch.${P}_bedienfeld_ton`]: st('off', { attributes: { friendly_name: 'Luftbefeuchter Büro Bedienfeld-Ton' } }),
+    [`switch.${P}_display_beleuchtung`]: st('on', { attributes: { friendly_name: 'Luftbefeuchter Büro Display-Beleuchtung' } }),
+    [`switch.${P}_zeitplan`]: st('off', { attributes: { friendly_name: 'Luftbefeuchter Büro Zeitplan' } }),
+    [`light.${P}_umgebungslicht`]: st('off', { attributes: { friendly_name: 'Luftbefeuchter Büro Umgebungslicht' } }),
+  };
+  const c = dreoCard(s, `humidifier.${P}`); const iv = c._set.devices[0]; const F = c._dvMap(iv);
+  assert.equal(F.filter, `sensor.${P}_filterlebensdauer`);
+  assert.equal(F.clean, `sensor.${P}_nutzung_seit_reinigung`);
+  assert.equal(F.water, `binary_sensor.${P}_wasserstand`);
+  assert.equal(F.fog, `number.${P}_nebelstufe`);
+  assert.equal(F.sleeptgt, `number.${P}_ziel_luftfeuchtigkeit_schlafmodus`);
+  assert.equal(F.display, `switch.${P}_display_beleuchtung`);
+  assert.equal(F.mute, `switch.${P}_bedienfeld_ton`);
+  assert.equal(F.sched, `switch.${P}_zeitplan`);
+  assert.equal(F.light, `light.${P}_umgebungslicht`);
+  assert.equal(F.lock, null);
+  const html = L.DEVTPL.dreo.render(c, iv, F, s[`humidifier.${P}`]);
+  assert.match(html, /An · Schlaf · Zielfeuchte erreicht/);
+  assert.match(html, /Ziel Schlafmodus/);
+  assert.match(html, /Seit Reinigung/);
+  assert.doesNotMatch(html, /Wassertank leer/);
+  assert.doesNotMatch(html, /Schlafmodus<\/span><div>.*Umgebungslicht/);
+});

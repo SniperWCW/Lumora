@@ -5367,12 +5367,16 @@ registerDevice({
     hum: { l: 'Luftfeuchte', dom: 'sensor', dc: 'humidity' },
     temp: { l: 'Temperatur', dom: 'sensor', dc: 'temperature' },
     pm: { l: 'Luftqualität (PM2.5)', dom: 'sensor', re: /pm_?2|pm25|air.?quality|luftqual/ },
-    filter: { l: 'Filter', dom: 'sensor', re: /filter/ },
+    filter: { l: 'Filter', dom: 'sensor', re: /filter/, not: /aktiv|active/ },
+    clean: { l: 'Nutzung seit Reinigung', dom: 'sensor', dc: 'duration', re: /reinig|clean/ },
+    reached: { l: 'Zielfeuchte erreicht', dom: 'sensor', re: /erreicht|reached/ },
     water: { l: 'Wassertank', dom: ['binary_sensor', 'sensor'], re: /water|wasser|tank|reservoir/ },
     fog: { l: 'Nebelstufe', dom: 'number', re: /fog|mist|nebel/ },
+    sleeptgt: { l: 'Zielfeuchte Schlafmodus', dom: 'number', re: /schlaf|sleep/, not: /licht|light|schwelle/ },
     lock: { l: 'Kindersicherung', dom: 'switch', re: /child|kinder|lock|sperre/ },
     display: { l: 'Display', dom: 'switch', re: /display|screen|anzeige|led/, not: /light|licht/ },
-    mute: { l: 'Ton aus', dom: 'switch', re: /mute|sound|beep|buzzer|stumm|ton/ },
+    mute: { l: 'Bedienton', dom: 'switch', re: /mute|sound|beep|buzzer|stumm|(?:^|[^a-z])ton(?:[^a-z]|$)/ },
+    sched: { l: 'Zeitplan', dom: 'switch', re: /zeitplan|schedule|timer/ },
     osc: { l: 'Schwenken', dom: 'switch', re: /oscill|schwenk|swing/ },
     light: { l: 'Licht', dom: 'light' },
   },
@@ -5391,7 +5395,8 @@ registerDevice({
     else if (d0 === 'climate' && curTemp !== null) big = `${c._de(curTemp, 1)} °`;
     else if (d0 === 'fan' && on && num(a.percentage) !== null) big = `${c._de(num(a.percentage), 0)} %`;
     const mode = d0 === 'humidifier' ? a.mode : a.preset_mode;
-    const sub = gone ? 'Nicht verfügbar' : [d0 === 'climate' ? (DR_HVAC[st.state] || st.state) : on ? 'An' : 'Aus', on && mode ? drLabel(mode) : ''].filter(Boolean).join(' · ');
+    const rs = S('reached'); const reached = rs && ['yes', 'on', 'true'].includes(String(rs.state).toLowerCase());
+    const sub = gone ? 'Nicht verfügbar' : [d0 === 'climate' ? (DR_HVAC[st.state] || st.state) : on ? 'An' : 'Aus', on && mode ? drLabel(mode) : '', on && reached ? 'Zielfeuchte erreicht' : ''].filter(Boolean).join(' · ');
     const icon = d0 === 'humidifier' ? 'mdi:air-humidifier' : d0 === 'climate' ? (hv === 'cooling' ? 'mdi:snowflake' : 'mdi:heat-wave') : on ? 'mdi:fan' : 'mdi:fan-off';
     const ws = S('water'); const wLow = ws && dom(ws.entity_id) === 'binary_sensor' && ws.state === 'on';
     const warn = wLow ? '<div class="dverr"><ha-icon icon="mdi:water-alert-outline"></ha-icon><div>Wassertank leer oder fehlt</div></div>' : '';
@@ -5418,9 +5423,10 @@ registerDevice({
       return `${pw ? `<div class="dvf">${pw}</div>` : ''}${h}`;
     };
     const stat = (l, s2, d) => dvStat(c, l, s2, d);
-    const tiles = [d0 !== 'humidifier' ? stat('Luftfeuchte', hs, 0) : '', d0 !== 'climate' ? stat('Temperatur', ts, 1) : '', stat('Luftqualität', S('pm'), 0), stat('Filter', S('filter'), 0), ws && !wLow && dom(ws.entity_id) === 'sensor' ? stat('Wassertank', ws, 0) : ''].join('');
-    const fg = S('fog'); const fogRow = fg ? row('Nebelstufe', fg.entity_id, 'knum', 1, c._dvVal(fg, 0)).replace(/data-d=/g, 'data-s="1" data-d=') : '';
-    const sw = [['lock', 'mdi:lock-outline', 'Kindersicherung'], ['display', 'mdi:monitor-shimmer', 'Display'], ['mute', 'mdi:volume-off', 'Ton aus'], ['osc', 'mdi:rotate-3d-variant', 'Schwenken'], ['light', 'mdi:lightbulb-outline', 'Licht']].map(([k, ic, l]) => {
+    const tiles = [d0 !== 'humidifier' ? stat('Luftfeuchte', hs, 0) : '', d0 !== 'climate' ? stat('Temperatur', ts, 1) : '', stat('Luftqualität', S('pm'), 0), stat('Filter', S('filter'), 0), stat('Seit Reinigung', S('clean'), 0), ws && !wLow && dom(ws.entity_id) === 'sensor' ? stat('Wassertank', ws, 0) : ''].join('');
+    const fg = S('fog'); const sl = d0 === 'humidifier' && a.mode === 'sleep' ? S('sleeptgt') : null;
+    const fogRow = (fg ? row('Nebelstufe', fg.entity_id, 'knum', 1, c._dvVal(fg, 0)).replace(/data-d=/g, 'data-s="1" data-d=') : '') + (sl ? row('Ziel Schlafmodus', sl.entity_id, 'knum', 5, c._dvVal(sl, 0)).replace(/data-d=/g, 'data-s="50" data-d=') : '');
+    const sw = [['lock', 'mdi:lock-outline', 'Kindersicherung'], ['display', 'mdi:monitor-shimmer', 'Display'], ['mute', 'mdi:volume-high', 'Bedienton'], ['sched', 'mdi:calendar-clock', 'Zeitplan'], ['osc', 'mdi:rotate-3d-variant', 'Schwenken'], ['light', 'mdi:lightbulb-outline', 'Licht']].map(([k, ic, l]) => {
       const s2 = S(k); return s2 ? `<button class="pill ${s2.state === 'on' ? 'sel' : ''}" data-act="toggle" data-id="${s2.entity_id}"><ha-icon icon="${ic}"></ha-icon>${l}</button>` : '';
     }).join('');
     return `<div class="dvc ${run ? 'run' : ''}"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="${icon}"></ha-icon></div><div class="tt"><b>${esc(iv.title || a.friendly_name || id)}</b><span>${esc(sub)}</span></div>${big ? `<div class="big">${esc(big)}</div>` : ''}</div>
