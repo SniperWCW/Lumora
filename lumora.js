@@ -793,6 +793,7 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .wct .wcs.in{background:none;opacity:.8}.wct .wcs.out{background:rgba(120,150,200,.35)}.wct .wcs.todo{background:rgba(220,160,50,.45)}
 .wct small{font-size:12px;color:var(--fg);opacity:.75}
 .sdc{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;flex-wrap:wrap}.sdc>div{display:flex;align-items:center;gap:6px}.sdc b{min-width:64px;text-align:center}.sdc .pill{display:inline-flex;align-items:center;gap:4px}.sdc .pill ha-icon{--mdc-icon-size:16px}
+.dvt{display:inline-flex;align-items:center;gap:4px}.dvt ha-icon{--mdc-icon-size:18px}
 .sdm small{display:block;font-size:11px;color:var(--fg2);margin-bottom:4px}.sdh{display:flex;align-items:flex-end;gap:3px;height:36px}.sdh i{flex:1;min-width:0;background:var(--b);border-radius:2px 2px 0 0;opacity:.85}
 .kx .dvm b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kxc>.kxr{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:default}.kxr>div{display:flex;align-items:center;gap:6px}.kxr b{min-width:56px;text-align:center}
 .kxs{display:flex;gap:10px;flex-wrap:wrap}.kxs>div{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;min-width:44px}.kxs i{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);box-sizing:border-box;background:var(--line)}.kxs .on i{border-color:var(--b);box-shadow:0 0 0 2px var(--b)}.kxs small{font-size:11px;color:var(--fg2)}
@@ -1334,7 +1335,7 @@ class LumoraCard extends HTMLElement {
       else if (this._auto().tracked.has(id)) parts.push(id + h.states[id].state);
       else if (cuSet.has(id) || this._set.pinned.some((p) => p.entity === id)) parts.push(id + h.states[id].state);
     }
-    for (const iv of this._dvAll()) { try { const m = this._dvMap(iv); parts.push(iv.main + (h.states[iv.main] ? h.states[iv.main].state + (h.states[iv.main].attributes.fan_speed || '') + (DEVTPL[iv.type].attrSig ? h.states[iv.main].last_updated : '') : '')); Object.values(m).forEach((x) => { if (x && h.states[x]) parts.push(x + h.states[x].state + (h.states[x].attributes.color_hex || '')); }); } catch (_) { /* ignore */ } }
+    for (const iv of this._dvAll()) { try { const m = this._dvMap(iv); parts.push(iv.main + (h.states[iv.main] ? h.states[iv.main].state + (h.states[iv.main].attributes.fan_speed || '') + (DEVTPL[iv.type].attrSig ? h.states[iv.main].last_updated : '') : '')); Object.values(m).forEach((x) => { if (x && h.states[x]) parts.push(x + h.states[x].state + (h.states[x].attributes.color_hex || '') + (h.states[x].attributes.humidex_felt === undefined ? '' : h.states[x].attributes.humidity)); }); } catch (_) { /* ignore */ } }
     if (this._dvAll().some((x) => x.type === 'packstation')) { for (const id in h.states) if (PS_RE.test(id)) parts.push(id + h.states[id].state); }
     if (this._dvAll().some((x) => x.type === 'waste')) parts.push(`wc${new Date().toDateString()}${new Date().getHours()}`);
     if (['home', 'more', 'rooms'].includes(this._view)) { parts.push(this._plSig()); parts.push(this._prSig()); }
@@ -3335,7 +3336,7 @@ _more() {
     return v;
   }
   /* Feld über die Haupt-Entität ableiten (fs.sib liefert die ID oder null), z. B. bei Integrationen ohne gemeinsames Gerät pro Raum */
-  _dvSib(iv, fs) { let id = null; try { id = fs.sib(iv.main, this._hass.states[iv.main], this._hass.states); } catch (_) { /* ignore */ } return id && this._hass.states[id] ? id : null; }
+  _dvSib(iv, fs) { let id = null; try { id = fs.sib(iv.main, this._hass.states[iv.main], this._hass.states, this); } catch (_) { /* ignore */ } return id && this._hass.states[id] ? id : null; }
   _dvS(id) { const st = id && this._hass.states[id]; return st && !['unavailable', 'unknown', ''].includes(st.state) ? st : null; }
   _dvVal(st, d) {
     const v = parseFloat(st.state); const u = st.attributes.unit_of_measurement || '';
@@ -4115,7 +4116,7 @@ _more() {
     if (act === 'noop') return;
     e.stopPropagation();
     if (Date.now() - (this._dgAt || 0) < 450) return;
-    if (this._edit && ['info', 'toggle', 'vstart', 'vdock', 'vlocate', 'vfan', 'qrun', 'knum', 'drh', 'drp', 'dro', 'drm', 'drc', 'gotoroom', 'evall', 'heatall', 'lights'].includes(act)) return;
+    if (this._edit && ['info', 'toggle', 'vstart', 'vdock', 'vlocate', 'vfan', 'qrun', 'knum', 'drp', 'dro', 'drm', 'drc', 'gotoroom', 'evall', 'heatall', 'lights'].includes(act)) return;
     if (act.startsWith('pr-')) { if (this._edit) return; if (this._printClick(t, act)) { this._sig = ''; this._render(); } return; }
     if (act.startsWith('pl-')) { if (this._edit) return; if (this._poolClick(t, act)) { this._sig = ''; this._render(); } return; }
     if (act.startsWith('fp-')) { if (this._edit) return; if (this._fpClick(t, act)) { this._sig = ''; this._render(); } return; }
@@ -4178,13 +4179,7 @@ _more() {
         const v = Math.round(Math.max(mn, Math.min(mx, base + Number(t.dataset.d))) * 10) / 10;
         h.callService('climate', 'set_temperature', { entity_id: id, temperature: v }); return;
       }
-      case 'drh': { /* Dreo Befeuchter: Zielfeuchte ± */
-        const n = h.states[id]; if (!n) return; const a = n.attributes;
-        const mn = Number.isFinite(Number(a.min_humidity)) ? Number(a.min_humidity) : 30; const mx = Number.isFinite(Number(a.max_humidity)) ? Number(a.max_humidity) : 90;
-        const cur = Number(a.humidity); const base = Number.isFinite(cur) && a.humidity !== null ? cur : Number(a.current_humidity);
-        if (!Number.isFinite(base)) return;
-        h.callService('humidifier', 'set_humidity', { entity_id: id, humidity: Math.round(Math.max(mn, Math.min(mx, base + Number(t.dataset.d)))) }); return;
-      }
+      case 'dvfold': { const iv = s.devices.find((x) => x.id === id); if (!iv) return; const o = this._dvOpen || (this._dvOpen = {}); o[id] = !dvFoldOpen(this, iv); this._sig = ''; this._render(); return; }
       case 'drp': { /* Dreo Ventilator: Stufe ± (unter 1 % = aus) */
         const n = h.states[id]; if (!n) return; const cur = Number(n.attributes.percentage) || 0;
         const v = Math.max(0, Math.min(100, cur + Number(t.dataset.d)));
@@ -4843,6 +4838,7 @@ registerDevice({
   type: 'smartdome', label: 'Heizung (Smartdome)', icon: 'mdi:radiator', desc: 'Raumstatus, Fensterpause, Pausenzeit und gesparte Gas-Menge (Integration Smartdome Heat Control)', size: 'w',
   main: { dom: 'sensor', dc: 'enum', platform: 'smartdome_heat_control', prefer: /status/ },
   fields: { climate: { l: 'Thermostat (Steuerung)', dom: 'climate', platform: 'smartdome_heat_control' } },
+  opts: [{ k: 'open', l: 'Details (Pause, Gas, Verlauf) standardmäßig aufgeklappt', def: 0, bool: true }],
   render: (c, iv, F, st) => {
     const a = st.attributes; const id = iv.main;
     const name = iv.title || String(a.friendly_name || id).replace(/\s*[–-]\s*Status$/i, '');
@@ -4863,14 +4859,15 @@ registerDevice({
     const min = (k) => { const v = Number(a[k]); return Number.isFinite(v) ? hmMin(Math.round(v)) : null; };
     const gas = (k) => { const v = Number(a[k]); return Number.isFinite(v) ? `${c._de(v, v < 10 ? 2 : 1)} m³` : null; };
     const has = a.window_pause_today_min !== undefined;
-    const tiles = [Number.isFinite(tgt) && !ctl ? tile('Soll', `${c._de(tgt, 1)} °C`) : '']
-      .concat(has ? [tile('Pause heute', min('window_pause_today_min')), tile('Gas heute', gas('gas_saved_today_m3')), tile('Gas Monat', gas('gas_saved_month_m3')), tile('Gas Jahr', gas('gas_saved_year_m3')), tile('Gas gesamt', gas('gas_saved_total_m3'))] : []).join('');
+    const soll = Number.isFinite(tgt) && !ctl ? tile('Soll', `${c._de(tgt, 1)} °C`) : '';
+    const tiles = has ? [tile('Pause heute', min('window_pause_today_min')), tile('Gas heute', gas('gas_saved_today_m3')), tile('Gas Monat', gas('gas_saved_month_m3')), tile('Gas Jahr', gas('gas_saved_year_m3')), tile('Gas gesamt', gas('gas_saved_total_m3'))].join('') : '';
     const hist = Array.isArray(a.window_pause_history) ? a.window_pause_history.map(Number).filter(Number.isFinite) : [];
     const mx = Math.max(1, ...hist);
     const bars = hist.length && hist.some((v) => v > 0)
       ? `<div class="sdm"><small>Pause pro Tag, letzte ${hist.length} Tage</small><div class="sdh">${hist.map((v) => `<i title="${hmMin(Math.round(v))}" style="height:${Math.max(4, Math.round((v / mx) * 100))}%"></i>`).join('')}</div></div>` : '';
+    const open = dvFoldOpen(c, iv); const det = tiles || bars;
     return `<div class="dvc ${run ? 'run' : ''}"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="${pause ? 'mdi:window-open-variant' : run ? 'mdi:radiator' : 'mdi:radiator-off'}"></ha-icon></div><div class="tt"><b>${esc(name)}</b><span>${esc(sub)}</span></div>${big}</div>
-      ${warn}${ctl}${tiles ? `<div class="dvs">${tiles}</div>` : ''}${bars}</div>`;
+      ${warn}${ctl}${soll ? `<div class="dvs">${soll}</div>` : ''}${det && open ? `${tiles ? `<div class="dvs">${tiles}</div>` : ''}${bars}` : ''}${det ? dvFoldBtn(iv, open, 'Details') : ''}</div>`;
   },
 });
 registerCard({ id: 'proxmox', label: 'Proxmox', icon: 'mdi:server', size: 'w', items: (c) => {
@@ -5223,6 +5220,9 @@ const dvOpt = (iv, k) => {
   const o = (DEVTPL[iv.type].opts || []).find((x) => x.k === k); if (!o) return undefined;
   const v = iv.opts && iv.opts[k]; return v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v)) ? Math.max(o.min ?? -Infinity, Math.min(o.max ?? Infinity, Number(v))) : o.def;
 };
+/* Einklappbare Details einer Gerätekarte: Zustand pro Karte im Speicher, Vorgabe über die Option „open“ */
+const dvFoldOpen = (c, iv) => { const o = c._dvOpen || {}; return iv.id in o ? !!o[iv.id] : !!dvOpt(iv, 'open'); };
+const dvFoldBtn = (iv, open, label) => `<div class="dvf"><button class="pill dvt" data-act="dvfold" data-id="${iv.id}" aria-expanded="${open}"><ha-icon icon="mdi:chevron-${open ? 'up' : 'down'}"></ha-icon>${open ? 'Weniger' : label}</button></div>`;
 const mgCap = (s) => { const t = String(s || '').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
 const mgDate = (s) => { const p = String(s || '').slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : String(s || ''); };
 const mgDay = (s) => { const d = new Date(`${String(s).slice(0, 10)}T12:00:00`); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }); };
@@ -5365,11 +5365,21 @@ registerDevice({
    werden am selben Gerät gesucht und lassen sich im Zahnrad ändern. */
 const DR_MODE = { auto: 'Auto', manual: 'Manuell', sleep: 'Schlaf', normal: 'Normal', low: 'Niedrig', medium: 'Mittel', high: 'Hoch', turbo: 'Turbo', natural: 'Natürlich', baby: 'Baby', eco: 'Eco', comfort: 'Komfort', boost: 'Boost', none: 'Keine', hotair: 'Heißluft', coolair: 'Kaltluft', fan: 'Lüften', dry: 'Entfeuchten' };
 const DR_HVAC = { off: 'Aus', heat: 'Heizen', cool: 'Kühlen', auto: 'Auto', heat_cool: 'Auto', dry: 'Entfeuchten', fan_only: 'Lüften' };
+/* Raumklima-Sensor (Integration room_climate) zum Gerät: gleicher Bereich, sonst steht der Raumname im Geräte- oder Bereichsnamen */
+const drRoom = (id, st, states, c) => {
+  const ids = Object.keys(states).filter((k) => k.startsWith('sensor.room_climate_') && states[k].attributes.humidex_felt !== undefined);
+  if (!ids.length) return null;
+  const ar = c._areaOf(id); if (ar) { const hit = ids.find((k) => c._areaOf(k) === ar); if (hit) return hit; }
+  const txt = norm(`${id} ${(st && st.attributes.friendly_name) || ''} ${ar ? c._aname(ar) : ''}`);
+  return ids.find((k) => { const rn = norm(states[k].attributes.room_name || ''); return rn.length > 2 && txt.includes(rn); }) || null;
+};
 const drLabel = (m) => { const k = String(m).toLowerCase(); return DR_MODE[k] || (k.charAt(0).toUpperCase() + k.slice(1)).replace(/_/g, ' '); };
 registerDevice({
   type: 'dreo', label: 'Dreo (Befeuchter, Ventilator, Heizung, Klima)', icon: 'mdi:air-humidifier', desc: 'Dreo-Geräte (Integration hass-dreo): Ein/Aus, Zielwert, Modi, Luftfeuchte, Temperatur, Wassertank, Kindersicherung und mehr', size: 'w',
   main: { dom: ['humidifier', 'fan', 'climate'], platform: 'dreo' },
+  opts: [{ k: 'open', l: 'Details (Nebelstufe, Filter, Schalter) beim Befeuchter aufgeklappt', def: 0, bool: true }],
   fields: {
+    room: { l: 'Raumklima (Luftfeuchte im Raum)', dom: 'sensor', sib: drRoom },
     humid: { l: 'Befeuchter (Steuerung)', dom: 'humidifier' },
     fanent: { l: 'Ventilator (Steuerung)', dom: 'fan' },
     climate: { l: 'Heizung / Klima (Steuerung)', dom: 'climate' },
@@ -5397,7 +5407,8 @@ registerDevice({
     const run = on && (d0 !== 'climate' || ['heating', 'cooling', 'drying', 'fan'].includes(hv) || !hv);
     const ents = [id, F.humid, F.fanent, F.climate].filter((x, i, l) => x && c._hass.states[x] && l.indexOf(x) === i);
     const hs = S('hum'); const ts = S('temp'); const num = (v) => { const n = Number(v); return v !== null && v !== '' && Number.isFinite(n) ? n : null; };
-    const curHum = hs ? num(hs.state) : num(a.current_humidity);
+    const rm = S('room'); const roomHum = rm ? num(rm.attributes.humidity) : null; /* Befeuchter: Luftfeuchte des Raums, nicht die des Geräts */
+    const curHum = roomHum !== null ? roomHum : hs ? num(hs.state) : num(a.current_humidity);
     const curTemp = ts ? num(ts.state) : num(a.current_temperature);
     let big = '';
     if (d0 === 'humidifier' && curHum !== null) big = `${c._de(curHum, 0)} %`;
@@ -5409,16 +5420,14 @@ registerDevice({
     const icon = d0 === 'humidifier' ? 'mdi:air-humidifier' : d0 === 'climate' ? (hv === 'cooling' ? 'mdi:snowflake' : 'mdi:heat-wave') : on ? 'mdi:fan' : 'mdi:fan-off';
     const ws = S('water'); const wLow = ws && dom(ws.entity_id) === 'binary_sensor' && ws.state === 'on';
     const warn = wLow ? '<div class="dverr"><ha-icon icon="mdi:water-alert-outline"></ha-icon><div>Wassertank leer oder fehlt</div></div>' : '';
-    const pills = (eid, list, cur, act, lab) => (Array.isArray(list) && list.length ? `<div class="dvf">${list.map((m) => `<button class="pill ${String(m) === String(cur) ? 'sel' : ''}" data-act="${act}" data-id="${eid}" data-v="${esc(m)}">${esc(lab(m))}</button>`).join('')}</div>` : '');
+    const btns = (eid, list, cur, act, lab) => (Array.isArray(list) && list.length ? list.map((m) => `<button class="pill ${String(m) === String(cur) ? 'sel' : ''}" data-act="${act}" data-id="${eid}" data-v="${esc(m)}">${esc(lab(m))}</button>`).join('') : '');
+    const pills = (eid, list, cur, act, lab) => { const b = btns(eid, list, cur, act, lab); return b ? `<div class="dvf">${b}</div>` : ''; };
     const row = (l, eid, act, step, val) => `<div class="kxr"><span>${l}</span><div><button class="pill" data-act="${act}" data-id="${eid}" data-d="${-step}" aria-label="Weniger">−</button><b>${val}</b><button class="pill" data-act="${act}" data-id="${eid}" data-d="${step}" aria-label="Mehr">+</button></div></div>`;
     const ctl = (eid) => {
       const e = c._hass.states[eid]; const ea = e.attributes; const d = dom(eid); const off = e.state === 'off'; let h = '';
       const pw = d === 'climate' ? '' : `<button class="pill ${off ? '' : 'sel'}" data-act="toggle" data-id="${eid}"><ha-icon icon="mdi:power"></ha-icon>${off ? 'Einschalten' : 'Ausschalten'}</button>`;
-      if (d === 'humidifier') {
-        const t = num(ea.humidity); const stp = num(ea.target_humidity_step) > 0 ? num(ea.target_humidity_step) : 5;
-        h += row('Zielfeuchte', eid, 'drh', stp, t !== null && !off ? `${c._de(t, 0)} %` : '–');
-        h += pills(eid, ea.available_modes, ea.mode, 'drm', drLabel);
-      } else if (d === 'fan') {
+      if (d === 'humidifier') return `<div class="dvf">${pw}${btns(eid, ea.available_modes, ea.mode, 'drm', drLabel)}</div>`; /* kompakt: Ein/Aus und Modi in einer Zeile, keine Zielfeuchte */
+      if (d === 'fan') {
         const p = num(ea.percentage); const stp = num(ea.percentage_step) > 0 ? Math.max(1, Math.round(num(ea.percentage_step))) : 10;
         if (ea.percentage !== undefined) h += row('Stufe', eid, 'drp', stp, p !== null && !off ? `${c._de(p, 0)} %` : 'Aus');
         h += pills(eid, ea.preset_modes, ea.preset_mode, 'drm', drLabel);
@@ -5438,26 +5447,26 @@ registerDevice({
     const sw = [['lock', 'mdi:lock-outline', 'Kindersicherung'], ['display', 'mdi:monitor-shimmer', 'Display'], ['mute', 'mdi:volume-high', 'Bedienton'], ['sched', 'mdi:calendar-clock', 'Zeitplan'], ['osc', 'mdi:rotate-3d-variant', 'Schwenken'], ['light', 'mdi:lightbulb-outline', 'Licht']].map(([k, ic, l]) => {
       const s2 = S(k); return s2 ? `<button class="pill ${s2.state === 'on' ? 'sel' : ''}" data-act="toggle" data-id="${s2.entity_id}"><ha-icon icon="${ic}"></ha-icon>${l}</button>` : '';
     }).join('');
+    const det = `${fogRow ? `<div class="dvm kxc">${fogRow}</div>` : ''}${tiles ? `<div class="dvs">${tiles}</div>` : ''}${sw ? `<div class="dvf">${sw}</div>` : ''}`;
+    const fold = d0 === 'humidifier' && !gone && det; const open = fold && dvFoldOpen(c, iv);
     return `<div class="dvc ${run ? 'run' : ''}"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="${icon}"></ha-icon></div><div class="tt"><b>${esc(iv.title || a.friendly_name || id)}</b><span>${esc(sub)}</span></div>${big ? `<div class="big">${esc(big)}</div>` : ''}</div>
-      ${warn}${gone ? '' : ents.map(ctl).join('')}${fogRow ? `<div class="dvm kxc">${fogRow}</div>` : ''}${tiles ? `<div class="dvs">${tiles}</div>` : ''}${sw ? `<div class="dvf">${sw}</div>` : ''}</div>`;
+      ${warn}${gone ? '' : ents.map(ctl).join('')}${fold ? `${open ? det : ''}${dvFoldBtn(iv, open, 'Mehr')}` : det}</div>`;
   },
 });
 
 /* ---------- Raumklima (Integration room_climate): Gerätekarte pro Raum ----------
    Haupt-Entität ist der Score-Sensor eines Raums (sensor.room_climate_<raum>_score). Daraus kommen Bewertung („Angenehm“),
    Beschreibung, Temperatur, Luftfeuchte, Außentemperatur, Wandfeuchte und die Hinweise (Lüften, Fenster, Rollladen, Heizung, Schimmel).
-   Der Empfehlungs-Sensor und das Thermostat (climate) des Raums werden aus dem Namen bzw. dem Attribut climate_entity abgeleitet
-   und lassen sich im Zahnrad ändern. Pro Raum eine Karte anlegen; im Raum steht dessen Score-Sensor oben in der Auswahl. */
+   Der Empfehlungs-Sensor des Raums wird aus dem Namen abgeleitet und lässt sich im Zahnrad ändern. Die Karte zeigt nur an, das
+   Thermostat wird hier nicht gesteuert (dafür gibt es die Heizungs-Gerätekarte). Pro Raum eine Karte anlegen; im Raum steht dessen Score-Sensor oben in der Auswahl. */
 const RC_LEVEL = { excellent: ['Ideal', 'mdi:emoticon-excited-outline'], good: ['Angenehm', 'mdi:emoticon-happy-outline'], medium: ['Mittel', 'mdi:emoticon-neutral-outline'], warning: ['Auffällig', 'mdi:alert-outline'], bad: ['Schlecht', 'mdi:alert-circle-outline'], critical: ['Kritisch', 'mdi:alert-octagon-outline'] };
-const RC_HVAC = { heating: 'Heizt', idle: 'Leerlauf', cooling: 'Kühlt', off: 'Aus' };
 registerDevice({
-  type: 'roomclimate', label: 'Raumklima', icon: 'mdi:home-thermometer-outline', desc: 'Bewertung, Temperatur, Luftfeuchte, Lüften-, Fenster- und Schimmelhinweise, Thermostat (Integration room_climate)', size: 'w',
+  type: 'roomclimate', label: 'Raumklima', icon: 'mdi:home-thermometer-outline', desc: 'Bewertung, Temperatur, Luftfeuchte, Lüften-, Fenster- und Schimmelhinweise (Integration room_climate)', size: 'w',
   main: { dom: 'sensor', attr: 'humidex_felt', re: /score|room.?climate/ },
   fields: {
     reco: { l: 'Empfehlung', dom: 'sensor', re: /recommendation|empfehlung/, sib: (id) => id.replace(/_score$/, '_recommendation') },
-    climate: { l: 'Thermostat (Soll ändern)', dom: 'climate', sib: (id, st) => (st && st.attributes.climate_entity) || null },
   },
-  opts: [{ k: 'stats', l: 'Messwerte anzeigen', def: 1, bool: true }, { k: 'hints', l: 'Hinweise anzeigen (Lüften, Fenster, Schimmel)', def: 1, bool: true }, { k: 'climate', l: 'Thermostat anzeigen', def: 1, bool: true }, { k: 'reco', l: 'Empfehlungstexte anzeigen', def: 0, bool: true }],
+  opts: [{ k: 'stats', l: 'Messwerte anzeigen', def: 1, bool: true }, { k: 'hints', l: 'Hinweise anzeigen (Lüften, Fenster, Schimmel)', def: 1, bool: true }, { k: 'reco', l: 'Empfehlungstexte anzeigen', def: 0, bool: true }],
   render: (c, iv, F, st) => {
     const id = iv.main; const a = st.attributes; const num = (v) => { const n = Number(v); return v !== null && v !== undefined && v !== '' && Number.isFinite(n) ? n : null; };
     const rs = c._dvS(F.reco); const lvKey = (rs && rs.state) || (a.level_class === 'good' && 'good') || '';
@@ -5485,16 +5494,9 @@ registerDevice({
       const lines = String(txt).split(/\s*\|\s*/).filter(Boolean).map((l) => { const m = /^([^:]{2,24}):\s*(.+)$/.exec(l); return m ? `<div><b>${esc(m[1])}</b> ${esc(m[2])}</div>` : `<div>${esc(l)}</div>`; });
       reco = lines.length ? `<div class="rcr">${lines.join('')}</div>` : '';
     }
-    let heat = '';
-    const cl = dvOpt(iv, 'climate') ? c._dvS(F.climate) : null;
-    if (cl) {
-      const ca = cl.attributes; const t = num(ca.temperature); const stp = num(ca.target_temp_step) > 0 ? num(ca.target_temp_step) : 0.5; const off = cl.state === 'off';
-      const lab = off ? RC_HVAC.off : RC_HVAC[ca.hvac_action] || (DR_HVAC[cl.state] || cl.state);
-      heat = `<div class="kxr"><span>Thermostat · ${esc(lab)}</span><div><button class="pill" data-act="sdt" data-id="${cl.entity_id}" data-d="${-stp}" aria-label="Weniger">−</button><b>${t !== null && !off ? `${c._de(t, 1)} °C` : '–'}</b><button class="pill" data-act="sdt" data-id="${cl.entity_id}" data-d="${stp}" aria-label="Mehr">+</button></div></div>`;
-    }
     const sub = a.description ? String(a.description) : level;
     return `<div class="dvc ${ok ? 'run' : ''}"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="${bad ? 'mdi:alert-circle-outline' : lv[1]}"></ha-icon></div><div class="tt"><b>${esc(room)} · ${esc(level)}</b><span>${esc(sub)}</span></div>${sc !== null ? `<div class="big">${c._de(sc, 0)}<small style="font-size:13px"> %</small></div>` : ''}</div>
-      ${warnHtml}${chipHtml}${stats ? `<div class="dvs">${stats}</div>` : ''}${reco}${heat}</div>`;
+      ${warnHtml}${chipHtml}${stats ? `<div class="dvs">${stats}</div>` : ''}${reco}</div>`;
   },
 });
 

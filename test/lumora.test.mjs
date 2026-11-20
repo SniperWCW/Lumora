@@ -311,14 +311,31 @@ test('Smartdome-Gerätekarte: Fensterpause zeigt Status, Pausenzeit, Gas und Ver
   });
   const iv = c._set.devices[0];
   assert.deepEqual([...c._dvMains(L.DEVTPL.smartdome).map((x) => x.id)], ['sensor.bad_status']);
-  const html = L.DEVTPL.smartdome.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
+  let html = L.DEVTPL.smartdome.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
   assert.match(html, /<b>Bad<\/b>/);
   assert.match(html, /Pausiert, Fenster offen/);
   assert.match(html, /Fenster offen, Heizung pausiert/);
+  assert.match(html, /20,4 °/);
+  /* standardmäßig eingeklappt: keine Kacheln, kein Verlauf, nur der Knopf */
+  assert.doesNotMatch(html, /Pause heute|class="sdh"|0,12 m³/);
+  assert.match(html, /data-act="dvfold" data-id="dv7"[^>]*aria-expanded="false"/);
+  c._dvOpen = { dv7: true };
+  html = L.DEVTPL.smartdome.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
+  assert.match(html, /aria-expanded="true"/);
   assert.match(html, /1 h 35 min/);
   assert.match(html, /0,12 m³/);
-  assert.match(html, /20,4 °/);
   assert.match(html, /class="sdh"/);
+  delete c._dvOpen; iv.opts = { open: 1 }; /* Option: standardmäßig aufgeklappt */
+  assert.match(L.DEVTPL.smartdome.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]), /Pause heute/);
+});
+
+test('Smartdome-Gerätekarte: Einklappen per Klick schaltet um und zeichnet neu', () => {
+  const c = smartdomeCard({ control_reason: 'normal_idle', window_pause_today_min: 5, gas_saved_today_m3: 0.1 });
+  let drawn = 0; c._render = () => { drawn++; }; c._edit = false;
+  const click = () => c._click({ target: { closest: () => ({ dataset: { act: 'dvfold', id: 'dv7' } }) }, stopPropagation() {} });
+  click(); assert.equal(c._dvOpen.dv7, true);
+  click(); assert.equal(c._dvOpen.dv7, false);
+  assert.equal(drawn, 2);
 });
 
 test('Smartdome-Gerätekarte: ältere Version ohne Statistik zeigt nur Status', () => {
@@ -327,7 +344,7 @@ test('Smartdome-Gerätekarte: ältere Version ohne Statistik zeigt nur Status', 
   const html = L.DEVTPL.smartdome.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
   assert.match(html, /Heizt/);
   assert.match(html, /class="dvc run"/);
-  assert.doesNotMatch(html, /Pause heute|sdh/);
+  assert.doesNotMatch(html, /Pause heute|sdh|dvfold/);
 });
 
 test('Smartdome-Gerätekarte: Thermostat wird gefunden und lässt sich steuern', () => {
@@ -1262,17 +1279,37 @@ test('Dreo-Gerätekarte: Vorlage ist registriert, Auswahl nur Dreo-Geräte, Feld
   assert.equal(F.light, 'light.schlafzimmer_nachtlicht');
 });
 
-test('Dreo-Gerätekarte: Befeuchter zeigt Feuchte, Zielwert, Modi, Wasserwarnung und Schalter', () => {
+test('Dreo-Gerätekarte: Befeuchter ist kompakt: Modi und Ein/Aus in einer Zeile, keine Zielfeuchte, Details eingeklappt', () => {
   const c = dreoCard(DREO_HUM(), 'humidifier.schlafzimmer'); const iv = c._set.devices[0];
-  const html = L.DEVTPL.dreo.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
+  let html = L.DEVTPL.dreo.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
   assert.match(html, /An · Auto/);
   assert.match(html, /48 %/);
-  assert.match(html, /data-act="drh" data-id="humidifier.schlafzimmer" data-d="5"/);
-  assert.match(html, /<b>55 %<\/b>/);
-  assert.match(html, /data-act="drm"[^>]*data-v="sleep"/);
+  assert.doesNotMatch(html, /data-act="drh"|Zielfeuchte<|<b>55 %<\/b>/);
+  assert.match(html, /<div class="dvf"><button class="pill sel" data-act="toggle" data-id="humidifier.schlafzimmer">[^]*data-act="drm"[^>]*data-v="sleep"/);
   assert.match(html, /Wassertank leer oder fehlt/);
-  assert.match(html, /data-act="toggle" data-id="switch.schlafzimmer_kindersicherung"/);
   assert.match(html, /class="dvc run"/);
+  assert.doesNotMatch(html, /kindersicherung|Nachtlicht|Schlafzimmer Temperatur|<small>Temperatur/);
+  assert.match(html, /data-act="dvfold" data-id="dvD"[^>]*aria-expanded="false"/);
+  c._dvOpen = { dvD: true };
+  html = L.DEVTPL.dreo.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
+  assert.match(html, /data-act="toggle" data-id="switch.schlafzimmer_kindersicherung"/);
+  assert.match(html, /<small>Temperatur<\/small>/);
+});
+
+test('Dreo-Gerätekarte: Prozentanzeige beim Befeuchter stammt vom Raumklima, ohne Raumklima vom Gerät', () => {
+  const s = { ...DREO_HUM(), 'sensor.room_climate_schlafzimmer_score': st('85', { attributes: { friendly_name: 'Room Climate Schlafzimmer Score', room_name: 'Schlafzimmer', humidex_felt: 'comfortable', humidity: 52.4 } }), 'sensor.room_climate_buro_score': st('90', { attributes: { friendly_name: 'Room Climate Büro Score', room_name: 'Büro', humidex_felt: 'comfortable', humidity: 41 } }) };
+  const c = dreoCard(s, 'humidifier.schlafzimmer'); const iv = c._set.devices[0];
+  c._hass.areas = {};
+  assert.equal(c._dvMap(iv).room, 'sensor.room_climate_schlafzimmer_score');
+  const html = L.DEVTPL.dreo.render(c, iv, c._dvMap(iv), s['humidifier.schlafzimmer']);
+  assert.match(html, /<div class="big">52 %<\/div>/);
+  assert.doesNotMatch(html, /48 %/);
+  /* Zuordnung über den Bereich hat Vorrang vor dem Namen */
+  c._areaOf = (id) => (id === 'humidifier.schlafzimmer' || id === 'sensor.room_climate_buro_score' ? 'a1' : null);
+  delete c._dvR; assert.equal(c._dvMap(iv).room, 'sensor.room_climate_buro_score');
+  /* manuelle Zuordnung wird respektiert, „-“ schaltet es ab */
+  iv.map = { room: '-' }; delete c._dvR;
+  assert.match(L.DEVTPL.dreo.render(c, iv, c._dvMap(iv), s['humidifier.schlafzimmer']), /<div class="big">48 %<\/div>/);
 });
 
 test('Dreo-Gerätekarte: Klicks rufen die passenden Dienste mit Grenzen auf', () => {
@@ -1284,7 +1321,6 @@ test('Dreo-Gerätekarte: Klicks rufen die passenden Dienste mit Grenzen auf', ()
   };
   const c = dreoCard(s, 'humidifier.h'); c._hass.callService = (d, sv, data) => calls.push([d, sv, data]); c._edit = false;
   const click = (act, id, ds = {}) => c._click({ target: { closest: () => ({ dataset: { act, id, ...ds } }) }, stopPropagation() {} });
-  click('drh', 'humidifier.h', { d: '5' });
   click('drm', 'humidifier.h', { v: 'sleep' });
   click('drp', 'fan.f', { d: '-10' });
   click('drp', 'fan.f', { d: '10' });
@@ -1292,7 +1328,6 @@ test('Dreo-Gerätekarte: Klicks rufen die passenden Dienste mit Grenzen auf', ()
   click('drm', 'fan.f', { v: 'turbo' });
   click('drc', 'climate.k', { v: 'off' });
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
-    ['humidifier', 'set_humidity', { entity_id: 'humidifier.h', humidity: 90 }],
     ['humidifier', 'set_mode', { entity_id: 'humidifier.h', mode: 'sleep' }],
     ['fan', 'turn_off', { entity_id: 'fan.f' }],
     ['fan', 'set_percentage', { entity_id: 'fan.f', percentage: 15 }],
@@ -1345,6 +1380,7 @@ test('Dreo-Gerätekarte: echte Entitäten des DR-HHM001S werden richtig zugeordn
   assert.equal(F.sched, `switch.${P}_zeitplan`);
   assert.equal(F.light, `light.${P}_umgebungslicht`);
   assert.equal(F.lock, null);
+  c._dvOpen = { dvD: true };
   const html = L.DEVTPL.dreo.render(c, iv, F, s[`humidifier.${P}`]);
   assert.match(html, /An · Schlaf · Zielfeuchte erreicht/);
   assert.match(html, /Ziel Schlafmodus/);
@@ -1376,14 +1412,14 @@ test('Raumklima-Gerätekarte: Vorlage registriert, Auswahl nur Score-Sensoren, F
   assert.deepEqual([...c._dvMains(L.DEVTPL.roomclimate).map((x) => x.id)].sort(), ['sensor.room_climate_buro_score', 'sensor.room_climate_kuche_score']);
   const F = c._dvMap(c._set.devices[0]);
   assert.equal(F.reco, 'sensor.room_climate_kuche_recommendation');
-  assert.equal(F.climate, 'climate.room_climate_kuche');
+  assert.equal(F.climate, undefined);
 });
 test('Raumklima-Gerätekarte: im Raum steht der Score-Sensor dieses Raums oben', () => {
   const c = rcCard(RC_STATES(), 'sensor.room_climate_kuche_score', { _view: 'rooms', _area: 'buro' });
   c._areaOf = (id) => (id.includes('buro') ? 'buro' : 'kuche');
   assert.equal(c._dvMains(L.DEVTPL.roomclimate)[0].id, 'sensor.room_climate_buro_score');
 });
-test('Raumklima-Gerätekarte: zeigt Bewertung, Messwerte, Hinweise und Thermostat; Empfehlungstexte nur per Option', () => {
+test('Raumklima-Gerätekarte: zeigt Bewertung, Messwerte und Hinweise ohne Thermostat; Empfehlungstexte nur per Option', () => {
   const c = rcCard(RC_STATES(), 'sensor.room_climate_kuche_score'); const iv = c._set.devices[0];
   let html = L.DEVTPL.roomclimate.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
   assert.match(html, /Küche · Angenehm/);
@@ -1391,14 +1427,14 @@ test('Raumklima-Gerätekarte: zeigt Bewertung, Messwerte, Hinweise und Thermosta
   assert.match(html, /22,3 °C/);
   assert.match(html, /45 %/);
   assert.match(html, /Jetzt lüften/);
-  assert.match(html, /data-act="sdt" data-id="climate.room_climate_kuche" data-d="0.5"/);
+  assert.doesNotMatch(html, /data-act="sdt"|Thermostat/);
   assert.match(html, /class="dvc run"/);
   assert.doesNotMatch(html, /class="rcr"/);
-  iv.opts = { reco: 1, stats: 0, hints: 0, climate: 0 };
+  iv.opts = { reco: 1, stats: 0, hints: 0 };
   html = L.DEVTPL.roomclimate.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
   assert.match(html, /class="rcr"/);
   assert.match(html, /<b>Frischluft<\/b> Fenster ist offen/);
-  assert.doesNotMatch(html, /Jetzt lüften|class="dvs"|data-act="sdt"/);
+  assert.doesNotMatch(html, /Jetzt lüften|class="dvs"/);
 });
 test('Raumklima-Gerätekarte: Schimmelrisiko hoch und Fenster schließen als Warnung', () => {
   const s = RC_STATES(); Object.assign(s['sensor.room_climate_kuche_score'].attributes, { mold_risk: 'high', close_window: true, close_window_reason: 'Außenluft zu feucht' });
