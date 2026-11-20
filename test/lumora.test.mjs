@@ -1352,3 +1352,60 @@ test('Dreo-Gerätekarte: echte Entitäten des DR-HHM001S werden richtig zugeordn
   assert.doesNotMatch(html, /Wassertank leer/);
   assert.doesNotMatch(html, /Schlafmodus<\/span><div>.*Umgebungslicht/);
 });
+
+/* ---------- Raumklima (Integration room_climate) ---------- */
+function rcCard(states, main, view = {}) {
+  const c = Object.create(L.card.prototype);
+  c._set = { devices: [{ id: 'dvR', type: 'roomclimate', main, map: {}, title: '' }], sources: {}, size: {}, hidden: [], place: {}, custom: [], pinned: [], quick: [] };
+  Object.keys(states).forEach((k) => { states[k].entity_id = k; });
+  c._hass = { states, entities: {}, devices: {}, areas: {} };
+  c._cfg = {}; Object.assign(c, view);
+  return c;
+}
+const RC_STATES = () => ({
+  'sensor.room_climate_kuche_score': st('87', { attributes: { friendly_name: 'Room Climate Küche Score', room_name: 'Küche', level: 'Angenehm', level_class: 'good', humidex_felt: 'comfortable', description: 'Küche: angenehmes Raumklima.', temperature: 22.26, humidity: 45.45, outside_temperature: 9.5, wall_surface_humidity: 57.6, mold_risk: 'low', ventilate_now: true, close_window: false, climate_entity: 'climate.room_climate_kuche' } }),
+  'sensor.room_climate_kuche_recommendation': st('good', { attributes: { recommendation: 'Frischluft: Fenster ist offen | Abkühlung: nicht nötig' } }),
+  'climate.room_climate_kuche': st('heat', { attributes: { temperature: 21, current_temperature: 21.3, hvac_action: 'idle', target_temp_step: 0.5 } }),
+  'sensor.room_climate_buro_score': st('90', { attributes: { friendly_name: 'Room Climate Büro Score', humidex_felt: 'comfortable', level: 'Ideal' } }),
+  'sensor.room_climate_buro_recommendation': st('excellent', { attributes: {} }),
+  'sensor.anderer_sensor': st('5', { attributes: {} }),
+});
+test('Raumklima-Gerätekarte: Vorlage registriert, Auswahl nur Score-Sensoren, Felder aus dem Raumnamen abgeleitet', () => {
+  assert.ok(L.win.LumoraDevices.list().some((x) => x.type === 'roomclimate'));
+  const c = rcCard(RC_STATES(), 'sensor.room_climate_kuche_score');
+  assert.deepEqual([...c._dvMains(L.DEVTPL.roomclimate).map((x) => x.id)].sort(), ['sensor.room_climate_buro_score', 'sensor.room_climate_kuche_score']);
+  const F = c._dvMap(c._set.devices[0]);
+  assert.equal(F.reco, 'sensor.room_climate_kuche_recommendation');
+  assert.equal(F.climate, 'climate.room_climate_kuche');
+});
+test('Raumklima-Gerätekarte: im Raum steht der Score-Sensor dieses Raums oben', () => {
+  const c = rcCard(RC_STATES(), 'sensor.room_climate_kuche_score', { _view: 'rooms', _area: 'buro' });
+  c._areaOf = (id) => (id.includes('buro') ? 'buro' : 'kuche');
+  assert.equal(c._dvMains(L.DEVTPL.roomclimate)[0].id, 'sensor.room_climate_buro_score');
+});
+test('Raumklima-Gerätekarte: zeigt Bewertung, Messwerte, Hinweise und Thermostat; Empfehlungstexte nur per Option', () => {
+  const c = rcCard(RC_STATES(), 'sensor.room_climate_kuche_score'); const iv = c._set.devices[0];
+  let html = L.DEVTPL.roomclimate.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
+  assert.match(html, /Küche · Angenehm/);
+  assert.match(html, /angenehmes Raumklima/);
+  assert.match(html, /22,3 °C/);
+  assert.match(html, /45 %/);
+  assert.match(html, /Jetzt lüften/);
+  assert.match(html, /data-act="sdt" data-id="climate.room_climate_kuche" data-d="0.5"/);
+  assert.match(html, /class="dvc run"/);
+  assert.doesNotMatch(html, /class="rcr"/);
+  iv.opts = { reco: 1, stats: 0, hints: 0, climate: 0 };
+  html = L.DEVTPL.roomclimate.render(c, iv, c._dvMap(iv), c._hass.states[iv.main]);
+  assert.match(html, /class="rcr"/);
+  assert.match(html, /<b>Frischluft<\/b> Fenster ist offen/);
+  assert.doesNotMatch(html, /Jetzt lüften|class="dvs"|data-act="sdt"/);
+});
+test('Raumklima-Gerätekarte: Schimmelrisiko hoch und Fenster schließen als Warnung', () => {
+  const s = RC_STATES(); Object.assign(s['sensor.room_climate_kuche_score'].attributes, { mold_risk: 'high', close_window: true, close_window_reason: 'Außenluft zu feucht' });
+  s['sensor.room_climate_kuche_recommendation'].state = 'bad';
+  const c = rcCard(s, 'sensor.room_climate_kuche_score'); const iv = c._set.devices[0];
+  const html = L.DEVTPL.roomclimate.render(c, iv, c._dvMap(iv), s['sensor.room_climate_kuche_score']);
+  assert.match(html, /Schimmelrisiko hoch/);
+  assert.match(html, /Fenster schließen: Außenluft zu feucht/);
+  assert.doesNotMatch(html, /class="dvc run"/);
+});

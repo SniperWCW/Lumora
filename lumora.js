@@ -746,6 +746,7 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .dve .rl span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dve .rl span:last-child{font-weight:600;white-space:nowrap;flex:none}.dve .rl ha-icon{--mdc-icon-size:18px;margin-right:6px}
 .dve .spk{margin-top:6px}
 .dvm i{grid-column:1/-1;height:5px;border-radius:3px;background:var(--line);overflow:hidden}.dvm i u{display:block;height:100%;background:var(--b)}.dvm i.lo u{background:#c9694f}
+.rcr{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--fg2);line-height:1.35}.rcr b{color:var(--fg);font-weight:600}
 .dverr{display:flex;gap:8px;align-items:center;background:rgba(200,80,60,.16);border-radius:12px;padding:8px 10px;font-size:13px}.dverr ha-icon{--mdc-icon-size:20px;flex:none}
 .bb{height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:5px}.bb u{display:block;height:100%;background:#7fa56a}.bb.wn u{background:#d9a441}.bb.lo u{background:#c9694f}
 .br em.lo,.br>ha-icon.lo{color:#c9694f}.br em.wn,.br>ha-icon.wn{color:#b8862b}
@@ -3279,7 +3280,11 @@ _more() {
       if (sp.re && !usePl && !sp.re.test(id)) return false;
       const r = this._hass.entities && this._hass.entities[id]; return !(r && r.hidden);
     }).map((x) => ({ id: x.entity_id, name: x.attributes.friendly_name || x.entity_id, hit: sp.prefer ? sp.prefer.test(norm(`${x.entity_id} ${x.attributes.friendly_name || ''}`)) : false }));
-    return out.sort((a, b) => (b.hit ? 1 : 0) - (a.hit ? 1 : 0));
+    out.sort((a, b) => (b.hit ? 1 : 0) - (a.hit ? 1 : 0));
+    /* Wird die Karte in einem Raum angelegt, stehen die Entitäten dieses Raums oben (stabile Sortierung) */
+    const ar = this._view === 'rooms' && this._area;
+    if (ar) out.sort((a, b) => (this._areaOf(b.id) === ar ? 1 : 0) - (this._areaOf(a.id) === ar ? 1 : 0));
+    return out;
   }
   _dvPool(iv) {
     const h = this._hass; const reg = h.entities || {}; const ids = Object.keys(h.states);
@@ -3325,10 +3330,12 @@ _more() {
     const cache = this._dvR || (this._dvR = {});
     if (cache[iv.id] && cache[iv.id].k === ck) return cache[iv.id].v;
     const v = {};
-    for (const k in tp.fields) { const m = iv.map[k]; const fs = tp.fields[k]; v[k] = m === '-' ? null : m || (fs.slot ? this._slot(fs.slot) : this._dvFind(iv, fs)); }
+    for (const k in tp.fields) { const m = iv.map[k]; const fs = tp.fields[k]; v[k] = m === '-' ? null : m || (fs.slot ? this._slot(fs.slot) : fs.sib ? this._dvSib(iv, fs) : this._dvFind(iv, fs)); }
     cache[iv.id] = { k: ck, v };
     return v;
   }
+  /* Feld über die Haupt-Entität ableiten (fs.sib liefert die ID oder null), z. B. bei Integrationen ohne gemeinsames Gerät pro Raum */
+  _dvSib(iv, fs) { let id = null; try { id = fs.sib(iv.main, this._hass.states[iv.main], this._hass.states); } catch (_) { /* ignore */ } return id && this._hass.states[id] ? id : null; }
   _dvS(id) { const st = id && this._hass.states[id]; return st && !['unavailable', 'unknown', ''].includes(st.state) ? st : null; }
   _dvVal(st, d) {
     const v = parseFloat(st.state); const u = st.attributes.unit_of_measurement || '';
@@ -5214,7 +5221,7 @@ const MG_STATUS = { expired: 'abgelaufen', expiring: 'läuft bald ab' };
 const mgS = (c) => c._mg || (c._mg = { page: {}, sched: {}, q: {}, open: {}, msg: {} });
 const dvOpt = (iv, k) => {
   const o = (DEVTPL[iv.type].opts || []).find((x) => x.k === k); if (!o) return undefined;
-  const v = iv.opts && iv.opts[k]; return v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v)) ? Math.max(o.min, Math.min(o.max, Number(v))) : o.def;
+  const v = iv.opts && iv.opts[k]; return v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v)) ? Math.max(o.min ?? -Infinity, Math.min(o.max ?? Infinity, Number(v))) : o.def;
 };
 const mgCap = (s) => { const t = String(s || '').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
 const mgDate = (s) => { const p = String(s || '').slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : String(s || ''); };
@@ -5433,6 +5440,61 @@ registerDevice({
     }).join('');
     return `<div class="dvc ${run ? 'run' : ''}"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="${icon}"></ha-icon></div><div class="tt"><b>${esc(iv.title || a.friendly_name || id)}</b><span>${esc(sub)}</span></div>${big ? `<div class="big">${esc(big)}</div>` : ''}</div>
       ${warn}${gone ? '' : ents.map(ctl).join('')}${fogRow ? `<div class="dvm kxc">${fogRow}</div>` : ''}${tiles ? `<div class="dvs">${tiles}</div>` : ''}${sw ? `<div class="dvf">${sw}</div>` : ''}</div>`;
+  },
+});
+
+/* ---------- Raumklima (Integration room_climate): Gerätekarte pro Raum ----------
+   Haupt-Entität ist der Score-Sensor eines Raums (sensor.room_climate_<raum>_score). Daraus kommen Bewertung („Angenehm“),
+   Beschreibung, Temperatur, Luftfeuchte, Außentemperatur, Wandfeuchte und die Hinweise (Lüften, Fenster, Rollladen, Heizung, Schimmel).
+   Der Empfehlungs-Sensor und das Thermostat (climate) des Raums werden aus dem Namen bzw. dem Attribut climate_entity abgeleitet
+   und lassen sich im Zahnrad ändern. Pro Raum eine Karte anlegen; im Raum steht dessen Score-Sensor oben in der Auswahl. */
+const RC_LEVEL = { excellent: ['Ideal', 'mdi:emoticon-excited-outline'], good: ['Angenehm', 'mdi:emoticon-happy-outline'], medium: ['Mittel', 'mdi:emoticon-neutral-outline'], warning: ['Auffällig', 'mdi:alert-outline'], bad: ['Schlecht', 'mdi:alert-circle-outline'], critical: ['Kritisch', 'mdi:alert-octagon-outline'] };
+const RC_HVAC = { heating: 'Heizt', idle: 'Leerlauf', cooling: 'Kühlt', off: 'Aus' };
+registerDevice({
+  type: 'roomclimate', label: 'Raumklima', icon: 'mdi:home-thermometer-outline', desc: 'Bewertung, Temperatur, Luftfeuchte, Lüften-, Fenster- und Schimmelhinweise, Thermostat (Integration room_climate)', size: 'w',
+  main: { dom: 'sensor', attr: 'humidex_felt', re: /score|room.?climate/ },
+  fields: {
+    reco: { l: 'Empfehlung', dom: 'sensor', re: /recommendation|empfehlung/, sib: (id) => id.replace(/_score$/, '_recommendation') },
+    climate: { l: 'Thermostat (Soll ändern)', dom: 'climate', sib: (id, st) => (st && st.attributes.climate_entity) || null },
+  },
+  opts: [{ k: 'stats', l: 'Messwerte anzeigen', def: 1, bool: true }, { k: 'hints', l: 'Hinweise anzeigen (Lüften, Fenster, Schimmel)', def: 1, bool: true }, { k: 'climate', l: 'Thermostat anzeigen', def: 1, bool: true }, { k: 'reco', l: 'Empfehlungstexte anzeigen', def: 0, bool: true }],
+  render: (c, iv, F, st) => {
+    const id = iv.main; const a = st.attributes; const num = (v) => { const n = Number(v); return v !== null && v !== undefined && v !== '' && Number.isFinite(n) ? n : null; };
+    const rs = c._dvS(F.reco); const lvKey = (rs && rs.state) || (a.level_class === 'good' && 'good') || '';
+    const lv = RC_LEVEL[lvKey] || (a.level ? [a.level, 'mdi:home-thermometer-outline'] : ['Keine Daten', 'mdi:home-thermometer-outline']);
+    const level = a.level || lv[0]; const sc = num(st.state);
+    const bad = ['warning', 'bad', 'critical'].includes(lvKey); const ok = ['excellent', 'good'].includes(lvKey);
+    const room = iv.title || a.room_name || cleanName(a.friendly_name) || id;
+    const mold = String(a.mold_risk || ''); const moldTxt = { medium: 'mittel', high: 'hoch' }[mold];
+    const warn = [];
+    if (a.close_window) warn.push(['mdi:window-closed', `Fenster schließen${a.close_window_reason ? `: ${a.close_window_reason}` : ''}`]);
+    if (mold === 'high') warn.push(['mdi:mushroom-outline', `Schimmelrisiko hoch${a.mold_risk_reason ? `: ${a.mold_risk_reason}` : ''}`]);
+    const warnHtml = dvOpt(iv, 'hints') ? warn.map(([ic, t]) => `<div class="dverr"><ha-icon icon="${ic}"></ha-icon><div>${esc(t)}</div></div>`).join('') : '';
+    const chips = [];
+    if (a.ventilate_now) chips.push(['mdi:window-open-variant', 'Jetzt lüften']);
+    if (a.close_cover) chips.push(['mdi:blinds', 'Rollladen schließen']);
+    if (a.reduce_heating) chips.push(['mdi:radiator-off', 'Heizung herunterregeln']);
+    if (moldTxt && mold !== 'high') chips.push(['mdi:mushroom-outline', `Schimmelrisiko ${moldTxt}`]);
+    if (a.window_open) chips.push(['mdi:window-open', 'Fenster offen']);
+    const chipHtml = dvOpt(iv, 'hints') && chips.length ? `<div class="dvf">${chips.map(([ic, t]) => `<button class="pill" data-act="info" data-id="${id}"><ha-icon icon="${ic}"></ha-icon>${esc(t)}</button>`).join('')}</div>` : '';
+    const tile = (l, v, u, d) => { const n = num(v); return n === null ? '' : `<div data-act="info" data-id="${id}"><small>${l}</small><b>${c._de(n, d)} ${u}</b></div>`; };
+    const stats = dvOpt(iv, 'stats') ? [tile('Temperatur', a.temperature, '°C', 1), tile('Luftfeuchte', a.humidity, '%', 0), tile('Außen', a.outside_temperature, '°C', 1), tile('Wandfeuchte', a.wall_surface_humidity, '%', 0), tile('CO₂', a.co2, 'ppm', 0)].join('') : '';
+    let reco = '';
+    if (dvOpt(iv, 'reco')) {
+      const txt = (rs && rs.attributes.recommendation) || a.recommendation || '';
+      const lines = String(txt).split(/\s*\|\s*/).filter(Boolean).map((l) => { const m = /^([^:]{2,24}):\s*(.+)$/.exec(l); return m ? `<div><b>${esc(m[1])}</b> ${esc(m[2])}</div>` : `<div>${esc(l)}</div>`; });
+      reco = lines.length ? `<div class="rcr">${lines.join('')}</div>` : '';
+    }
+    let heat = '';
+    const cl = dvOpt(iv, 'climate') ? c._dvS(F.climate) : null;
+    if (cl) {
+      const ca = cl.attributes; const t = num(ca.temperature); const stp = num(ca.target_temp_step) > 0 ? num(ca.target_temp_step) : 0.5; const off = cl.state === 'off';
+      const lab = off ? RC_HVAC.off : RC_HVAC[ca.hvac_action] || (DR_HVAC[cl.state] || cl.state);
+      heat = `<div class="kxr"><span>Thermostat · ${esc(lab)}</span><div><button class="pill" data-act="sdt" data-id="${cl.entity_id}" data-d="${-stp}" aria-label="Weniger">−</button><b>${t !== null && !off ? `${c._de(t, 1)} °C` : '–'}</b><button class="pill" data-act="sdt" data-id="${cl.entity_id}" data-d="${stp}" aria-label="Mehr">+</button></div></div>`;
+    }
+    const sub = a.description ? String(a.description) : level;
+    return `<div class="dvc ${ok ? 'run' : ''}"><div class="dvh" data-act="info" data-id="${id}"><div class="ib"><ha-icon icon="${bad ? 'mdi:alert-circle-outline' : lv[1]}"></ha-icon></div><div class="tt"><b>${esc(room)} · ${esc(level)}</b><span>${esc(sub)}</span></div>${sc !== null ? `<div class="big">${c._de(sc, 0)}<small style="font-size:13px"> %</small></div>` : ''}</div>
+      ${warnHtml}${chipHtml}${stats ? `<div class="dvs">${stats}</div>` : ''}${reco}${heat}</div>`;
   },
 });
 
