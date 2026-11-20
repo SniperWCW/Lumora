@@ -2208,20 +2208,20 @@ class LumoraCard extends HTMLElement {
     const sub = [i.label, i.active && i.left !== null ? `noch ${this._fmtMin(i.left)}` : null, i.active ? i.program : null].filter(Boolean).join(' · ');
     return `<div class="ap ${i.active ? 'run' : ''}" data-act="info" data-id="${a.base}_zustand"><div class="h"><ha-icon icon="${a.icon}"></ha-icon><div><b>${esc(a.title)}</b><span>${esc(i.off ? 'Aus' : sub)}</span></div></div>${i.active && i.prog !== null ? `<div class="bar"><i style="width:${Math.round(i.prog)}%"></i></div>` : ''}</div>`;
   }
-  _pkgs(st0) {
+  _pkgs(st0, days) {
     const st = st0 || this._xs('packages'); if (!st) return null;
     const arr = (v) => (Array.isArray(v) ? v : []);
-    const keep = (x) => this._pkgKeep(x);
+    const keep = (x) => this._pkgKeep(x, days);
     const dhl = arr(st.attributes.dhl).filter((x) => x && x.tracking_id && keep(x));
     const amz = arr(st.attributes.amazon).filter((x) => x && x.tracking_id && keep(x));
     return { st, n: dhl.length + amz.length, today: parseInt(st.attributes.today_count, 10) || 0, dhl, amz };
   }
-  /* Offene Sendungen immer, zugestellte nur die letzten PKG_DAYS Tage (wie Zuhause 3.0) */
-  _pkgKeep(x) {
+  /* Offene Sendungen immer, zugestellte nur die letzten PKG_DAYS Tage (wie Zuhause 3.0); die Gerätekarte stellt die Tage ein */
+  _pkgKeep(x, days = PKG_DAYS) {
     const txt = `${x.status || ''} ${x.short_status || ''}`.toLowerCase();
     const done = x.delivered === true || String(x.delivered).toLowerCase() === 'true' || String(x.group || '').toLowerCase() === 'delivered' || String(x.short_status || '').toUpperCase() === 'DELIVERED' || txt.includes('zugestellt');
     if (!done) return true;
-    const cut = new Date(); cut.setHours(0, 0, 0, 0); cut.setDate(cut.getDate() - PKG_DAYS);
+    const cut = new Date(); cut.setHours(0, 0, 0, 0); cut.setDate(cut.getDate() - days);
     let d = null;
     const m = String(x.status || '').match(/(\d{1,2})\.\s*(Januar|Februar|März|Maerz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)/i);
     if (m) {
@@ -2234,10 +2234,11 @@ class LumoraCard extends HTMLElement {
     }
     return !d || d.getTime() >= cut.getTime();
   }
-  _pkgPanel(pk) {
-    const rows = [...pk.dhl.map((x) => ({ t: `DHL ${x.tracking_id || ''}`, s: x.short_status || x.status, p: typeof x.progress === 'number' ? x.progress / 5 : null })),
+  _pkgPanel(pk, max) {
+    const all = [...pk.dhl.map((x) => ({ t: `DHL ${x.tracking_id || ''}`, s: x.short_status || x.status, p: typeof x.progress === 'number' ? x.progress / 5 : null })),
       ...pk.amz.map((x) => ({ t: x.custom_name || x.friendly_name || 'Amazon', s: x.status || x.short_status, p: null }))];
-    return this._panel('mdi:package-variant-closed', 'Pakete', pk.today > 0 ? `${pk.today} heute in Zustellung` : 'Sendungen', pk.n, rows.map((r) => `<div class="pkr"><b>${esc(r.t)}</b><span>${esc(r.s || '')}</span>${r.p !== null ? `<div class="bar"><i style="width:${Math.round(r.p * 100)}%"></i></div>` : ''}</div>`).join('') || '<div class="empty">Keine Sendungen unterwegs.</div>', pk.st.entity_id);
+    const rows = max > 0 ? all.slice(0, max) : all; const more = all.length - rows.length;
+    return this._panel('mdi:package-variant-closed', 'Pakete', pk.today > 0 ? `${pk.today} heute in Zustellung` : 'Sendungen', pk.n, (rows.map((r) => `<div class="pkr"><b>${esc(r.t)}</b><span>${esc(r.s || '')}</span>${r.p !== null ? `<div class="bar"><i style="width:${Math.round(r.p * 100)}%"></i></div>` : ''}</div>`).join('') || '<div class="empty">Keine Sendungen unterwegs.</div>') + (more > 0 ? `<div class="empty">+ ${more} weitere</div>` : ''), pk.st.entity_id);
   }
   _panel(icon, title, sub, big, body, id) {
     return `<div class="en" data-act="info" data-id="${id}"><div class="hd"><div class="ib"><ha-icon icon="${icon}"></ha-icon></div><div><b>${esc(title)}</b><span>${esc(sub)}</span></div><div class="big">${big}</div></div>${body || ''}</div>`;
@@ -4912,9 +4913,10 @@ registerDevice({
   type: 'pkg', label: 'Pakete', icon: 'mdi:package-variant-closed', desc: 'Offene und zuletzt zugestellte Sendungen (DHL, Amazon) mit Status und Fortschritt', size: 'w',
   main: { dom: 'sensor', re: /paket|package|parcel/, prefer: /paket|package|parcel/ },
   fields: {},
+  opts: [{ k: 'count', l: 'Sendungen anzeigen (Anzahl)', def: 10, min: 1, max: 50, step: 1 }, { k: 'days', l: 'Zugestellte anzeigen (Tage)', def: PKG_DAYS, min: 0, max: 30, step: 1 }],
   render: (c, iv, F, st) => {
-    const pk = c._pkgs(st);
-    return pk ? c._pkgPanel(pk) : (c._edit ? '<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="mdi:package-variant-closed"></ha-icon></div><div class="tt"><b>Pakete</b><span>Keine Sendungsdaten an diesem Sensor</span></div></div></div>' : '');
+    const pk = c._pkgs(st, dvOpt(iv, 'days'));
+    return pk ? c._pkgPanel(pk, dvOpt(iv, 'count')) : (c._edit ? '<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="mdi:package-variant-closed"></ha-icon></div><div class="tt"><b>Pakete</b><span>Keine Sendungsdaten an diesem Sensor</span></div></div></div>' : '');
   },
 });
 /* Mealie Grocy Bridge, Vorrat: Richtwerte und Zuordnungstabellen (Quelle: BLE) */

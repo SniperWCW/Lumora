@@ -980,6 +980,24 @@ test('Gerätekarten: Pakete zeigt Sendungen des gewählten Sensors, automatische
   assert.equal(c._allReg().filter((x) => x.def.id === 'pkg').length, 0);
 });
 
+test('Gerätekarten: Pakete mit einstellbarer Anzahl und Tagen für Zugestelltes', () => {
+  const day = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString(); };
+  const dhl = [1, 2, 3].map((i) => ({ tracking_id: `T${i}`, short_status: 'In Zustellung' }));
+  dhl.push({ tracking_id: 'OLD3', short_status: 'DELIVERED', event_time: day(3) }, { tracking_id: 'OLD10', short_status: 'DELIVERED', event_time: day(10) });
+  const st = { entity_id: 'sensor.paketverfolgung', state: '5', attributes: { friendly_name: 'Paketverfolgung', dhl, amazon: [] } };
+  const c = Object.create(L.card.prototype);
+  c._hass = { states: { [st.entity_id]: st }, entities: {}, callWS: () => new Promise(() => {}) };
+  c._cfg = {}; c._dvP = null; c._dvR = null; c._set = { sources: {}, hidden: [], size: {}, place: {}, devices: [] };
+  const iv = (opts) => ({ id: 'p1', type: 'pkg', main: st.entity_id, map: {}, title: '', opts });
+  const r = (opts) => L.DEVTPL.pkg.render(c, iv(opts), {}, st);
+  const rows = (h) => (h.match(/class="pkr"/g) || []).length;
+  assert.equal(rows(r()), 4); // Standard 5 Tage: OLD10 entfällt
+  assert.equal(rows(r({ days: 30 })), 5);
+  assert.equal(rows(r({ days: 1 })), 3);
+  const h = r({ count: 2 });
+  assert.equal(rows(h), 2); assert.match(h, /\+ 2 weitere/);
+});
+
 /* ---------- Mealie Grocy Bridge: drei Gerätekarten ---------- */
 function mgCard(type, id, attrs, opts) {
   const states = { [id]: st('3', { entity_id: id, last_updated: 'u1', attributes: { friendly_name: 'Mealie Grocy Bridge', ...attrs } }) };
