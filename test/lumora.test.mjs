@@ -1455,6 +1455,11 @@ test('Wichtel-Gerätekarte: ohne eigene Entität, täglicher Wichtel mit Spruch,
   assert.match(html, /class="dvc elf"/);
   assert.match(html, /class="elq"/);
   assert.match(html, /Wichtel-Aufgabe/);
+  assert.match(html, /Geschichte lesen/);
+  assert.equal(L.DEVTPL.elf.render(c, iv, c._dvMap(iv), c._hass.states['sun.sun']).includes('<p>'), false);
+  c._elfOpen = true;
+  assert.match(L.DEVTPL.elf.render(c, iv, c._dvMap(iv), c._hass.states['sun.sun']), /<p>[^<]{40,}<\/p>/);
+  c._elfOpen = false;
   const first = html.match(/<b>([^<]+)<\/b><\/div>|<b>([^<]+)<\/b>(?:<span>|<\/div>)/);
   assert.ok(first);
   c._elfOff = 1;

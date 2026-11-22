@@ -788,6 +788,10 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .elf .dvh .tt small{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.75}
 .elf .dvh .big small{font-size:12px;font-weight:600;opacity:.7;margin-left:3px}
 .elf .elq{background:var(--line);border-radius:16px;padding:10px 12px;font-size:14px;line-height:1.35;font-style:italic}
+.elf .els{background:var(--line);border-radius:16px;padding:10px 12px;font-size:13.5px;line-height:1.4;cursor:pointer}
+.elf .els b{display:flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.8}
+.elf .els ha-icon{--mdc-icon-size:18px}
+.elf .els p{margin:8px 0 0}
 .elf .elt{display:flex;gap:10px;align-items:flex-start;background:rgba(120,170,110,.22);border-radius:16px;padding:10px 12px;font-size:13.5px;line-height:1.35}
 .elf .elt ha-icon{--mdc-icon-size:20px;flex:none;color:#d9a62e}
 .elf .elt b{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.75;margin-bottom:2px}
@@ -1363,7 +1367,7 @@ class LumoraCard extends HTMLElement {
     for (const iv of this._dvAll()) { try { const m = this._dvMap(iv); parts.push(iv.main + (h.states[iv.main] ? h.states[iv.main].state + (h.states[iv.main].attributes.fan_speed || '') + (DEVTPL[iv.type].attrSig ? h.states[iv.main].last_updated : '') : '')); Object.values(m).forEach((x) => { if (x && h.states[x]) parts.push(x + h.states[x].state + (h.states[x].attributes.color_hex || '') + (h.states[x].attributes.humidex_felt === undefined ? '' : h.states[x].attributes.humidity)); }); } catch (_) { /* ignore */ } }
     if (this._dvAll().some((x) => x.type === 'packstation')) { for (const id in h.states) if (PS_RE.test(id)) parts.push(id + h.states[id].state); }
     if (this._dvAll().some((x) => x.type === 'waste')) parts.push(`wc${new Date().toDateString()}${new Date().getHours()}`);
-    if (this._dvAll().some((x) => x.type === 'elf')) parts.push(`elf${new Date().toDateString()}${this._elfOff || 0}`);
+    if (this._dvAll().some((x) => x.type === 'elf')) parts.push(`elf${new Date().toDateString()}${this._elfOff || 0}${this._elfOpen ? 1 : 0}`);
     if (['home', 'more', 'rooms'].includes(this._view)) { parts.push(this._plSig()); parts.push(this._prSig()); }
     if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
     parts.push(this._bd.s);
@@ -4175,6 +4179,7 @@ _more() {
         }
         this._sheet = 'dvmain'; this._q = ''; break;
       }
+      case 'elfstory': if (this._edit) return; this._elfOpen = !this._elfOpen; this._sig = ''; break;
       case 'elfnext': if (this._edit) return; this._elfOff = (this._elfOff || 0) + 1; this._sig = ''; break;
       case 'dvnew': {
         const iv = { id: `dv${Date.now().toString(36)}`, type: this._dvT, main: id, map: {}, title: '' };
@@ -5352,47 +5357,41 @@ registerDevice({
   },
 });
 const ELVES = [
-  ['Zimtstern', 'Ich habe heimlich alle Socken gezählt. Es fehlen immer noch welche.', 'Findet zusammen einen einzelnen Socken und gebt ihm eine Mütze aus Papier.'],
-  ['Lebkuchen', 'Heute bin ich im Backofen Probe gesessen. Der war mir zu warm.', 'Backt oder verziert heute einen Keks, der genau so aussieht wie ihr.'],
-  ['Glöckchen', 'Klingeling! Wer dreimal leise lacht, bekommt Wichtelstaub.', 'Lacht dreimal ganz leise und flüstert dabei einen Wunsch.'],
-  ['Flöckchen', 'Ich bin heute auf einer Schneeflocke gerutscht. Sehr empfehlenswert.', 'Schneidet gemeinsam eine Schneeflocke aus Papier und hängt sie ans Fenster.'],
-  ['Bommel', 'Meine Mütze hat so viele Bommel, dass ich nicht mehr durch die Tür passe.', 'Messt, wer die größte Mütze im Haus hat. Wer gewinnt?'],
-  ['Tannenzapf', 'Ich habe der Tanne einen Schluck Wasser gebracht. Sie hat Danke gesagt.', 'Gebt dem Weihnachtsbaum oder einer Zimmerpflanze etwas Wasser und bedankt euch bei ihr.'],
-  ['Pfefferkuchen', 'Pssst, ich esse nur Krümel. Die zählen nicht.', 'Räumt gemeinsam fünf Dinge auf, die auf dem Boden liegen.'],
-  ['Mütze', 'Ich habe mich im Mützenfach verlaufen und erst nach drei Tagen wieder rausgefunden.', 'Spielt Verstecken: Ein Kuscheltier versteckt sich, der Rest sucht.'],
-  ['Schneeball', 'Ich bin heute so schnell gerannt, dass ich meinen eigenen Schatten verloren habe.', 'Macht ein Schattenspiel an der Wand mit der Taschenlampe.'],
-  ['Nikolaus-Nuss', 'Es gibt Nüsse, die nie geknackt werden. Das ist meine Lieblingssorte.', 'Knackt eine Nuss und teilt sie mit jemandem aus der Familie.'],
-  ['Zuckerstange', 'Ich bin süß, aber nur außen. Innen bin ich Pfefferminz.', 'Malt eine große Zuckerstange und hängt sie an den Kühlschrank.'],
-  ['Kerzenlicht', 'Ich passe heute auf, dass kein Licht allein ist.', 'Macht das Wohnzimmer dunkel und schaltet nur die Lichterkette an. Singt ein leises Lied.'],
-  ['Strickmütz', 'Meine Oma hat mir 17 Paar Handschuhe gestrickt. Ich habe aber nur zwei Hände.', 'Sucht ein Paar Handschuhe, das sich nicht mehr kennt, und führt es wieder zusammen.'],
-  ['Honigduft', 'Ich habe heute den Duft von Orangen gesammelt. Er liegt in meiner Tasche.', 'Steckt Nelken in eine Orange und stellt sie auf den Tisch.'],
-  ['Rentierhuf', 'Ich habe geübt, rückwärts zu laufen. Der Schlitten ist nämlich oft im Rückwärtsgang.', 'Lauft eine Runde rückwärts durch die Wohnung. Vorsicht vor Türen!'],
-  ['Sternschnupp', 'Ich habe einen Stern gefunden, der keinen Platz am Himmel hatte.', 'Faltet oder malt einen Stern und klebt ihn an die Zimmerdecke.'],
-  ['Wunschzettel', 'Alle Wünsche, die ich gelesen habe, riechen nach Schokolade.', 'Malt einen Wunsch, der nichts kostet, und schenkt ihn jemandem.'],
-  ['Mandelkern', 'Ich bin heute im Mandelkern eingeschlafen. Es war sehr gemütlich.', 'Baut aus Kissen und Decken ein gemütliches Nest und lest darin eine Geschichte.'],
-  ['Fichtennadel', 'Ich pikse nicht, ich kitzle nur!', 'Kitzelt euch gegenseitig mit einer Feder, aber nur ein bisschen.'],
-  ['Schlittenglocke', 'Wenn es dunkel wird, höre ich die Glocken schon ganz leise.', 'Hört nach dem Abendessen fünf Minuten lang ein Weihnachtslied.'],
-  ['Marzipan', 'Ich habe die Schokoladentafel nur geprüft. Alles in Ordnung.', 'Probiert etwas Neues zum Naschen, aber jeder bekommt nur ein Stück.'],
-  ['Lichterkettchen', 'Ich bin heute allen Lichtern nachgegangen. Eine Steckdose war traurig.', 'Zählt alle Lichter in der Wohnung. Wer findet die meisten?'],
-  ['Plätzchenkrümel', 'Ich habe eine Spur aus Krümeln gelegt. Folgt ihr!', 'Legt eine Spur aus Wollfäden zu einem kleinen Geschenk im Haus.'],
-  ['Eiszapfen', 'Ich bin heute ganz leise gewesen, damit der Schnee nicht aufwacht.', 'Spielt fünf Minuten das Flüsterspiel: Alles darf nur geflüstert werden.'],
-  ['Tannenduft', 'Ich habe nachgeschaut: Der Baum steht noch. Alles gut.', 'Lasst jeden etwas Neues an den Baum hängen, das er selbst gemacht hat.'],
-  ['Wollsocke', 'Ich bin die weichste Socke der Welt. Ihr dürft mich streicheln.', 'Zieht dicke Socken an und rutscht damit durch den Flur.'],
-  ['Mondschein', 'Der Mond hat mir zugezwinkert. Ich habe zurückgezwinkert.', 'Schaut abends aus dem Fenster und sucht Mond und Sterne.'],
-  ['Schokotaler', 'Ich bin nur ein kleiner Wichtel, aber ich habe einen großen Hunger.', 'Teilt etwas Süßes in genau so viele gleiche Teile, wie Leute im Haus sind.'],
-  ['Wichtelpost', 'Ich habe einen Brief für euch. Er ist nur unsichtbar.', 'Malt dem Wichtel ein Bild und legt es abends hin. Vielleicht antwortet er.'],
-  ['Funkelstern', 'Der Weihnachtsmann hat mir erlaubt, ein bisschen zu leuchten.', 'Haltet beide Hände hoch und leuchtet mit den Fingern wie Sterne.'],
+  ['Zimtstern', 'Ich habe heimlich alle Socken gezählt. Es fehlen immer noch welche.', 'Findet zusammen einen einzelnen Socken und gebt ihm eine Mütze aus Papier.', 'Zimtstern sammelt Socken, die allein unterwegs sind. In seiner Höhle wohnen schon sieben, und jeder hat einen Namen. Nur einen Partner hat noch keiner gefunden.'],
+  ['Lebkuchen', 'Heute bin ich im Backofen Probe gesessen. Der war mir zu warm.', 'Backt oder verziert heute einen Keks, der genau so aussieht wie ihr.', 'Lebkuchen wollte wissen, wie es im Backofen ist, und kletterte hinein. Er schwitzte so sehr, dass sein Zuckerguss schmolz. Seitdem hat er eine ganz glänzende Nase.'],
+  ['Glöckchen', 'Klingeling! Wer dreimal leise lacht, bekommt Wichtelstaub.', 'Lacht dreimal ganz leise und flüstert dabei einen Wunsch.', 'Glöckchen hat ein winziges Glöckchen am Hut, das nur klingelt, wenn jemand etwas Liebes denkt. Heute hat es den ganzen Tag geklingelt. Er weiß noch nicht, wer so nett an ihn gedacht hat.'],
+  ['Flöckchen', 'Ich bin heute auf einer Schneeflocke gerutscht. Sehr empfehlenswert.', 'Schneidet gemeinsam eine Schneeflocke aus Papier und hängt sie ans Fenster.', 'Flöckchen fiel als allerkleinste Schneeflocke vom Himmel und landete auf einer Wichtelnase. Seitdem gehören die beiden zusammen. Wenn es kalt wird, kribbelt die Nase und Flöckchen freut sich.'],
+  ['Bommel', 'Meine Mütze hat so viele Bommel, dass ich nicht mehr durch die Tür passe.', 'Messt, wer die größte Mütze im Haus hat. Wer gewinnt?', 'Bommel hat auf seiner Mütze einen Bommel, der so groß ist, dass er darauf schlafen kann. Eines Nachts rollte der Bommel durch die Küche, mit Bommel obendrauf. Am Morgen lagen beide unter dem Tisch und lachten.'],
+  ['Tannenzapf', 'Ich habe der Tanne einen Schluck Wasser gebracht. Sie hat Danke gesagt.', 'Gebt dem Weihnachtsbaum oder einer Zimmerpflanze etwas Wasser und bedankt euch bei ihr.', 'Tannenzapf wohnt im Weihnachtsbaum und kennt jede Nadel mit Namen. Wenn der Baum Durst hat, räuspert er sich ganz leise. Nur Wichtel können das hören.'],
+  ['Pfefferkuchen', 'Pssst, ich esse nur Krümel. Die zählen nicht.', 'Räumt gemeinsam fünf Dinge auf, die auf dem Boden liegen.', 'Pfefferkuchen ist der heimlichste Wichtel der Welt. Er nascht nur Krümel, und die zählen nicht, sagt er. Dafür räumt er nachts heimlich ein Spielzeug auf, damit es niemand merkt.'],
+  ['Mütze', 'Ich habe mich im Mützenfach verlaufen und erst nach drei Tagen wieder rausgefunden.', 'Spielt Verstecken: Ein Kuscheltier versteckt sich, der Rest sucht.', 'Mütze hat sich im Mützenfach verlaufen und musste drei Tage lang nach dem Ausgang suchen. Er fand ihn erst, als er auf einen warmen Schal stieß, der nach Zuhause roch. Seitdem hat er immer einen Wollfaden dabei.'],
+  ['Schneeball', 'Ich bin heute so schnell gerannt, dass ich meinen eigenen Schatten verloren habe.', 'Macht ein Schattenspiel an der Wand mit der Taschenlampe.', 'Schneeball rannte so schnell, dass sein Schatten nicht mehr mitkam. Der Schatten wartete geduldig an der Wand, bis es dunkel wurde. Dann tanzten die beiden zusammen im Lampenlicht.'],
+  ['Nikolaus-Nuss', 'Es gibt Nüsse, die nie geknackt werden. Das ist meine Lieblingssorte.', 'Knackt eine Nuss und teilt sie mit jemandem aus der Familie.', 'Nikolaus-Nuss ist eine Nuss, die nie geknackt wird, weil sie so schlau ist. Sie versteckt sich immer zwischen den Mandarinen. Nur wer ganz lieb fragt, bekommt sie geschenkt.'],
+  ['Zuckerstange', 'Ich bin süß, aber nur außen. Innen bin ich Pfefferminz.', 'Malt eine große Zuckerstange und hängt sie an den Kühlschrank.', 'Zuckerstange glaubte lange, sie sei ein Spazierstock für Riesen. Dann merkte sie, dass sie nach Pfefferminz duftet und alle sie lieb haben. Jetzt steht sie stolz am Fenster und freut sich über den Schnee.'],
+  ['Kerzenlicht', 'Ich passe heute auf, dass kein Licht allein ist.', 'Macht das Wohnzimmer dunkel und schaltet nur die Lichterkette an. Singt ein leises Lied.', 'Kerzenlicht hat ein Flämmchen auf dem Kopf und passt auf, dass kein Licht allein bleibt. Abends geht er von Zimmer zu Zimmer und sagt leise Gute Nacht. Jedes Licht antwortet mit einem Flackern.'],
+  ['Strickmütz', 'Meine Oma hat mir 17 Paar Handschuhe gestrickt. Ich habe aber nur zwei Hände.', 'Sucht ein Paar Handschuhe, das sich nicht mehr kennt, und führt es wieder zusammen.', 'Strickmütz bekam von seiner Oma siebzehn Paar Handschuhe gestrickt. Er hat aber nur zwei Hände, also verschenkt er die anderen. So haben schon viele kalte Wichtelhände wieder warm.'],
+  ['Honigduft', 'Ich habe heute den Duft von Orangen gesammelt. Er liegt in meiner Tasche.', 'Steckt Nelken in eine Orange und stellt sie auf den Tisch.', 'Honigduft sammelt Düfte in einem kleinen Beutel. Orange, Zimt und Tannenholz hat er schon. Heute roch es nach Plätzchen, und der Beutel ging fast über.'],
+  ['Rentierhuf', 'Ich habe geübt, rückwärts zu laufen. Der Schlitten ist nämlich oft im Rückwärtsgang.', 'Lauft eine Runde rückwärts durch die Wohnung. Vorsicht vor Türen!', 'Rentierhuf übt täglich rückwärts laufen, weil der Schlitten im Schnee oft rückwärts rutscht. Einmal lief er rückwärts durch die Küche und stieß an den Besen. Der Besen sagte nichts, aber er lächelte.'],
+  ['Sternschnupp', 'Ich habe einen Stern gefunden, der keinen Platz am Himmel hatte.', 'Faltet oder malt einen Stern und klebt ihn an die Zimmerdecke.', 'Sternschnupp fand einen kleinen Stern, der keinen Platz am Himmel mehr hatte. Er nahm ihn mit nach Hause und hängte ihn ans Fenster. Jetzt leuchtet er jeden Abend für alle, die hinausschauen.'],
+  ['Wunschzettel', 'Alle Wünsche, die ich gelesen habe, riechen nach Schokolade.', 'Malt einen Wunsch, der nichts kostet, und schenkt ihn jemandem.', 'Wunschzettel liest den ganzen Tag die Wünsche der Kinder. Die meisten riechen nach Schokolade, manche nach Keksen. Die schönsten Wünsche sind die, die gar nichts kosten.'],
+  ['Mandelkern', 'Ich bin heute im Mandelkern eingeschlafen. Es war sehr gemütlich.', 'Baut aus Kissen und Decken ein gemütliches Nest und lest darin eine Geschichte.', 'Mandelkern ist mitten in einer Mandelschale eingeschlafen und hat bis zum Morgen geträumt. Er träumte von einem Schlitten aus Marzipan. Beim Aufwachen hatte er Hunger auf Kekse.'],
+  ['Schlittenglocke', 'Wenn es dunkel wird, höre ich die Glocken schon ganz leise.', 'Hört nach dem Abendessen fünf Minuten lang ein Weihnachtslied.', 'Schlittenglocke hört abends die Glocken des Weihnachtsmanns schon von weit weg. Sie klingen leise und silbern. Wenn man ganz still ist, hört man sie vielleicht auch.'],
+  ['Marzipan', 'Ich habe die Schokoladentafel nur geprüft. Alles in Ordnung.', 'Probiert etwas Neues zum Naschen, aber jeder bekommt nur ein Stück.', 'Marzipan ist rund, rosa und ein bisschen frech. Er behauptet, er prüfe nur, ob die Schokolade noch gut ist. Dabei hat er schon ein Stück zu viel geprüft.'],
+  ['Lichterkettchen', 'Ich bin heute allen Lichtern nachgegangen. Eine Steckdose war traurig.', 'Zählt alle Lichter in der Wohnung. Wer findet die meisten?', 'Lichterkettchen blinkt in allen Farben und will jedes Licht im Haus besuchen. Eine Steckdose war traurig, weil niemand mit ihr gesprochen hat. Da leuchtete Lichterkettchen ihr zu, und sie freute sich.'],
+  ['Plätzchenkrümel', 'Ich habe eine Spur aus Krümeln gelegt. Folgt ihr!', 'Legt eine Spur aus Wollfäden zu einem kleinen Geschenk im Haus.', 'Plätzchenkrümel legt eine Spur aus Krümeln durchs ganze Haus. Wer ihr folgt, entdeckt am Ende eine kleine Überraschung. Der Krümel selbst versteckt sich dabei hinter dem Sofa und kichert.'],
+  ['Eiszapfen', 'Ich bin heute ganz leise gewesen, damit der Schnee nicht aufwacht.', 'Spielt fünf Minuten das Flüsterspiel: Alles darf nur geflüstert werden.', 'Eiszapfen ist ganz still, damit der Schnee nicht aufwacht. Er hängt am Dach und träumt von der Sonne. Wenn sie scheint, tropft er vor Freude.'],
+  ['Wichtelpost', 'Ich habe einen Brief für euch. Er ist nur unsichtbar.', 'Malt dem Wichtel ein Bild und legt es abends hin. Vielleicht antwortet er.', 'Wichtelpost trägt Briefe zwischen Wichteln und Kindern hin und her. Seine Briefe sind unsichtbar, aber sie kommen immer an. Heute hat er einen ganz besonderen dabei: einen Dank an euch.'],
 ];
 const elfDays = () => { const n = new Date(); return Math.floor(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) / 86400000); };
-/* Wichtel des Tages: ohne eigene Entität. Täglich wechselnder Wichtel mit Spruch, Mini-Aufgabe für die Familie und Countdown bis Heiligabend. Antippen zeigt den nächsten Wichtel (nur zum Ansehen, ohne zu speichern). */
+/* Wichtel des Tages: ohne eigene Entität. 24 Wichtel, im Dezember passend zum Datum (1. bis 24.), sonst täglich wechselnd. Mit Spruch, kleiner Geschichte, Mini-Aufgabe für die Familie und Countdown bis Heiligabend. Antippen zeigt den nächsten Wichtel (nur zum Ansehen, ohne zu speichern). */
 registerDevice({
-  type: 'elf', label: 'Wichtel (Weihnachten)', icon: 'mdi:tree-outline', desc: 'Wichtel des Tages mit Spruch, kleiner Aufgabe und Countdown bis Heiligabend', size: 'w', solo: 'sun.sun',
+  type: 'elf', label: 'Wichtel (Weihnachten)', icon: 'mdi:tree-outline', desc: 'Wichtel des Tages mit Spruch, kleiner Geschichte, Aufgabe und Countdown bis Heiligabend', size: 'w', solo: 'sun.sun',
   main: { dom: 'sun' },
   fields: {},
-  opts: [{ k: 'count', l: 'Countdown bis Heiligabend anzeigen', def: 1, bool: true }, { k: 'task', l: 'Tages-Aufgabe anzeigen', def: 1, bool: true }],
+  opts: [{ k: 'count', l: 'Countdown bis Heiligabend anzeigen', def: 1, bool: true }, { k: 'task', l: 'Tages-Aufgabe anzeigen', def: 1, bool: true }, { k: 'story', l: 'Geschichte anzeigen', def: 1, bool: true }],
   render: (c, iv) => {
-    const L = ELVES.length; const e = ELVES[(((elfDays() + (c._elfOff || 0)) % L) + L) % L];
-    const now = new Date(); const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()); const diff = Math.round((new Date(now.getFullYear(), 11, 24) - t0) / 86400000);
+    const L = ELVES.length; const now = new Date();
+    const e = ELVES[(((now.getMonth() === 11 && now.getDate() <= 24 ? now.getDate() - 1 : elfDays()) + (c._elfOff || 0)) % L + L) % L]; const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()); const diff = Math.round((new Date(now.getFullYear(), 11, 24) - t0) / 86400000);
     let sub = ''; let big = '';
     if (dvOpt(iv, 'count')) {
       if (diff > 1 && diff <= 60) { sub = `Noch ${diff} Tage bis Heiligabend`; big = `<div class="big">${diff}<small>Tage</small></div>`; }
@@ -5401,7 +5400,8 @@ registerDevice({
       else if (diff < 0 && now.getMonth() === 11) sub = 'Frohe Weihnachten';
     }
     const task = dvOpt(iv, 'task') ? `<div class="elt"><ha-icon icon="mdi:star-four-points"></ha-icon><div><b>Wichtel-Aufgabe</b>${esc(e[2])}</div></div>` : '';
-    return `<div class="dvc elf"><div class="dvh" data-act="elfnext" title="Nächster Wichtel"><div class="ib"><span class="elfe">\u{1F9DD}</span></div><div class="tt"><small>${esc(iv.title || 'Wichtel des Tages')}</small><b>${esc(e[0])}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>${big}</div><div class="elq">\u201E${esc(e[1])}\u201C</div>${task}</div>`;
+    const story = dvOpt(iv, 'story') ? `<div class="els ${c._elfOpen ? 'open' : ''}" data-act="elfstory"><b><ha-icon icon="mdi:book-open-variant-outline"></ha-icon>${c._elfOpen ? 'Geschichte' : 'Geschichte lesen'}</b>${c._elfOpen ? `<p>${esc(e[3])}</p>` : ''}</div>` : '';
+    return `<div class="dvc elf"><div class="dvh" data-act="elfnext" title="Nächster Wichtel"><div class="ib"><span class="elfe">\u{1F9DD}</span></div><div class="tt"><small>${esc(iv.title || 'Wichtel des Tages')}</small><b>${esc(e[0])}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>${big}</div><div class="elq">\u201E${esc(e[1])}\u201C</div>${story}${task}</div>`;
   },
 });
 registerCard({ id: 'dev', label: 'Gerätekarten', icon: 'mdi:view-grid-plus-outline', home: true, size: 'w', items: (c) => c._dvAll().map((iv) => {
