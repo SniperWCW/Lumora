@@ -783,6 +783,14 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .wc .wch small{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fg);opacity:.75}
 .wc .wch .tt b{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wc .wch .tt span{font-size:13px;color:var(--fg);opacity:.8}
+.elf .elfe{font-size:26px;line-height:1}
+.elf .dvh .ib{background:rgba(196,58,58,.22)}
+.elf .dvh .tt small{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.75}
+.elf .dvh .big small{font-size:12px;font-weight:600;opacity:.7;margin-left:3px}
+.elf .elq{background:var(--line);border-radius:16px;padding:10px 12px;font-size:14px;line-height:1.35;font-style:italic}
+.elf .elt{display:flex;gap:10px;align-items:flex-start;background:rgba(120,170,110,.22);border-radius:16px;padding:10px 12px;font-size:13.5px;line-height:1.35}
+.elf .elt ha-icon{--mdc-icon-size:20px;flex:none;color:#d9a62e}
+.elf .elt b{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.75;margin-bottom:2px}
 .wcp{flex:none;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700;background:rgba(128,128,128,.22);color:var(--fg);white-space:nowrap}
 .wcp.t0{background:rgba(214,96,88,.4)}.wcp.t1{background:rgba(220,160,50,.4)}
 .wcg{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px}
@@ -884,7 +892,7 @@ const FX_LABEL = {
   night: ['Nachthimmel', 'Sterne, Mond mit Phase und Sternschnuppen nach Sonnenstand'],
   autumn: ['Herbst', 'Fallende Blätter, automatisch 22.9. bis 30.11.'],
   halloween: ['Halloween', 'Fledermäuse, Spinne, Geister, automatisch 24.10. bis 1.11.'],
-  christmas: ['Weihnachten', 'Schnee, Lichterkette und Schlitten, automatisch ab 1. Advent bis 6.1.'],
+  christmas: ['Weihnachten', 'Schnee, Lichterkette, Schlitten und ein Wichtel, der ab und zu vorbeischaut, automatisch ab 1. Advent bis 6.1.'],
 };
 const FX_MODES = ['auto', 'on', 'off'];
 const FX_MODE_L = { auto: 'Auto', on: 'Immer an', off: 'Aus' };
@@ -1136,6 +1144,23 @@ const Fx = (() => {
     st.tm -= dt;
     if (!st.sl && st.tm <= 0) { st.sl = { x: W + 120, y: R(H * 0.12, H * 0.3), ph: R(0, 6) }; st.tm = R(45, 90); }
     if (st.sl) { const q = st.sl; q.x -= 160 * dt; if (q.x < -160) st.sl = null; else emoji('\u{1F98C}\u{1F98C}\u{1F6F7}', q.x, q.y + Math.sin(t * 2 + q.ph) * 8, 34, a); }
+    /* Wichtel: schaut ab und zu am unteren Rand herein, winkt kurz und verschwindet wieder */
+    st.te = (st.te === undefined ? R(5, 10) : st.te) - dt;
+    if (!st.el && st.te <= 0) { st.el = { x: R(W * 0.12, W * 0.88), ph: 0, wait: 0, o: 0 }; st.te = R(40, 80); }
+    if (st.el) {
+      const q = st.el; const sz = 46;
+      if (q.ph === 0) { q.o += 70 * dt; if (q.o >= sz * 0.8) { q.ph = 1; q.wait = 3.2; } }
+      else if (q.ph === 1) { q.wait -= dt; if (q.wait <= 0) q.ph = 2; }
+      else { q.o -= 80 * dt; if (q.o <= 0) st.el = null; }
+      if (st.el) {
+        const sw = q.ph === 1 ? 1 : 0.3;
+        ctx.save(); ctx.globalAlpha = a; ctx.translate(q.x, H - q.o + sz * 0.5); ctx.rotate(Math.sin(t * 3.2) * 0.12 * sw);
+        ctx.font = `${sz}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('\u{1F9DD}', 0, 0);
+        if (q.ph === 1) { ctx.font = `${Math.round(sz * 0.5)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`; ctx.rotate(Math.sin(t * 9) * 0.35); ctx.fillText('\u{1F44B}', sz * 0.75, -sz * 0.25); }
+        ctx.restore();
+      }
+    }
   };
 
   const frame = (ts) => {
@@ -1150,7 +1175,7 @@ const Fx = (() => {
       const st = get(k); const c = conf.act[k]; let want = 0;
       if (c) { if (!st.on) { st.on = true; st.t0 = now; } want = (!c.dur || (now - st.t0) / 1000 < c.dur) ? 1 : 0; } else st.on = false;
       st.a += Math.max(-1, Math.min(1, (want - st.a))) * Math.min(1, dt * 1.2);
-      if (st.a < 0.01 && !want) { st.a = 0; st.p = []; st.pd = null; st.dbl = 0; st.g = null; st.sh = null; st.sp = null; st.sl = null; st.bolt = null; st.fl = 0; return; }
+      if (st.a < 0.01 && !want) { st.a = 0; st.p = []; st.pd = null; st.dbl = 0; st.g = null; st.sh = null; st.sp = null; st.sl = null; st.el = null; st.bolt = null; st.fl = 0; return; }
       busy = true; const a = st.a; const v = c ? c.v : st.v; st.v = v || st.v;
       if (k === 'weather') {
         const rainy = ['rain', 'pouring', 'storm', 'lightning-rainy', 'snowy-rainy'].includes(v);
@@ -1169,7 +1194,7 @@ const Fx = (() => {
       else if (k === 'christmas') christmas(st, dt, a, t);
     } catch (_) {
       /* ein Fehler in einem Effekt darf die Animationsschleife nicht beenden (sonst Ruckeln/Neustart alle paar Sekunden) */
-      const s = S[k]; if (s) { s.p = []; s.pd = null; s.g = null; s.sh = null; s.sp = null; s.sl = null; s.bolt = null; }
+      const s = S[k]; if (s) { s.p = []; s.pd = null; s.g = null; s.sh = null; s.sp = null; s.sl = null; s.el = null; s.bolt = null; }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0; busy = true;
     } });
     if (busy) raf = requestAnimationFrame(frame);
@@ -1338,6 +1363,7 @@ class LumoraCard extends HTMLElement {
     for (const iv of this._dvAll()) { try { const m = this._dvMap(iv); parts.push(iv.main + (h.states[iv.main] ? h.states[iv.main].state + (h.states[iv.main].attributes.fan_speed || '') + (DEVTPL[iv.type].attrSig ? h.states[iv.main].last_updated : '') : '')); Object.values(m).forEach((x) => { if (x && h.states[x]) parts.push(x + h.states[x].state + (h.states[x].attributes.color_hex || '') + (h.states[x].attributes.humidex_felt === undefined ? '' : h.states[x].attributes.humidity)); }); } catch (_) { /* ignore */ } }
     if (this._dvAll().some((x) => x.type === 'packstation')) { for (const id in h.states) if (PS_RE.test(id)) parts.push(id + h.states[id].state); }
     if (this._dvAll().some((x) => x.type === 'waste')) parts.push(`wc${new Date().toDateString()}${new Date().getHours()}`);
+    if (this._dvAll().some((x) => x.type === 'elf')) parts.push(`elf${new Date().toDateString()}${this._elfOff || 0}`);
     if (['home', 'more', 'rooms'].includes(this._view)) { parts.push(this._plSig()); parts.push(this._prSig()); }
     if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
     parts.push(this._bd.s);
@@ -3078,8 +3104,8 @@ _more() {
       const iv = this._set.devices.find((x) => x.id === this._dvId); const tp = iv && DEVTPL[iv.type];
       if (iv && tp) {
         const F = this._dvMap(iv); const ms = this._hass.states[iv.main];
-        c = `<h2>${esc(tp.label)}</h2><div class="hint">${esc(iv.main)}</div><h4>Titel</h4><input class="dvin" placeholder="${esc((ms && ms.attributes.friendly_name) || iv.main)}" value="${esc(iv.title)}">
-          <h4>Entitäten</h4><div class="hint">Gefundenes ist schon eingetragen. Passt etwas nicht, wähle es selbst aus.</div>${Object.keys(tp.fields).map((k) => {
+        c = `<h2>${esc(tp.label)}</h2>${tp.solo ? '' : `<div class="hint">${esc(iv.main)}</div>`}<h4>Titel</h4><input class="dvin" placeholder="${esc(tp.solo ? tp.label : (ms && ms.attributes.friendly_name) || iv.main)}" value="${esc(iv.title)}">
+          ${Object.keys(tp.fields).length ? '<h4>Entitäten</h4><div class="hint">Gefundenes ist schon eingetragen. Passt etwas nicht, wähle es selbst aus.</div>' : ''}${Object.keys(tp.fields).map((k) => {
           const ch = iv.map[k]; const st = F[k] && this._hass.states[F[k]];
           const sub = ch === '-' ? 'Nicht verwendet' : st ? `${st.attributes.friendly_name || F[k]}${ch ? ' · manuell' : ' · automatisch'}` : F[k] ? `${F[k]} (nicht verfügbar)` : 'Nicht gefunden';
           return `<div class="row"><div class="t"><b>${esc(tp.fields[k].l)}</b><span>${esc(sub)}</span></div><button data-act="dvpick" data-k="${k}">Ändern</button></div>`;
@@ -4140,7 +4166,16 @@ _more() {
       case 'vfan': h.callService('vacuum', 'set_fan_speed', { entity_id: id, fan_speed: t.dataset.v }); return;
       case 'adddv': this._sheet = 'dvadd'; break;
       case 'addcustroom': this._sheet = 'add'; this._q = ''; this._flt = 'all'; this._cust = true; break;
-      case 'dvtype': this._dvT = t.dataset.k; this._sheet = 'dvmain'; this._q = ''; break;
+      case 'dvtype': {
+        this._dvT = t.dataset.k; const tp0 = DEVTPL[this._dvT];
+        /* Karten ohne eigene Entität (z. B. Wichtel) werden sofort angelegt, als Platzhalter dient eine immer vorhandene Entität */
+        if (tp0 && tp0.solo && this._hass.states[tp0.solo]) {
+          const iv0 = { id: `dv${Date.now().toString(36)}`, type: this._dvT, main: tp0.solo, map: {}, title: '' };
+          s.devices.push(iv0); this._placeNew(iv0.id); this._dvId = iv0.id; this._sheet = 'dv'; this._save(); break;
+        }
+        this._sheet = 'dvmain'; this._q = ''; break;
+      }
+      case 'elfnext': if (this._edit) return; this._elfOff = (this._elfOff || 0) + 1; this._sig = ''; break;
       case 'dvnew': {
         const iv = { id: `dv${Date.now().toString(36)}`, type: this._dvT, main: id, map: {}, title: '' };
         s.devices.push(iv); this._placeNew(iv.id);
@@ -5316,12 +5351,65 @@ registerDevice({
       <div class="mgz">Richtwerte: Bundeszentrum für Ernährung (BLE), Kinder mit 70 %, Getränke 1 Liter je Kind und Tag.</div></div>`;
   },
 });
+const ELVES = [
+  ['Zimtstern', 'Ich habe heimlich alle Socken gezählt. Es fehlen immer noch welche.', 'Findet zusammen einen einzelnen Socken und gebt ihm eine Mütze aus Papier.'],
+  ['Lebkuchen', 'Heute bin ich im Backofen Probe gesessen. Der war mir zu warm.', 'Backt oder verziert heute einen Keks, der genau so aussieht wie ihr.'],
+  ['Glöckchen', 'Klingeling! Wer dreimal leise lacht, bekommt Wichtelstaub.', 'Lacht dreimal ganz leise und flüstert dabei einen Wunsch.'],
+  ['Flöckchen', 'Ich bin heute auf einer Schneeflocke gerutscht. Sehr empfehlenswert.', 'Schneidet gemeinsam eine Schneeflocke aus Papier und hängt sie ans Fenster.'],
+  ['Bommel', 'Meine Mütze hat so viele Bommel, dass ich nicht mehr durch die Tür passe.', 'Messt, wer die größte Mütze im Haus hat. Wer gewinnt?'],
+  ['Tannenzapf', 'Ich habe der Tanne einen Schluck Wasser gebracht. Sie hat Danke gesagt.', 'Gebt dem Weihnachtsbaum oder einer Zimmerpflanze etwas Wasser und bedankt euch bei ihr.'],
+  ['Pfefferkuchen', 'Pssst, ich esse nur Krümel. Die zählen nicht.', 'Räumt gemeinsam fünf Dinge auf, die auf dem Boden liegen.'],
+  ['Mütze', 'Ich habe mich im Mützenfach verlaufen und erst nach drei Tagen wieder rausgefunden.', 'Spielt Verstecken: Ein Kuscheltier versteckt sich, der Rest sucht.'],
+  ['Schneeball', 'Ich bin heute so schnell gerannt, dass ich meinen eigenen Schatten verloren habe.', 'Macht ein Schattenspiel an der Wand mit der Taschenlampe.'],
+  ['Nikolaus-Nuss', 'Es gibt Nüsse, die nie geknackt werden. Das ist meine Lieblingssorte.', 'Knackt eine Nuss und teilt sie mit jemandem aus der Familie.'],
+  ['Zuckerstange', 'Ich bin süß, aber nur außen. Innen bin ich Pfefferminz.', 'Malt eine große Zuckerstange und hängt sie an den Kühlschrank.'],
+  ['Kerzenlicht', 'Ich passe heute auf, dass kein Licht allein ist.', 'Macht das Wohnzimmer dunkel und schaltet nur die Lichterkette an. Singt ein leises Lied.'],
+  ['Strickmütz', 'Meine Oma hat mir 17 Paar Handschuhe gestrickt. Ich habe aber nur zwei Hände.', 'Sucht ein Paar Handschuhe, das sich nicht mehr kennt, und führt es wieder zusammen.'],
+  ['Honigduft', 'Ich habe heute den Duft von Orangen gesammelt. Er liegt in meiner Tasche.', 'Steckt Nelken in eine Orange und stellt sie auf den Tisch.'],
+  ['Rentierhuf', 'Ich habe geübt, rückwärts zu laufen. Der Schlitten ist nämlich oft im Rückwärtsgang.', 'Lauft eine Runde rückwärts durch die Wohnung. Vorsicht vor Türen!'],
+  ['Sternschnupp', 'Ich habe einen Stern gefunden, der keinen Platz am Himmel hatte.', 'Faltet oder malt einen Stern und klebt ihn an die Zimmerdecke.'],
+  ['Wunschzettel', 'Alle Wünsche, die ich gelesen habe, riechen nach Schokolade.', 'Malt einen Wunsch, der nichts kostet, und schenkt ihn jemandem.'],
+  ['Mandelkern', 'Ich bin heute im Mandelkern eingeschlafen. Es war sehr gemütlich.', 'Baut aus Kissen und Decken ein gemütliches Nest und lest darin eine Geschichte.'],
+  ['Fichtennadel', 'Ich pikse nicht, ich kitzle nur!', 'Kitzelt euch gegenseitig mit einer Feder, aber nur ein bisschen.'],
+  ['Schlittenglocke', 'Wenn es dunkel wird, höre ich die Glocken schon ganz leise.', 'Hört nach dem Abendessen fünf Minuten lang ein Weihnachtslied.'],
+  ['Marzipan', 'Ich habe die Schokoladentafel nur geprüft. Alles in Ordnung.', 'Probiert etwas Neues zum Naschen, aber jeder bekommt nur ein Stück.'],
+  ['Lichterkettchen', 'Ich bin heute allen Lichtern nachgegangen. Eine Steckdose war traurig.', 'Zählt alle Lichter in der Wohnung. Wer findet die meisten?'],
+  ['Plätzchenkrümel', 'Ich habe eine Spur aus Krümeln gelegt. Folgt ihr!', 'Legt eine Spur aus Wollfäden zu einem kleinen Geschenk im Haus.'],
+  ['Eiszapfen', 'Ich bin heute ganz leise gewesen, damit der Schnee nicht aufwacht.', 'Spielt fünf Minuten das Flüsterspiel: Alles darf nur geflüstert werden.'],
+  ['Tannenduft', 'Ich habe nachgeschaut: Der Baum steht noch. Alles gut.', 'Lasst jeden etwas Neues an den Baum hängen, das er selbst gemacht hat.'],
+  ['Wollsocke', 'Ich bin die weichste Socke der Welt. Ihr dürft mich streicheln.', 'Zieht dicke Socken an und rutscht damit durch den Flur.'],
+  ['Mondschein', 'Der Mond hat mir zugezwinkert. Ich habe zurückgezwinkert.', 'Schaut abends aus dem Fenster und sucht Mond und Sterne.'],
+  ['Schokotaler', 'Ich bin nur ein kleiner Wichtel, aber ich habe einen großen Hunger.', 'Teilt etwas Süßes in genau so viele gleiche Teile, wie Leute im Haus sind.'],
+  ['Wichtelpost', 'Ich habe einen Brief für euch. Er ist nur unsichtbar.', 'Malt dem Wichtel ein Bild und legt es abends hin. Vielleicht antwortet er.'],
+  ['Funkelstern', 'Der Weihnachtsmann hat mir erlaubt, ein bisschen zu leuchten.', 'Haltet beide Hände hoch und leuchtet mit den Fingern wie Sterne.'],
+];
+const elfDays = () => { const n = new Date(); return Math.floor(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) / 86400000); };
+/* Wichtel des Tages: ohne eigene Entität. Täglich wechselnder Wichtel mit Spruch, Mini-Aufgabe für die Familie und Countdown bis Heiligabend. Antippen zeigt den nächsten Wichtel (nur zum Ansehen, ohne zu speichern). */
+registerDevice({
+  type: 'elf', label: 'Wichtel (Weihnachten)', icon: 'mdi:tree-outline', desc: 'Wichtel des Tages mit Spruch, kleiner Aufgabe und Countdown bis Heiligabend', size: 'w', solo: 'sun.sun',
+  main: { dom: 'sun' },
+  fields: {},
+  opts: [{ k: 'count', l: 'Countdown bis Heiligabend anzeigen', def: 1, bool: true }, { k: 'task', l: 'Tages-Aufgabe anzeigen', def: 1, bool: true }],
+  render: (c, iv) => {
+    const L = ELVES.length; const e = ELVES[(((elfDays() + (c._elfOff || 0)) % L) + L) % L];
+    const now = new Date(); const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()); const diff = Math.round((new Date(now.getFullYear(), 11, 24) - t0) / 86400000);
+    let sub = ''; let big = '';
+    if (dvOpt(iv, 'count')) {
+      if (diff > 1 && diff <= 60) { sub = `Noch ${diff} Tage bis Heiligabend`; big = `<div class="big">${diff}<small>Tage</small></div>`; }
+      else if (diff === 1) sub = 'Morgen ist Heiligabend';
+      else if (diff === 0) sub = 'Heute ist Heiligabend!';
+      else if (diff < 0 && now.getMonth() === 11) sub = 'Frohe Weihnachten';
+    }
+    const task = dvOpt(iv, 'task') ? `<div class="elt"><ha-icon icon="mdi:star-four-points"></ha-icon><div><b>Wichtel-Aufgabe</b>${esc(e[2])}</div></div>` : '';
+    return `<div class="dvc elf"><div class="dvh" data-act="elfnext" title="Nächster Wichtel"><div class="ib"><span class="elfe">\u{1F9DD}</span></div><div class="tt"><small>${esc(iv.title || 'Wichtel des Tages')}</small><b>${esc(e[0])}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>${big}</div><div class="elq">\u201E${esc(e[1])}\u201C</div>${task}</div>`;
+  },
+});
 registerCard({ id: 'dev', label: 'Gerätekarten', icon: 'mdi:view-grid-plus-outline', home: true, size: 'w', items: (c) => c._dvAll().map((iv) => {
   const tp = DEVTPL[iv.type]; const st = c._hass.states[iv.main];
   if (!st) return c._edit ? { id: iv.id, html: `<div class="dvc"><div class="dvh"><div class="ib"><ha-icon icon="${tp.icon}"></ha-icon></div><div class="tt"><b>${esc(iv.title || tp.label)}</b><span>${esc(iv.main)} nicht gefunden</span></div></div></div>`, size: tp.size, cfg: true } : null;
   const r0 = c._hass.entities && c._hass.entities[iv.main]; const dd = r0 && r0.device_id && c._hass.devices && c._hass.devices[r0.device_id];
   const nm = iv.title || (dd && (dd.name_by_user || dd.name)) || String(st.attributes.friendly_name || iv.main).replace(/\s*[–-]\s*Status$/i, '');
-  return { id: iv.id, html: tp.render(c, iv, c._dvMap(iv), st), size: tp.size, cfg: true, name: `${tp.label}: ${nm}` };
+  return { id: iv.id, html: tp.render(c, iv, c._dvMap(iv), st), size: tp.size, cfg: true, name: tp.solo ? (iv.title || tp.label) : `${tp.label}: ${nm}` };
 }).filter(Boolean) });
 
 registerCard({ id: 'advent', label: 'Adventskalender', icon: 'mdi:gift-outline', size: 'w', items: (c) => {

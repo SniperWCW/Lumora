@@ -1445,3 +1445,23 @@ test('Raumklima-Gerätekarte: Schimmelrisiko hoch und Fenster schließen als War
   assert.match(html, /Fenster schließen: Außenluft zu feucht/);
   assert.doesNotMatch(html, /class="dvc run"/);
 });
+
+test('Wichtel-Gerätekarte: ohne eigene Entität, täglicher Wichtel mit Spruch, Aufgabe und Countdown', () => {
+  assert.ok(L.win.LumoraDevices.list().some((x) => x.type === 'elf'));
+  assert.equal(L.DEVTPL.elf.solo, 'sun.sun');
+  const c = poolCard({ 'sun.sun': st('below_horizon') }, { id: 'dv5', type: 'elf', main: 'sun.sun' });
+  const iv = c._set.devices[0];
+  let html = L.DEVTPL.elf.render(c, iv, c._dvMap(iv), c._hass.states['sun.sun']);
+  assert.match(html, /class="dvc elf"/);
+  assert.match(html, /class="elq"/);
+  assert.match(html, /Wichtel-Aufgabe/);
+  const first = html.match(/<b>([^<]+)<\/b><\/div>|<b>([^<]+)<\/b>(?:<span>|<\/div>)/);
+  assert.ok(first);
+  c._elfOff = 1;
+  const next = L.DEVTPL.elf.render(c, iv, c._dvMap(iv), c._hass.states['sun.sun']);
+  assert.notEqual(next, html);
+  iv.opts = { task: 0, count: 0 };
+  html = L.DEVTPL.elf.render(c, iv, c._dvMap(iv), c._hass.states['sun.sun']);
+  assert.doesNotMatch(html, /Wichtel-Aufgabe/);
+  assert.doesNotMatch(html, /Heiligabend/);
+});
