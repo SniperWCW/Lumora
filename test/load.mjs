@@ -11,6 +11,6 @@ export function load() {
   ctx.globalThis = ctx;
   vm.createContext(ctx);
   // const-Deklarationen sichtbar machen, damit Hilfsfunktionen testbar sind
-  vm.runInContext(`${src}\n;globalThis.__t = { visEval, visClean, vrBuild, vrCat, dvOpt, mgS, mergeLook, LOOK_PRESETS, BLOCK_DEF, roomIcon, FP, WC, DEVTPL, parseYaml, embedConfig, cleanName, VERSION, DOM_ICON, NAME_ICON };`, ctx, { filename: 'lumora.js' });
+  vm.runInContext(`${src}\n;globalThis.__t = { visEval, visClean, vrBuild, vrCat, dvOpt, mgS, mergeLook, LOOK_PRESETS, BLOCK_DEF, roomIcon, FP, WC, DEVTPL, parseYaml, embedConfig, cleanName, VERSION, DOM_ICON, NAME_ICON, lblHit, isHid, NO_DB, NO_SEC, ROOM_BLOCKS };`, ctx, { filename: 'lumora.js' });
   return { ...ctx.__t, card: reg['lumora-card'], win };
 }

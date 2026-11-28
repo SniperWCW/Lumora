@@ -1610,3 +1610,188 @@ test('Hervorheben: Taste bekommt die Klasse hl und aria-pressed', () => {
   states['light.sofa'].state = 'off';
   assert.doesNotMatch(c._quickHtml(['scene.film']), /qa hl/);
 });
+
+/* ---------- Ideen aus simon42-dashboard-strategy: Label-Ausblendung, Verlauf, Chips, Raum-Blöcke ---------- */
+function card(states, entities, set = {}) {
+  const c = Object.create(L.card.prototype);
+  Object.keys(states).forEach((k) => { states[k].entity_id = k; if (!states[k].attributes) states[k].attributes = {}; });
+  c._hass = { states, entities: entities || {}, areas: {}, floors: {}, devices: {} };
+  c._set = { alerts: { door: true, window: true, motion: true, smoke: true, alarm: true, lock: false, weather: false, climate: false }, chips: {}, excludeEntities: [], excludeAreas: [], hidden: [], ignore: [], snooze: {}, look: {}, order: {}, roomSensors: {}, hiddenAreas: [], place: {}, size: {}, pinned: [], ...set };
+  c._areaOf = () => null;
+  return c;
+}
+const sa = (state, attributes = {}) => ({ state, last_changed: new Date().toISOString(), attributes });
+
+test('Label no-dboard: Schreibweisen und versteckte Entitäten', () => {
+  assert.equal(L.lblHit({ labels: ['no-dboard'] }, L.NO_DB), true);
+  assert.equal(L.lblHit({ labels: ['No_Dboard'] }, L.NO_DB), true);
+  assert.equal(L.lblHit({ labels: ['no_lumora'] }, L.NO_DB), true);
+  assert.equal(L.lblHit({ labels: ['no_seclog'] }, L.NO_DB), false);
+  assert.equal(L.lblHit({ labels: ['no_seclog'] }, L.NO_SEC), true);
+  assert.equal(L.lblHit({}, L.NO_DB), false);
+  assert.equal(L.isHid({ hidden: true }), true);
+  assert.equal(L.isHid({ labels: ['no-dboard'] }), true);
+  assert.equal(L.isHid({ labels: ['x'] }), false);
+  assert.equal(L.isHid(undefined), false);
+});
+
+test('Label no-dboard: Meldungen ignorieren die Entität', () => {
+  const dc = { device_class: 'door', friendly_name: 'Tür' };
+  const c = card({ 'binary_sensor.a': sa('on', { ...dc, friendly_name: 'Haustür' }), 'binary_sensor.b': sa('on', { ...dc, friendly_name: 'Keller' }) }, { 'binary_sensor.b': { labels: ['no-dboard'] } });
+  const al = c._alerts();
+  assert.deepEqual([...al.map((x) => x.id)], ['binary_sensor.a']);
+});
+
+test('Nicht erreichbare Geräte: gruppiert nach Gerät, ohne versteckte, Diagnose und Label', () => {
+  const c = card({
+    'light.a1': sa('unavailable', { friendly_name: 'A1' }), 'sensor.a2': sa('unavailable', { friendly_name: 'A2' }),
+    'sensor.diag': sa('unavailable'), 'sensor.hid': sa('unavailable'), 'sensor.lbl': sa('unavailable'), 'light.ok': sa('on'), 'update.x': sa('unavailable'),
+  }, {
+    'light.a1': { device_id: 'dA' }, 'sensor.a2': { device_id: 'dA' }, 'sensor.diag': { device_id: 'dB', entity_category: 'diagnostic' },
+    'sensor.hid': { device_id: 'dC', hidden: true }, 'sensor.lbl': { device_id: 'dD', labels: ['no-dboard'] }, 'update.x': { device_id: 'dE' },
+  });
+  c._hass.devices = { dA: { name: 'Lampe Bad' } };
+  const u = c._unavail();
+  assert.equal(u.length, 1);
+  assert.equal(u[0].name, 'Lampe Bad');
+  assert.equal(u[0].n, 2);
+});
+
+test('Nicht erreichbare Karten ausblenden: nur mit Schalter und nicht im Bearbeiten-Modus', () => {
+  const c = card({ 'light.a': sa('unavailable'), 'light.b': sa('on') }, {});
+  assert.equal(c._ua('light.a'), false);
+  c._set.look.hideUnavail = true;
+  assert.equal(c._ua('light.a'), true);
+  assert.equal(c._ua('light.b'), false);
+  assert.equal(c._ua('light.fehlt'), false);
+  c._edit = true;
+  assert.equal(c._ua('light.a'), false);
+});
+
+test('Chips: Strom, Medien, Sonne, Updates, nicht erreichbar', () => {
+  const c = card({
+    'sensor.hausverbrauch': sa('1250', { unit_of_measurement: 'W', device_class: 'power' }),
+    'media_player.tv': sa('playing', { friendly_name: 'Wohnzimmer TV' }), 'media_player.alt': sa('paused'),
+    'sun.sun': sa('above_horizon', { next_setting: '2026-11-28T15:30:00Z' }),
+    'update.core': sa('on', { friendly_name: 'Home Assistant Core Update' }), 'update.ok': sa('off'),
+    'light.weg': sa('unavailable'),
+  }, { 'light.weg': { device_id: 'd1' } }, { chips: { power: true, unav: true, media: true, sun: true, upd: true } });
+  c._inf = () => ({ travel: [], trains: [] }); c._warns = () => []; c._ice = () => null; c._slot = () => 'sensor.hausverbrauch';
+  c._hass.devices = { d1: { name: 'Gartenlicht' } };
+  const h = c._infoPills([]);
+  assert.match(h, /1,3 kW/);
+  assert.match(h, /Wohnzimmer TV/);
+  assert.match(h, /Sonnenuntergang \d\d:\d\d/);
+  assert.match(h, /Update: Home Assistant Core/);
+  assert.match(h, /1 nicht erreichbar/);
+  c._set.chips = { power: false, unav: false, media: false, sun: false, upd: false };
+  assert.equal(c._infoPills([]), '');
+});
+
+test('Kamera: Live-Umschalter tauscht Standbild gegen den Strom, immer nur eine Kamera', () => {
+  const cam = (id) => ({ entity_id: id, state: 'idle', attributes: { friendly_name: id, entity_picture: `/api/camera_proxy/${id}?token=abc` } });
+  const c = card({}, {});
+  const still = c._camHtml(cam('camera.a'), 'cams', '');
+  assert.match(still, /camera_proxy\/camera\.a/);
+  assert.match(still, /data-act="camlive"/);
+  assert.doesNotMatch(still, /data-live/);
+  c._live = 'camera.a';
+  const live = c._camHtml(cam('camera.a'), 'cams', '');
+  assert.match(live, /camera_proxy_stream\/camera\.a\?token=abc/);
+  assert.match(live, /data-live="1"/);
+  assert.doesNotMatch(c._camHtml(cam('camera.b'), 'cams', ''), /data-live/);
+  c._edit = true;
+  assert.doesNotMatch(c._camHtml(cam('camera.a'), 'cams', ''), /camlive/);
+});
+
+test('Sicherheits-Verlauf: Zeilen aus dem Logbuch', () => {
+  const c = card({
+    'binary_sensor.tuer': sa('off', { device_class: 'door', friendly_name: 'Haustür' }), 'binary_sensor.bew': sa('off', { device_class: 'motion', friendly_name: 'Flur Bewegung' }),
+    'lock.haus': sa('locked', { friendly_name: 'Haustürschloss' }), 'binary_sensor.rauch': sa('off', { device_class: 'smoke', friendly_name: 'Rauchmelder' }),
+  }, {});
+  const t0 = Date.now() / 1000;
+  const rows = c._slRows([
+    { entity_id: 'binary_sensor.tuer', state: 'on', when: t0 - 300 }, { entity_id: 'binary_sensor.tuer', state: 'off', when: t0 - 200 },
+    { entity_id: 'binary_sensor.bew', state: 'on', when: t0 - 100 }, { entity_id: 'binary_sensor.bew', state: 'off', when: t0 - 90 },
+    { entity_id: 'lock.haus', state: 'unlocked', when: new Date((t0 - 50) * 1000).toISOString() },
+    { entity_id: 'binary_sensor.rauch', state: 'on', when: t0 - 10 }, { entity_id: 'binary_sensor.tuer', state: 'unavailable', when: t0 },
+  ]);
+  assert.equal(rows.length, 5);
+  assert.equal(rows[0].tx, 'Rauch: Rauchmelder meldet');
+  assert.equal(rows[0].bad, true);
+  assert.equal(rows[1].tx, 'Haustürschloss entsperrt');
+  assert.equal(rows[2].tx, 'Bewegung: Flur');
+  assert.equal(rows[3].tx, 'Haustür geschlossen');
+  assert.equal(rows[4].tx, 'Haustür geöffnet');
+});
+
+test('Sicherheits-Verlauf: Auswahl der Entitäten (Label no_seclog, Ausschlüsse, Klassen)', () => {
+  const c = card({
+    'binary_sensor.a': sa('off', { device_class: 'door' }), 'binary_sensor.b': sa('off', { device_class: 'door' }), 'binary_sensor.c': sa('off', { device_class: 'battery' }),
+    'binary_sensor.d': sa('off', { device_class: 'window' }), 'lock.e': sa('locked'), 'binary_sensor.f': sa('off', { device_class: 'motion' }),
+  }, { 'binary_sensor.b': { labels: ['no_seclog'] }, 'binary_sensor.f': { labels: ['no-dboard'] } }, { excludeEntities: ['binary_sensor.d'] });
+  assert.deepEqual([...c._slIds()].sort(), ['binary_sensor.a', 'lock.e']);
+});
+
+test('Sicherheits-Verlauf: lädt über das Logbuch und zeigt Fehler lesbar', async () => {
+  const c = card({ 'binary_sensor.a': sa('off', { device_class: 'door', friendly_name: 'Tür' }) }, {});
+  let req = null;
+  c._hass.callWS = (m) => { req = m; return Promise.resolve([{ entity_id: 'binary_sensor.a', state: 'on', when: Date.now() / 1000 }]); };
+  c._slLoad(true);
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(req.type, 'logbook/get_events');
+  assert.deepEqual([...req.entity_ids], ['binary_sensor.a']);
+  assert.match(c._slHtml(), /Tür geöffnet/);
+  c._hass.callWS = () => Promise.reject(new Error('kaputt'));
+  c._slLoad(true);
+  await new Promise((r) => setTimeout(r, 5));
+  assert.match(c._slHtml(), /nicht lesbar \(kaputt\)/);
+});
+
+function roomCard(look) {
+  const states = {
+    'light.k1': sa('on', { friendly_name: 'Küche Decke' }), 'cover.k2': sa('open', { friendly_name: 'Küche Rollo' }), 'switch.k3': sa('off', { friendly_name: 'Küche Kaffee' }),
+    'climate.k4': sa('heat', { friendly_name: 'Küche Heizung', current_temperature: 21 }), 'camera.k5': sa('idle', { friendly_name: 'Küche Kamera', entity_picture: '/api/camera_proxy/camera.k5?token=t' }),
+    'light.k6': sa('unavailable', { friendly_name: 'Küche Lampe weg' }),
+  };
+  const ent = {}; Object.keys(states).forEach((k) => { ent[k] = { area_id: 'kueche' }; });
+  const c = card(states, ent, { look: L.mergeLook(look) });
+  c._hass.areas = { kueche: { name: 'Küche', floor_id: null } };
+  c._areaOf = () => 'kueche'; c._aname = () => 'Küche'; c._regItems = () => []; c._dvAll = () => []; c._hist = () => []; c._spark = () => ''; c._plugPower = () => null; c._visOk = () => true;
+  c._floor = '_'; c._area = 'kueche';
+  return c;
+}
+
+test('Räume: Blöcke nach Art mit Überschrift, Zähler und Kamera-Block', () => {
+  const c = roomCard({});
+  const h = c._rooms();
+  const ti = (k) => h.indexOf(`>${k}</span>`);
+  assert.ok(ti('Kameras') > -1 && ti('Lichter') > ti('Kameras') && ti('Rollläden') > ti('Lichter') && ti('Klima') > ti('Rollläden') && ti('Schalter und Geräte') > ti('Klima'));
+  assert.equal((h.match(/class="rblk"/g) || []).length, 5);
+  assert.match(h, /Lampe weg/);
+});
+
+test('Räume: Reihenfolge der Blöcke pro Raum ist einstellbar', () => {
+  const c = roomCard({});
+  c._set.order['rblocks:kueche'] = ['switch', 'light'];
+  const h = c._rooms();
+  assert.ok(h.indexOf('>Schalter und Geräte</span>') < h.indexOf('>Lichter</span>'));
+  assert.ok(h.indexOf('>Lichter</span>') < h.indexOf('>Kameras</span>'));
+});
+
+test('Räume: Gruppierung abschaltbar, nicht erreichbare Kacheln ausblendbar', () => {
+  const c = roomCard({ roomBlocks: false });
+  const h = c._rooms();
+  assert.doesNotMatch(h, /class="rblk"/);
+  assert.match(h, /Lampe weg/);
+  const c2 = roomCard({ hideUnavail: true });
+  assert.doesNotMatch(c2._rooms(), /Lampe weg/);
+  c2._edit = true;
+  assert.match(c2._rooms(), /Lampe weg/);
+});
+
+test('Räume: im Bearbeiten-Modus sind die Blöcke ziehbar', () => {
+  const c = roomCard({}); c._edit = true;
+  const h = c._rooms();
+  assert.match(h, /<div class="rblk"><span class="tools"><\/span><i class="dg" data-s="rblocks:kueche" data-id="light"/);
+});

@@ -6,7 +6,7 @@ const VERSION = '0.0.0-dev';
 const KEY = 'lumora_panel';
 const DEF = {
   alerts: { door: true, window: true, motion: true, smoke: true, alarm: true, lock: false, weather: true, climate: true },
-  chips: { warn: false, ice: false },
+  chips: { warn: false, ice: false, power: false, unav: false, media: false, sun: false, upd: false },
   excludeEntities: [],
   excludeAreas: ['fahrzeug'],
   pinned: [],
@@ -37,7 +37,7 @@ const DEF = {
 const LOOK_DEF = {
   layout: 'classic', theme: '', accent: '', bg1: '', bg2: '', radius: '', cards: '', gap: '', font: '',
   title: 'Zuhause', sub: 'Willkommen daheim ♡', greet: 'Schön, dass du da bist!', greetImg: '', statusOk: 'Alles in Ordnung', statusSub: '',
-  showClock: true, showWeather: true, roomImg: true, roomMax: 4, rooms: [], kpis: ['lights', 'heat', 'temp'], cals: [], evMax: 3,
+  showClock: true, showWeather: true, roomImg: true, hideUnavail: false, roomBlocks: true, roomMax: 4, rooms: [], kpis: ['lights', 'heat', 'temp'], cals: [], evMax: 3,
 };
 const LOOK_V = 3;
 /* id, Name, Standardbreite (von 12 Spalten), Standard an */
@@ -183,6 +183,10 @@ const DC_ICON = {
   illuminance: 'mdi:brightness-5', energy: 'mdi:lightning-bolt',
 };
 const INACTIVE = ['off', 'unavailable', 'unknown', 'idle', 'closed', 'locked', 'standby', 'disarmed', 'paused', 'docked', 'not_home', 'none'];
+/* Raum-Blöcke: Schlüssel, Name, Icon, Domänen */
+const ROOM_BLOCKS = [['light', 'Lichter', 'mdi:lightbulb-group-outline', ['light']], ['cover', 'Rollläden', 'mdi:blinds', ['cover']], ['climate', 'Klima', 'mdi:thermostat', ['climate', 'fan', 'humidifier']], ['lock', 'Schlösser', 'mdi:lock-outline', ['lock']], ['media', 'Medien', 'mdi:play-circle-outline', ['media_player']], ['scene', 'Szenen', 'mdi:palette-outline', ['scene']], ['switch', 'Schalter und Geräte', 'mdi:toggle-switch-outline', ['switch', 'vacuum']], ['sens', 'Sensoren', 'mdi:eye-outline', ['binary_sensor', 'sensor']]];
+const SEC_CLASSES = ['door', 'garage_door', 'opening', 'window', 'motion', 'occupancy', 'presence', 'smoke', 'gas', 'carbon_monoxide', 'moisture'];
+const SEC_ALARM = { armed_home: 'Scharf (zuhause)', armed_away: 'Scharf (abwesend)', armed_night: 'Scharf (Nacht)', armed_vacation: 'Scharf (Urlaub)', armed_custom_bypass: 'Scharf', disarmed: 'Unscharf', triggered: 'Ausgelöst', pending: 'Wartet', arming: 'Wird scharf' };
 const ROOM_DOMAINS = ['light', 'switch', 'cover', 'climate', 'media_player', 'camera', 'fan', 'lock', 'vacuum', 'humidifier', 'scene', 'binary_sensor', 'sensor'];
 const BS_CLASSES = ['door', 'window', 'opening', 'garage_door', 'motion', 'occupancy', 'smoke', 'moisture', 'gas'];
 const SENSOR_CLASSES = ['power', 'co2', 'illuminance'];
@@ -194,6 +198,11 @@ const FLT_LABEL = { all: 'Alle', light: 'Licht', switch: 'Schalter', climate: 'K
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const dom = (id) => id.split('.')[0];
+/* Label-Ausblendung (Idee aus simon42-dashboard-strategy): Entitäten mit dem HA-Label "no-dboard" (oder "no-lumora") tauchen in Lumora nirgends auf; "no_seclog" nimmt sie nur aus dem Sicherheits-Verlauf aus */
+const NO_DB = ['no_dboard', 'no_lumora'];
+const NO_SEC = ['no_seclog'];
+const lblHit = (r, list) => !!(r && Array.isArray(r.labels) && r.labels.some((l) => list.includes(String(l).toLowerCase().replace(/-/g, '_'))));
+const isHid = (r) => !!(r && (r.hidden || lblHit(r, NO_DB)));
 /* ---------- Mini-YAML (für Fremdkarten) ----------
    Reicht für Karten-Konfigurationen: Maps, Listen, verschachtelt, Zeichenketten in Anführungszeichen, [a, b] und {a: b},
    Block-Texte (| und >) und Kommentare. Anker, Tags und mehrere Dokumente werden nicht unterstützt. */
@@ -642,6 +651,8 @@ h3{margin:22px 0 10px;font-size:13px;font-weight:500;letter-spacing:.08em;text-t
 .ptz .pb.UP{grid-column:2;grid-row:1}.ptz .pb.LEFT{grid-column:1;grid-row:2}.ptz .pb.DOWN{grid-column:2;grid-row:2}.ptz .pb.RIGHT{grid-column:3;grid-row:2}
 .cam{border-radius:18px;overflow:hidden;background:rgba(0,0,0,.3);position:relative;aspect-ratio:16/9;cursor:pointer}
 .cam img{width:100%;height:100%;object-fit:cover;display:block}
+.cam .lv{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:3px;min-width:30px;height:30px;padding:0 8px;box-sizing:border-box;justify-content:center;border-radius:99px;background:rgba(0,0,0,.5);color:#fff;font-size:12px;z-index:2;cursor:pointer}.cam .lv.on{background:#c0392b}.cam .lv ha-icon{--mdc-icon-size:18px}
+.rblk{margin-bottom:6px}.rblk>.tools{display:none}.rblk>h3{margin:14px 0 8px}.rblk>h3>span:first-child{display:flex;align-items:center;gap:6px}.rblk>h3 ha-icon{--mdc-icon-size:18px}.rblk>h3 .cnt{opacity:.6;font-size:12px;letter-spacing:0}.rblk>.cams{margin-bottom:4px}:host(.ed) .rblk>h3{cursor:grab;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .cam span.n{position:absolute;left:10px;bottom:8px;font-size:13px;background:rgba(0,0,0,.5);color:#fff;padding:3px 9px;border-radius:99px}
 .tabs{display:flex;gap:8px;overflow:auto;padding-bottom:8px;margin:0 -2px}
 .tabs .pill{white-space:nowrap}.pill.sel{background:var(--selbg);color:var(--selfg)}
@@ -1444,7 +1455,7 @@ class LumoraCard extends HTMLElement {
   }
   _signature() {
     const h = this._hass;
-    if (this._view === 'cams') return ['cams', this._sheet, this._edit, this._set.ptz.cam, this._ptzCam(), this._set.hidden.join(), (this._set.order.cams || []).join(), Object.values(h.states).filter((x) => dom(x.entity_id) === 'camera').map((x) => x.entity_id + (x.state === 'unavailable' ? 'x' : '') + (x.attributes.entity_picture || '')).join()].join('|'); const parts = [this._view, this._floor, this._area, this._sheet, this._edit, Math.floor(Date.now() / 60000), this._set.pinned.length, this._set.hidden.length, this._set.hiddenAreas.length, JSON.stringify(this._set.look), JSON.stringify(this._set.camW)];
+    if (this._view === 'cams') return ['cams', this._live || '', this._sheet, this._edit, this._set.ptz.cam, this._ptzCam(), this._set.hidden.join(), (this._set.order.cams || []).join(), Object.values(h.states).filter((x) => dom(x.entity_id) === 'camera').map((x) => x.entity_id + (x.state === 'unavailable' ? 'x' : '') + (x.attributes.entity_picture || '')).join()].join('|'); const parts = [this._view, this._live || '', this._floor, this._area, this._sheet, this._edit, Math.floor(Date.now() / 60000), this._set.pinned.length, this._set.hidden.length, this._set.hiddenAreas.length, JSON.stringify(this._set.look), JSON.stringify(this._set.camW)];
     const cuSet = new Set(this._set.custom.map((x) => x.entity));
     const doms = ['weather', 'light', 'media_player', 'vacuum', 'person', 'alarm_control_panel', 'lock', 'binary_sensor', 'camera', 'switch', 'cover', 'climate', 'fan'];
     for (const id in h.states) {
@@ -1465,7 +1476,7 @@ class LumoraCard extends HTMLElement {
     if (['home', 'more', 'rooms'].includes(this._view)) { parts.push(this._plSig()); parts.push(this._prSig()); }
     if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
     parts.push(this._bd.s);
-    parts.push('sn' + this._snoozed().length); parts.push(this._visSig()); parts.push(this._qhlSig());
+    parts.push('sn' + this._snoozed().length); parts.push(this._visSig()); parts.push(this._qhlSig()); parts.push(this._chipSig());
     for (const id of ['input_text.advent_geoffnet', 'input_text.advent_gefunden', 'input_boolean.advent_testmodus']) if (h.states[id]) parts.push(id + h.states[id].state);
     parts.push(this._fpSig());
     return parts.join('|');
@@ -1553,7 +1564,7 @@ class LumoraCard extends HTMLElement {
       const st = h.states[id]; const d = dom(id);
       if (d !== 'binary_sensor' && d !== 'alarm_control_panel' && d !== 'lock') continue;
       const reg = h.entities && h.entities[id];
-      if (reg && reg.hidden) continue;
+      if (isHid(reg)) continue;
       if (s.excludeEntities.includes(id)) continue;
       const area = this._areaOf(id);
       if (area && s.excludeAreas.includes(area)) continue;
@@ -1647,11 +1658,13 @@ class LumoraCard extends HTMLElement {
     return `<div class="vent ${cls}" data-act="info" data-id="${st.entity_id}"><ha-icon icon="${calm ? 'mdi:window-closed-variant' : 'mdi:window-open-variant'}"></ha-icon><div><b>${esc(a.title || st.state)}${dur}</b><span>${esc([rooms, win].filter(Boolean).join(' · ') || a.reason || '')}</span></div></div>`;
   }
   _chipOn(k) { const v = this._set.chips[k]; return v === undefined ? true : v; }
+  /* Opt-in (Design): Karten, Chips und Kacheln von Geräten, die gerade nicht erreichbar sind, ausblenden (nicht im Bearbeiten-Modus) */
+  _ua(id) { if (!this._set.look.hideUnavail || this._edit) return false; const st = this._hass.states[id]; return !!st && st.state === 'unavailable'; }
   _cands(k, loose) {
     const d = SLOTS[k]; const h = this._hass; const out = [];
     for (const id in h.states) {
       if (!d.d.includes(dom(id))) continue;
-      const r = h.entities && h.entities[id]; if (r && r.hidden) continue;
+      const r = h.entities && h.entities[id]; if (isHid(r)) continue;
       const st = h.states[id]; const a = st.attributes || {};
       if (d.dc && a.device_class !== d.dc) continue;
       const txt = norm(`${id} ${a.friendly_name || ''}`);
@@ -1778,7 +1791,7 @@ class LumoraCard extends HTMLElement {
   _pinChips() {
     const h = this._hass;
     return this._set.pinned.map((p) => {
-      const st = h.states[p.entity]; if (!st) return '';
+      const st = h.states[p.entity]; if (!st || this._ua(p.entity)) return '';
       const idle = !!p.only && INACTIVE.includes(st.state);
       if (idle && !this._edit) return '';
       return `<button class="pill ${idle ? 'hid' : ''}" data-act="info" data-id="${esc(p.entity)}"><ha-icon icon="${this._icon(st)}"></ha-icon>${esc(st.attributes.friendly_name || p.entity)} · ${esc(this._state(st))}</button>`;
@@ -1797,7 +1810,79 @@ class LumoraCard extends HTMLElement {
     if (on('motion') && mo.length) out.push(`<button class="pill" data-act="alerts"><ha-icon icon="mdi:motion-sensor"></ha-icon>Bewegung · ${esc(mo.slice(0, 2).join(', '))}${mo.length > 2 ? ` +${mo.length - 2}` : ''}</button>`);
     const hasTr = inf.travel.some(([, id]) => this._ok(h.states[id])) || inf.trains.some(([, id]) => this._ok(h.states[id]));
     if (on('trav') && hasTr) out.push('<button class="pill" data-act="trav"><ha-icon icon="mdi:car-clock"></ha-icon>Fahrzeiten</button>');
+    if (on('power')) { const e = this._slot('e_consumption'); const v = e ? this._num(e) : null; if (v !== null) out.push(`<button class="pill" data-act="info" data-id="${esc(e)}"><ha-icon icon="mdi:flash-outline"></ha-icon>${esc(this._w(v))}</button>`); }
+    if (on('unav')) { const u = this._unavail(); if (u.length) out.push(`<button class="pill warn" data-act="lst" data-k="unav"><ha-icon icon="mdi:lan-disconnect"></ha-icon>${u.length} nicht erreichbar</button>`); }
+    if (on('media')) { const m = this._playing(); if (m.length) out.push(m.length === 1 ? `<button class="pill" data-act="info" data-id="${esc(m[0].entity_id)}"><ha-icon icon="mdi:play-circle-outline"></ha-icon>${esc(m[0].attributes.friendly_name || m[0].entity_id)}</button>` : `<button class="pill" data-act="lst" data-k="media"><ha-icon icon="mdi:play-circle-outline"></ha-icon>${m.length} Medien laufen</button>`); }
+    const sn = h.states['sun.sun'];
+    if (on('sun') && sn) { const up = sn.state === 'above_horizon'; const t = sn.attributes[up ? 'next_setting' : 'next_rising']; if (t) out.push(`<button class="pill" data-act="info" data-id="sun.sun"><ha-icon icon="${up ? 'mdi:weather-sunset-down' : 'mdi:weather-sunset-up'}"></ha-icon>${up ? 'Sonnenuntergang' : 'Sonnenaufgang'} ${esc(new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }))}</button>`); }
+    if (on('upd')) { const u = this._updates(); if (u.length) out.push(u.length === 1 ? `<button class="pill" data-act="info" data-id="${esc(u[0].entity_id)}"><ha-icon icon="mdi:update"></ha-icon>Update: ${esc(cleanName(u[0].attributes.friendly_name || u[0].entity_id).replace(/\s*Update$/i, ''))}</button>` : `<button class="pill" data-act="lst" data-k="upd"><ha-icon icon="mdi:update"></ha-icon>${u.length} Updates</button>`); }
     return out.join('');
+  }
+  /* Geräte (oder Einzelentitäten) mit nicht erreichbaren Entitäten; versteckte, Diagnose- und ignorierte Entitäten zählen nicht (15 s Zwischenspeicher) */
+  _unavail() {
+    const now = Date.now(); if (this._ux && now - this._ux.t < 15000) return this._ux.l;
+    const h = this._hass; const ig = this._set.ignore; const dev = {};
+    for (const id in h.states) {
+      if (h.states[id].state !== 'unavailable') continue;
+      const r = h.entities && h.entities[id]; if (!r || isHid(r) || r.entity_category || ig.includes(id)) continue;
+      const d = dom(id); if (d === 'update' || d === 'event') continue;
+      const key = r.device_id || id; const o = dev[key] || (dev[key] = { id, n: 0, name: r.device_id ? this._devName(id) : (h.states[id].attributes.friendly_name || id) });
+      o.n++;
+    }
+    const l = Object.values(dev).sort((x, y) => x.name.localeCompare(y.name, 'de'));
+    this._ux = { t: now, l }; return l;
+  }
+  _playing() { return Object.values(this._hass.states).filter((x) => dom(x.entity_id) === 'media_player' && x.state === 'playing' && !isHid(this._hass.entities && this._hass.entities[x.entity_id])); }
+  _updates() { return Object.values(this._hass.states).filter((x) => dom(x.entity_id) === 'update' && x.state === 'on' && !isHid(this._hass.entities && this._hass.entities[x.entity_id]) && !this._set.ignore.includes(x.entity_id)); }
+  _chipSig() { const c = this._set.chips; const h = this._hass; const p = []; if (c.unav) p.push('u' + this._unavail().map((x) => x.id + x.n).join()); if (c.sun && h.states['sun.sun']) p.push('s' + h.states['sun.sun'].state); if (c.upd) p.push('p' + this._updates().length); return p.join('|'); }
+  /* ---------- Sicherheits-Verlauf: Logbuch der letzten 24 Stunden (Label no_seclog nimmt Entitäten aus) ---------- */
+  _slIds() {
+    const h = this._hass; const s = this._set; const out = [];
+    for (const id in h.states) {
+      const d = dom(id); if (d !== 'binary_sensor' && d !== 'lock' && d !== 'alarm_control_panel') continue;
+      const r = h.entities && h.entities[id]; if (isHid(r) || lblHit(r, NO_SEC)) continue;
+      if (s.excludeEntities.includes(id)) continue;
+      const area = this._areaOf(id); if (area && s.excludeAreas.includes(area)) continue;
+      if (d === 'binary_sensor' && !SEC_CLASSES.includes(h.states[id].attributes.device_class)) continue;
+      out.push(id);
+    }
+    return out;
+  }
+  _slLoad(force) {
+    const now = Date.now(); const c = this._sl;
+    if (c && c.busy) return;
+    if (!force && c && now - c.t < 60000) return;
+    const ids = this._slIds();
+    if (!ids.length) { this._sl = { t: now, rows: [], n: 0 }; return; }
+    this._sl = { ...(c || { rows: [] }), t: c ? c.t : 0, busy: true, n: ids.length };
+    const end = new Date(); const start = new Date(end.getTime() - 24 * 3600 * 1000);
+    const done = (rows, err) => { this._sl = { t: Date.now(), rows, err, n: ids.length }; if (this._sheet === 'seclog') { this._sig = ''; this._render(); } };
+    Promise.resolve(this._hass.callWS({ type: 'logbook/get_events', start_time: start.toISOString(), end_time: end.toISOString(), entity_ids: ids })).then((ev) => done(this._slRows(Array.isArray(ev) ? ev : []))).catch((x) => done([], (x && (x.message || x.code)) || 'Logbuch nicht lesbar'));
+  }
+  _slRows(ev) {
+    const h = this._hass; const rows = [];
+    ev.forEach((e) => {
+      const id = e.entity_id; const state = e.state; if (!id || !state || ['unavailable', 'unknown'].includes(state)) return;
+      const st = h.states[id]; const dc = st && st.attributes.device_class; const d = dom(id); const nm = cleanName((st && st.attributes.friendly_name) || e.name || id);
+      let ic; let tx;
+      if (d === 'lock') { if (state === 'locked') { ic = 'mdi:lock'; tx = `${nm} verriegelt`; } else if (state === 'unlocked') { ic = 'mdi:lock-open'; tx = `${nm} entsperrt`; } else return; }
+      else if (d === 'alarm_control_panel') { ic = 'mdi:shield-home'; tx = `${nm}: ${SEC_ALARM[state] || state}`; }
+      else if (['motion', 'occupancy', 'presence'].includes(dc)) { if (state !== 'on') return; ic = 'mdi:motion-sensor'; tx = `Bewegung: ${nm}`; }
+      else if (['smoke', 'gas', 'carbon_monoxide', 'moisture'].includes(dc)) { ic = state === 'on' ? 'mdi:alert-circle' : 'mdi:check-circle-outline'; tx = `${dc === 'smoke' ? 'Rauch' : dc === 'moisture' ? 'Wasser' : 'Gas'}: ${nm} ${state === 'on' ? 'meldet' : 'wieder in Ordnung'}`; }
+      else { ic = dc === 'window' ? (state === 'on' ? 'mdi:window-open-variant' : 'mdi:window-closed-variant') : (state === 'on' ? 'mdi:door-open' : 'mdi:door-closed'); tx = `${nm} ${state === 'on' ? 'geöffnet' : 'geschlossen'}`; }
+      let ts = typeof e.when === 'number' ? (e.when > 1e11 ? e.when : e.when * 1000) : Date.parse(e.when); if (isNaN(ts)) return;
+      rows.push({ id, ic, tx, ts, bad: ['smoke', 'gas', 'carbon_monoxide', 'moisture'].includes(dc) && state === 'on' || state === 'triggered' });
+    });
+    rows.sort((x, y) => y.ts - x.ts);
+    return rows.slice(0, 120);
+  }
+  _slHtml() {
+    this._slLoad(false);
+    const c = this._sl || { rows: [] }; const now = new Date(); let last = '';
+    const day = (d) => (d.toDateString() === now.toDateString() ? 'Heute' : d.toDateString() === new Date(now.getTime() - 864e5).toDateString() ? 'Gestern' : d.toLocaleDateString('de-DE'));
+    const rows = c.rows.map((r) => { const d = new Date(r.ts); const dl = day(d); const hd = dl !== last ? `<h4>${dl}</h4>` : ''; last = dl; return `${hd}<div class="row" data-act="info" data-id="${esc(r.id)}"><ha-icon icon="${r.ic}"></ha-icon><div class="t"><b>${r.bad ? '<i class="sev s0"></i>' : ''}${esc(r.tx)}</b><span>${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span></div></div>`; }).join('');
+    const empty = c.busy && !c.rows.length ? 'Lade …' : c.err ? `Verlauf nicht lesbar (${esc(c.err)})` : c.n === 0 ? 'Keine Türen, Fenster, Bewegungsmelder oder Schlösser gefunden.' : 'In den letzten 24 Stunden ist nichts passiert.';
+    return `<h2>Verlauf · 24 Stunden</h2><div class="hint">Türen, Fenster, Bewegung, Rauch, Schlösser und Alarm aus dem Logbuch. Einzelne Entitäten lassen sich in Home Assistant mit dem Label <b>no_seclog</b> ausnehmen.</div>${rows || `<div class="empty">${empty}</div>`}<div class="row" style="border:0;margin-top:10px"><button data-act="slreload">${c.busy ? 'Lade …' : 'Aktualisieren'}</button><button class="sel" data-act="close">Fertig</button></div>`;
   }
   /* ---------- Türklingel & Bewegung: Kamera-Popup ---------- */
   _doorCheck() {
@@ -1937,7 +2022,7 @@ class LumoraCard extends HTMLElement {
 
   _byDomain() {
     const D = {};
-    for (const id in this._hass.states) { const st = this._hass.states[id]; const r = this._hass.entities && this._hass.entities[id]; if (r && r.hidden) continue; (D[dom(id)] || (D[dom(id)] = [])).push(st); }
+    for (const id in this._hass.states) { const st = this._hass.states[id]; const r = this._hass.entities && this._hass.entities[id]; if (isHid(r)) continue; (D[dom(id)] || (D[dom(id)] = [])).push(st); }
     return D;
   }
 
@@ -2273,7 +2358,7 @@ class LumoraCard extends HTMLElement {
       const h = this._hass; const m = {}; const byDev = {};
       for (const k in h.entities || {}) {
         const r = h.entities[k]; const st = h.states[k];
-        if (r && r.device_id && st && dom(k) === 'sensor' && st.attributes.device_class === 'power' && st.attributes.unit_of_measurement === 'W' && !r.hidden) (byDev[r.device_id] || (byDev[r.device_id] = [])).push(k);
+        if (r && r.device_id && st && dom(k) === 'sensor' && st.attributes.device_class === 'power' && st.attributes.unit_of_measurement === 'W' && !isHid(r)) (byDev[r.device_id] || (byDev[r.device_id] = [])).push(k);
       }
       for (const k in h.entities || {}) { const r = h.entities[k]; if (r && dom(k) === 'switch' && r.device_id && byDev[r.device_id]) m[k] = byDev[r.device_id][0]; }
       this._pwMap = m;
@@ -2542,7 +2627,7 @@ _more() {
     for (const id in h.states) {
       const d = dom(id); if (d !== 'sensor' && d !== 'binary_sensor') continue;
       const st = h.states[id]; const a = st.attributes || {}; if (a.device_class !== 'battery' || ig.includes(id)) continue;
-      const r = h.entities && h.entities[id]; if (r && r.hidden) continue;
+      const r = h.entities && h.entities[id]; if (isHid(r)) continue;
       if (BATX.test(norm(`${id} ${a.friendly_name || ''}`))) continue;
       let v = null;
       if (d === 'sensor') {
@@ -2834,7 +2919,7 @@ _more() {
   _offline() {
     const h = this._hass; const ig = this._set.ignore; const dev = {};
     for (const id in h.states) {
-      const r = h.entities && h.entities[id]; if (!r || !r.device_id || r.hidden || r.entity_category) continue;
+      const r = h.entities && h.entities[id]; if (!r || !r.device_id || isHid(r) || r.entity_category) continue;
       if (dom(id) === 'update') continue;
       const o = dev[r.device_id] || (dev[r.device_id] = { n: 0, off: 0, id });
       o.n++; if (h.states[id].state === 'unavailable') o.off++;
@@ -3017,7 +3102,7 @@ _more() {
     const h = this._hass; const areas = {};
     for (const id in h.states) {
       const d = dom(id); if (!ROOM_DOMAINS.includes(d)) continue;
-      const r = h.entities && h.entities[id]; if (!r || r.hidden || r.entity_category) continue;
+      const r = h.entities && h.entities[id]; if (!r || isHid(r) || r.entity_category) continue;
       const a = this._areaOf(id); if (!a) continue;
       if (this._set.hidden.includes(id) && !this._edit) continue;
       const st = h.states[id]; const dc = st.attributes.device_class;
@@ -3069,11 +3154,20 @@ _more() {
     const cams = this._ord('rcams:' + a.id, ents.filter((s) => dom(s.entity_id) === 'camera' && s.state !== 'unavailable'), (s) => s.entity_id);
     const used = new Set(ents.filter((s) => dom(s.entity_id) === 'switch').map((s) => this._plugPower(s.entity_id)).filter(Boolean));
     this._dvAll().filter((x) => x.type === 'smartdome' && this._set.place[x.id] === `area:${a.id}`).forEach((x) => { try { const cid = sdClimate(this, x); if (cid && this._hass.states[x.main]) used.add(cid); } catch (_) { /* ignore */ } });
-    const tileEnts = this._ord('tiles:' + a.id, ents.filter((s) => dom(s.entity_id) !== 'camera' && !used.has(s.entity_id) && !['temperature', 'humidity'].includes(s.attributes.device_class))
+    const tileEnts = this._ord('tiles:' + a.id, ents.filter((s) => dom(s.entity_id) !== 'camera' && !used.has(s.entity_id) && !this._ua(s.entity_id) && !['temperature', 'humidity'].includes(s.attributes.device_class))
       .sort((x, y) => ROOM_DOMAINS.indexOf(dom(x.entity_id)) - ROOM_DOMAINS.indexOf(dom(y.entity_id))), (s) => s.entity_id);
     const isAct = (x) => { const d = dom(x.entity_id); return d !== 'sensor' && (d === 'binary_sensor' ? x.state === 'on' : !INACTIVE.includes(x.state)); };
     const nAct = tileEnts.filter(isAct).length; const onlyAct = this._roomAct && !this._edit;
-    const tiles = (onlyAct ? tileEnts.filter(isAct) : tileEnts).map((s) => this._tile(s, a.name, 'tiles:' + a.id)).join('');
+    const shown = onlyAct ? tileEnts.filter(isAct) : tileEnts;
+    const grp = this._set.look.roomBlocks !== false;
+    const tiles = grp ? '' : shown.map((s) => this._tile(s, a.name, 'tiles:' + a.id)).join('');
+    let blocks = '';
+    if (grp) {
+      const mk = [];
+      if (cams.length) mk.push({ k: 'cams', l: 'Kameras', i: 'mdi:cctv', n: cams.length, h: `<div class="cams">${cams.map((s) => this._camHtml(s, 'rcams:' + a.id)).join('')}</div>` });
+      ROOM_BLOCKS.forEach(([k, l, i, ds]) => { const li = shown.filter((s) => ds.includes(dom(s.entity_id))); if (li.length) mk.push({ k, l, i, n: li.length, h: `<div class="grid">${li.map((s) => this._tile(s, a.name, 'tiles:' + a.id)).join('')}</div>` }); });
+      blocks = this._ord('rblocks:' + a.id, mk, (b) => b.k).map((b) => `<div class="rblk">${this._tools('rblocks:' + a.id, b.k, null)}<h3><span><ha-icon icon="${b.i}"></ha-icon>${b.l}</span><span class="cnt">${b.n}</span></h3>${b.h}</div>`).join('');
+    }
     const lg = ents.filter((x) => dom(x.entity_id) === 'light'); const cv = ents.filter((x) => dom(x.entity_id) === 'cover');
     const qa = [
       (nAct || this._roomAct) && `<button class="pill ${this._roomAct ? 'sel' : ''}" data-act="roomact"><ha-icon icon="mdi:flash-outline"></ha-icon>Aktiv (${nAct})</button>`,
@@ -3083,9 +3177,9 @@ _more() {
     const rsc = `areareg:${a.id}`; const rcells = this._ord(rsc, this._regItems(`area:${a.id}`), (x) => x.id).map((x) => this._cell(x, rsc)).filter(Boolean).join('');
     return `<div class="tabs">${ftabs}</div><div class="tabs">${atabs}</div>
       <div class="rh"><h2>${esc(a.name)}</h2><div class="inf"><span>${info.join(' · ')}</span>${t ? `<span class="spi">${this._spark(this._hist(t.entity_id, 24), 24)}</span>` : ''}${this._edit ? `<button class="pill" data-act="regpick"><ha-icon icon="mdi:card-plus-outline"></ha-icon>Karte</button><button class="pill" data-act="rsens" data-id="${a.id}"><ha-icon icon="mdi:thermometer"></ha-icon>Sensoren</button>` : ''}${this._editBtn()}</div></div>${this._hint()}
-      ${cams.length ? `<div class="cams" style="margin-bottom:10px">${cams.map((s) => this._camHtml(s, 'rcams:' + a.id)).join('')}</div>` : ''}
+      ${!grp && cams.length ? `<div class="cams" style="margin-bottom:10px">${cams.map((s) => this._camHtml(s, 'rcams:' + a.id)).join('')}</div>` : ''}
       ${qa ? `<div class="tabs" style="margin-bottom:10px">${qa}</div>` : ''}
-      <div class="grid">${rcells}${tiles || (rcells ? '' : `<div class="empty">${onlyAct ? 'Nichts aktiv in diesem Raum.' : 'Keine Geräte in diesem Raum.'}</div>`)}</div>`;
+      ${grp ? `${rcells ? `<div class="grid">${rcells}</div>` : ''}${blocks || (rcells ? '' : `<div class="empty">${onlyAct ? 'Nichts aktiv in diesem Raum.' : 'Keine Geräte in diesem Raum.'}</div>`)}` : `<div class="grid">${rcells}${tiles || (rcells ? '' : `<div class="empty">${onlyAct ? 'Nichts aktiv in diesem Raum.' : 'Keine Geräte in diesem Raum.'}</div>`)}</div>`}`;
   }
   _editBtn() { return `<button class="pill" data-act="edit"><ha-icon icon="mdi:pencil"></ha-icon>${this._edit ? 'Fertig' : 'Bearbeiten'}</button>`; }
   _tools(scope, id, hideKey, o) {
@@ -3141,10 +3235,14 @@ _more() {
       <div class="tx" data-act="info" data-id="${st.entity_id}"><b>${esc(n)}</b><span>${esc(this._state(st))}</span></div></div>`;
   }
   _camHtml(st, scope, extra) {
-    const src = st.attributes.entity_picture || '';
+    const src0 = st.attributes.entity_picture || '';
+    /* Standbild (alle 10 s aktualisiert) ist der Normalfall; "Live" schaltet genau eine Kamera auf den MJPEG-Strom (schont ältere Geräte) */
+    const canLive = /\/api\/camera_proxy\//.test(src0); const live = canLive && this._live === st.entity_id;
+    const src = live ? src0.replace('/api/camera_proxy/', '/api/camera_proxy_stream/') : src0;
+    const lv = canLive && !this._edit ? `<span class="lv ${live ? 'on' : ''}" role="button" tabindex="0" data-act="camlive" data-id="${st.entity_id}" aria-label="${live ? 'Live beenden' : 'Live ansehen'}"><ha-icon icon="${live ? 'mdi:stop' : 'mdi:play'}"></ha-icon>${live ? 'Live' : ''}</span>` : '';
     const tools = extra !== undefined ? extra : this._tools(scope, st.entity_id, 'hidden');
     const w = scope === 'homecams' ? this._camW(st.entity_id) : 0;
-    return `<div class="cam ${this._set.hidden.includes(st.entity_id) ? 'hid' : ''}" ${w ? `data-w="${w}" ` : ''}data-act="info" data-id="${st.entity_id}">${src ? `<img data-b="${esc(src)}" src="${esc(src)}" alt="">` : ''}${tools}<span class="n">${esc(cleanName(st.attributes.friendly_name))}</span></div>`;
+    return `<div class="cam ${this._set.hidden.includes(st.entity_id) ? 'hid' : ''}" ${w ? `data-w="${w}" ` : ''}data-act="info" data-id="${st.entity_id}">${src ? `<img data-b="${esc(src)}" ${live ? 'data-live="1" ' : ''}src="${esc(src)}" alt="">` : ''}${lv}${tools}<span class="n">${esc(cleanName(st.attributes.friendly_name))}</span></div>`;
   }
   _homeCams() {
     const sts = this._set.homeCams.map((id) => this._hass.states[id]).filter((x) => x && x.state !== 'unavailable'); if (!sts.length) return '';
@@ -3158,7 +3256,7 @@ _more() {
   _refreshCams() {
     if (this._edit || this._dg || (typeof document !== 'undefined' && document.hidden)) return;
     const q = this.shadowRoot.querySelectorAll; if (!q) return;
-    this.shadowRoot.querySelectorAll('img[data-b]').forEach((img) => {
+    this.shadowRoot.querySelectorAll('img[data-b]:not([data-live])').forEach((img) => {
       const b = img.dataset.b; const u = `${b}${b.includes('?') ? '&' : '?'}_t=${Date.now()}`;
       const n = new Image(); n.onload = () => { img.src = u; }; n.src = u;
     });
@@ -3195,12 +3293,20 @@ _more() {
     if (this._sheet === 'alerts') {
       const al = this._alerts(); const s = this._set;
       const CAT = [['door', 'Türen'], ['window', 'Fenster'], ['motion', 'Bewegung'], ['smoke', 'Rauch / Wasser / Gas'], ['alarm', 'Alarmanlage'], ['lock', 'Schloss entsperrt'], ['weather', 'DWD, NINA & Eiswarnung'], ['climate', 'Schimmel, Lüften & Raumklima']];
-      c = `<h2>Meldungen</h2>${al.map((a) => `<div class="row"><ha-icon icon="${a.icon}"></ha-icon><div class="t"><b><i class="sev s${a.sev}"></i>${esc(a.text)}</b><span>${SEV[a.sev] || ''} · ${ago(a.since)}</span></div><button data-act="snooze" data-id="${a.id}">1 h Ruhe</button><button data-act="hide" data-id="${a.id}">Ausblenden</button></div>`).join('') || '<div class="empty">Keine aktiven Meldungen.</div>'}
+      c = `<h2>Meldungen</h2><div class="row"><ha-icon icon="mdi:history"></ha-icon><div class="t"><b>Verlauf</b><span>Türen, Fenster, Bewegung, Schlösser und Alarm der letzten 24 Stunden</span></div><button data-act="seclog">Öffnen</button></div>${al.map((a) => `<div class="row"><ha-icon icon="${a.icon}"></ha-icon><div class="t"><b><i class="sev s${a.sev}"></i>${esc(a.text)}</b><span>${SEV[a.sev] || ''} · ${ago(a.since)}</span></div><button data-act="snooze" data-id="${a.id}">1 h Ruhe</button><button data-act="hide" data-id="${a.id}">Ausblenden</button></div>`).join('') || '<div class="empty">Keine aktiven Meldungen.</div>'}
         ${this._snoozed().length ? `<h4>Schlummernd</h4>${this._snoozed().map((x) => `<div class="row"><div class="t"><b>${esc(x.name)}</b><span>bis ${new Date(x.until).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span></div><button data-act="unsnooze" data-id="${x.id}">Aufheben</button></div>`).join('')}` : ''}
         <h4>Benachrichtigen bei neuen Meldungen</h4>${this._ntfRows()}
         <h4>Was gemeldet wird</h4>${CAT.map(([k, l]) => `<div class="row"><div class="t"><b>${l}</b></div><button class="${s.alerts[k] ? 'sel' : ''}" data-act="cat" data-k="${k}">${s.alerts[k] ? 'An' : 'Aus'}</button></div>`).join('')}
         <h4>Räume von Meldungen ausnehmen</h4>${Object.keys(this._hass.areas || {}).sort((x, y) => this._aname(x).localeCompare(this._aname(y), 'de')).map((id) => `<div class="row"><div class="t"><b>${esc(this._aname(id))}</b></div><button class="${s.excludeAreas.includes(id) ? '' : 'sel'}" data-act="exarea" data-id="${id}">${s.excludeAreas.includes(id) ? 'Aus' : 'Gemeldet'}</button></div>`).join('')}
         ${s.excludeEntities.length ? `<h4>Ausgeblendet</h4>${s.excludeEntities.map((id) => `<div class="row"><div class="t"><b>${esc((this._hass.states[id] && this._hass.states[id].attributes.friendly_name) || id)}</b></div><button data-act="unhide" data-id="${id}">Einblenden</button></div>`).join('')}` : ''}`;
+    } else if (this._sheet === 'seclog') {
+      c = this._slHtml();
+    } else if (this._sheet === 'lst') {
+      const k = this._lstK; const h = this._hass;
+      const T = { unav: ['Nicht erreichbare Geräte', 'mdi:lan-disconnect'], upd: ['Verfügbare Updates', 'mdi:update'], media: ['Laufende Medien', 'mdi:play-circle-outline'] }[k] || ['Liste', 'mdi:format-list-bulleted'];
+      const rows = k === 'unav' ? this._unavail().map((x) => ({ id: x.id, t: x.name, s: `${x.n} ${x.n === 1 ? 'Entität' : 'Entitäten'} nicht erreichbar`, ic: 'mdi:lan-disconnect' }))
+        : (k === 'upd' ? this._updates() : this._playing()).map((x) => ({ id: x.entity_id, t: cleanName(x.attributes.friendly_name || x.entity_id), s: k === 'upd' ? `${x.attributes.installed_version || ''}${x.attributes.latest_version ? ` → ${x.attributes.latest_version}` : ''}` : `${x.attributes.media_title || ''}${x.attributes.media_artist ? ` · ${x.attributes.media_artist}` : ''}`, ic: this._icon(x) }));
+      c = `<h2>${T[0]}</h2>${rows.map((r) => `<div class="row" data-act="info" data-id="${esc(r.id)}"><ha-icon icon="${r.ic}"></ha-icon><div class="t"><b>${esc(r.t)}</b>${r.s ? `<span>${esc(r.s)}</span>` : ''}</div></div>`).join('') || '<div class="empty">Nichts zu zeigen.</div>'}${k === 'unav' ? '<div class="hint">Mit dem Label <b>no-dboard</b> in Home Assistant verschwindet eine Entität aus Lumora, auch aus dieser Liste. Geräte lassen sich unter Batterien und offline auch einzeln ausblenden.</div>' : ''}`;
     } else if (this._sheet === 'rs') {
       const aid = this._rsArea; const rs = this._set.roomSensors[aid] || {};
       const mk = (dc, key, title) => {
@@ -3224,7 +3330,7 @@ _more() {
       const k = this._sk;
       c = `<h2>${esc(SLOTS[k].l)}</h2><input class="srch" placeholder="Entität suchen" value="${esc(this._q)}"><div class="row" data-act="srcset" data-k="${k}" data-id=""><div class="t"><b>Automatisch erkennen</b></div></div><div class="row" data-act="srcset" data-k="${k}" data-id="-"><div class="t"><b>Nicht verwenden</b></div></div><div class="list"></div>`;
     } else if (this._sheet === 'chips') {
-      const CH = [['lights', 'Lampen an'], ['outdoor', 'Außentemperatur'], ['motion', 'Bewegung'], ['count', 'Zähler der Meldungen'], ['warn', 'Wetter- und NINA-Warnungen'], ['ice', 'Eiswarnung'], ['bike', 'Fahrrad'], ['pollen', 'Pollen'], ['trav', 'Fahrzeiten']];
+      const CH = [['lights', 'Lampen an'], ['outdoor', 'Außentemperatur'], ['motion', 'Bewegung'], ['count', 'Zähler der Meldungen'], ['warn', 'Wetter- und NINA-Warnungen'], ['ice', 'Eiswarnung'], ['bike', 'Fahrrad'], ['pollen', 'Pollen'], ['trav', 'Fahrzeiten'], ['power', 'Stromverbrauch'], ['unav', 'Nicht erreichbare Geräte'], ['media', 'Laufende Medien'], ['sun', 'Sonne (Auf- und Untergang)'], ['upd', 'Verfügbare Updates']];
       c = `<h2>Chips</h2><div class="hint">Warnungen stehen schon in der Meldungszeile, deshalb sind sie hier standardmäßig aus.</div>${CH.map(([k, l]) => `<div class="row"><div class="t"><b>${l}</b></div><button class="${this._chipOn(k) ? 'sel' : ''}" data-act="chip" data-k="${k}">${this._chipOn(k) ? 'An' : 'Aus'}</button></div>`).join('')}
         <h4>Eigene Chips</h4><div class="hint">Beliebige Entität als Chip. „Nur bei aktiv“ blendet ihn aus, solange die Entität aus, zu oder inaktiv ist.</div>
         ${this._set.pinned.map((p) => { const st = this._hass.states[p.entity]; return `<div class="row"><ha-icon icon="${st ? this._icon(st) : 'mdi:help-circle-outline'}"></ha-icon><div class="t"><b>${esc((st && st.attributes.friendly_name) || p.entity)}</b><span>${esc(p.entity)}</span></div><button class="${p.only ? 'sel' : ''}" data-act="ponly" data-id="${esc(p.entity)}">Nur bei aktiv</button><button data-act="unpin" data-id="${esc(p.entity)}">Entfernen</button></div>`; }).join('')}
@@ -3370,6 +3476,7 @@ _more() {
       <div class="lkl">Abstand</div>${this._lkSeg('gap', [['', 'Standard'], ['s', 'Eng'], ['m', 'Normal'], ['l', 'Weit']], L.gap)}
       <div class="lkl">Schrift</div>${this._lkSeg('font', [['', 'Standard'], ['round', 'Rund'], ['serif', 'Serif']], L.font)}
       <h4>Weitere Einstellungen</h4><div class="lkc"><button class="pill" data-act="fx"><ha-icon icon="mdi:weather-night"></ha-icon>Effekte</button><button class="pill" data-act="door"><ha-icon icon="mdi:bell-ring"></ha-icon>Klingel</button><button class="pill" data-act="chips"><ha-icon icon="mdi:tune"></ha-icon>Chips</button><button class="pill" data-act="src"><ha-icon icon="mdi:link-variant"></ha-icon>Quellen</button><button class="pill" data-act="hc"><ha-icon icon="mdi:cctv"></ha-icon>Kameras</button><button class="pill" data-act="alerts"><ha-icon icon="mdi:bell-ring-outline"></ha-icon>Meldungen</button></div>
+      <h4>Anzeige</h4><div class="row"><div class="t"><b>Nicht erreichbare Karten ausblenden</b><span>Kacheln, Chips und eigene Karten von Geräten, die gerade offline sind, verschwinden (im Bearbeiten-Modus bleiben sie sichtbar)</span></div>${this._lkTg('hideUnavail')}</div><div class="row"><div class="t"><b>Räume nach Art gruppieren</b><span>Lichter, Rollläden, Klima, Schlösser, Medien, Szenen, Schalter und Sensoren als Blöcke; die Reihenfolge ist je Raum frei (Bearbeiten, Überschrift ziehen)</span></div>${this._lkTg('roomBlocks')}</div>
       <h4>Blöcke der Kachel-Startseite</h4>${blocks}<div class="lkc" style="margin-top:8px"><button class="pill" data-act="lkcards"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</button></div><div class="hint" style="margin-top:8px">Pfeile verschieben, die Breite wird in zwölf Spalten gerechnet (¼, ⅓, ½, ⅔, voll), das Zahnrad öffnet die Einstellungen des Blocks. Direkt auf der Startseite geht es auch im Bearbeiten-Modus: Blöcke ziehen, Breite, Zahnrad und Auge.</div>
       <div class="row" style="border:0;margin-top:10px"><button data-act="lkreset">Zurücksetzen</button><button class="sel" data-act="close">Fertig</button></div>`;
   }
@@ -3467,7 +3574,7 @@ _more() {
     const pinned = this._set.pinned.map((p) => p.entity);
     const res = Object.values(this._hass.states).filter((s) => {
       const d = dom(s.entity_id); if (f ? !f.includes(d) : !ROOM_DOMAINS.concat(['script', 'input_boolean']).includes(d)) return false;
-      const r = this._hass.entities && this._hass.entities[s.entity_id]; if (r && (r.hidden || r.entity_category)) return false;
+      const r = this._hass.entities && this._hass.entities[s.entity_id]; if (r && (isHid(r) || r.entity_category)) return false;
       return !q || s.entity_id.toLowerCase().includes(q) || (s.attributes.friendly_name || '').toLowerCase().includes(q);
     }).slice(0, 40);
     el.innerHTML = res.map((s) => `<div class="row" data-act="pick" data-id="${s.entity_id}"><ha-icon icon="${this._icon(s)}"></ha-icon><div class="t"><b>${esc(s.attributes.friendly_name || s.entity_id)}</b><span>${esc(s.entity_id)}${pinned.includes(s.entity_id) ? ' · angepinnt' : ''}</span></div></div>`).join('') || '<div class="empty">Nichts gefunden.</div>';
@@ -3487,7 +3594,7 @@ _more() {
       if (sp.attr && a[sp.attr] === undefined) return false;
       if (sp.unit && !sp.unit.includes(a.unit_of_measurement)) return false;
       if (sp.re && !usePl && !sp.re.test(id)) return false;
-      const r = this._hass.entities && this._hass.entities[id]; return !(r && r.hidden);
+      const r = this._hass.entities && this._hass.entities[id]; return !isHid(r);
     }).map((x) => ({ id: x.entity_id, name: x.attributes.friendly_name || x.entity_id, hit: sp.prefer ? sp.prefer.test(norm(`${x.entity_id} ${x.attributes.friendly_name || ''}`)) : false }));
     out.sort((a, b) => (b.hit ? 1 : 0) - (a.hit ? 1 : 0));
     /* Wird die Karte in einem Raum angelegt, stehen die Entitäten dieses Raums oben (stabile Sortierung) */
@@ -3503,7 +3610,7 @@ _more() {
     const P = { k, A: [], B: [], C: [] };
     for (const id of ids) {
       if (id === iv.main) continue;
-      const e = reg[id]; if (e && e.hidden) continue;
+      const e = reg[id]; if (isHid(e)) continue;
       if (dv && e && e.device_id === dv) P.A.push(id);
       else if (id.split('.')[1].startsWith(`${stem}_`)) P.B.push(id);
       else P.C.push(id);
@@ -4330,7 +4437,8 @@ _more() {
     if (act.startsWith('fp-')) { if (this._edit) return; if (this._fpClick(t, act)) { this._sig = ''; this._render(); } return; }
     if (act.startsWith('mg-')) { if (this._edit) return; if (this._mgClick(t, act)) { this._sig = ''; this._render(); } return; }
     switch (act) {
-      case 'nav': this._view = t.dataset.v; this._sheet = null; this._edit = false; break;
+      case 'nav': this._view = t.dataset.v; this._sheet = null; this._edit = false; this._live = null; break;
+      case 'camlive': this._live = this._live === id ? null : id; clearTimeout(this._lvt); if (this._live) this._lvt = setTimeout(() => { this._live = null; this._sig = ''; this._render(); }, 120000); break;
       case 'floor': this._floor = id; this._area = null; break;
       case 'area': this._area = id; break;
       case 'ptz': if (!this._edit) this._ptzMove(t.dataset.d); return;
@@ -4450,6 +4558,9 @@ _more() {
       case 'advagain': h.callService('script', 'advent_oeffnen', { tag: this._advN }); return;
       case 'advfound': h.callService('script', 'advent_gefunden', { tag: this._advN }); break;
       case 'close': this._sheet = null; break;
+      case 'seclog': this._sheet = 'seclog'; this._slLoad(false); break;
+      case 'slreload': this._slLoad(true); break;
+      case 'lst': this._lstK = t.dataset.k; this._sheet = 'lst'; break;
       case 'cat': s.alerts[t.dataset.k] = !s.alerts[t.dataset.k]; this._save(); break;
       case 'hide': if (!s.excludeEntities.includes(id)) s.excludeEntities.push(id); this._save(); break;
       case 'snooze': s.snooze[id] = Date.now() + 3600000; this._save(); break;
@@ -4516,7 +4627,7 @@ _more() {
       case 'gotoroom': this._view = 'rooms'; this._floor = t.dataset.f; this._area = id; this._sheet = null; this._edit = false; break;
       case 'lkpre': { const pr = LOOK_PRESETS[t.dataset.k]; if (pr) Object.assign(s.look, pr); this._save(); break; }
       case 'lk': { const k = t.dataset.k; if (['layout', 'theme', 'radius', 'cards', 'gap', 'font'].includes(k)) { s.look[k] = t.dataset.v; this._save(); } break; }
-      case 'lkt': { const k = t.dataset.k; if (['showClock', 'showWeather', 'roomImg'].includes(k)) { s.look[k] = !s.look[k]; this._save(); } break; }
+      case 'lkt': { const k = t.dataset.k; if (['showClock', 'showWeather', 'roomImg', 'hideUnavail', 'roomBlocks'].includes(k)) { s.look[k] = !s.look[k]; this._save(); } break; }
       case 'lkclr': { const k = t.dataset.k; if (['accent', 'bg1', 'bg2'].includes(k)) { s.look[k] = ''; this._save(); } break; }
       case 'lkn': { const k = t.dataset.k; const mx = k === 'roomMax' ? 12 : k === 'evMax' ? 8 : 0; if (mx) { s.look[k] = Math.max(1, Math.min(mx, s.look[k] + Number(t.dataset.d))); this._save(); } break; }
       case 'lkblk': this._sheet = 'lkblk'; this._lkb = id; break;
@@ -4675,6 +4786,7 @@ registerCard({ id: 'offline', label: 'Geräte offline', icon: 'mdi:lan-disconnec
 } });
 registerCard({ id: 'custom', label: 'Eigene Karten', icon: 'mdi:card-text-outline', home: true, size: 's', items: (c) => c._set.custom.map((cu) => {
   const st = c._hass.states[cu.entity];
+  if (st && c._ua(cu.entity)) return null;
   if (!st) return c._edit ? { id: cu.id, html: c._customMissing(cu), cfg: true } : null;
   return { id: cu.id, html: c._customHtml(cu, st), size: cu.kind === 'spark' ? 'w' : 's', cfg: true };
 }).filter(Boolean) });
