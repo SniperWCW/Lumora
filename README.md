@@ -68,7 +68,7 @@ Dashboard-Ansicht vom Typ `panel` mit folgender Karte:
 ```yaml
 type: custom:lumora-card
 # optional
-theme: sand        # Standard; alternativ: sage (Salbei) oder auto (hell/dunkel nach Gerät)
+theme: sand        # Standard; alternativ: sage (Salbei), night (Mitternacht) oder auto (hell/dunkel nach Gerät)
 name: Anna         # optional, sonst Name aus der Person des Benutzers
 energy:            # optional, überschreibt die automatische Erkennung
   pv: sensor.pv_leistung
@@ -93,7 +93,9 @@ color_to: "#d6c5a8"
 
 Über die Schaltfläche **Design** (Palette) auf der Startseite lässt sich das Aussehen pro Benutzer anpassen. Die Einstellungen liegen im Benutzerprofil und gehören zum Layout, das auch als Gruppenlayout veröffentlicht werden kann.
 
-- **Vorlagen:** Sand oder Salbei (Kacheln). Eine Vorlage setzt Startseite, Farbthema, Rundung, Kartenstil und Schrift auf einmal.
+- **Vorlagen:** Sand, Salbei (Kacheln) oder Mitternacht (dunkles Marineblau, Glas-Kacheln, schwebende Navigation). Eine Vorlage setzt Startseite, Farbthema, Rundung, Kartenstil und Schrift auf einmal.
+- **Sichtbarkeit pro Karte:** Im Bearbeiten-Modus am Auge-Symbol mit Zahnrad (oder im Block-Dialog einer Karte). Regeln nach Zustand, Anwesenheit, Tag/Nacht, Uhrzeit, Wochentagen und Benutzer; „zeigen, wenn“ oder „ausblenden, wenn“, alle oder eine Bedingung. Im Bearbeiten-Modus bleibt die Karte sichtbar.
+- **Schnellaktionen leuchten:** Im Bearbeiten-Modus am Glühbirnen-Symbol der Taste eine Entität wählen; die Taste leuchtet, solange sie an ist. Skripte leuchten ohne Auswahl, solange sie laufen.
 - **Startseite:** *Klassisch* (wie bisher) oder *Kacheln*. Die Kachel-Startseite besteht aus Blöcken: Kopfzeile mit Uhr und Wetter, Kennzahlen, Räume mit Foto, Meldungen, Termine, Hausstatus, Grußkachel sowie Karten und Kameras.
 - **Reihenfolge und Breite:** Jeder Block lässt sich nach oben oder unten schieben, ein- oder ausblenden und in der Breite wählen (¼, ⅓, ½, ⅔, voll; zwölf Spalten). Auf dem Handy stehen die Blöcke untereinander.
 - **Kennzahlen:** Beleuchtung, Heizung, Raumtemperatur Ø, Luftfeuchte Ø, Verbrauch, offene Fenster und Türen, Anwesenheit; Auswahl und Reihenfolge frei.

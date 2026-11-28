@@ -1470,3 +1470,143 @@ test('Wichtel-Gerätekarte: ohne eigene Entität, täglicher Wichtel mit Spruch,
   assert.doesNotMatch(html, /Wichtel-Aufgabe/);
   assert.doesNotMatch(html, /Heiligabend/);
 });
+
+/* ---------- Sichtbarkeitsregeln ---------- */
+const at = (h, m = 0, d = 3) => new Date(2026, 10, d, h, m); /* 3.11.2026 ist ein Dienstag */
+const vs = (o) => { Object.keys(o).forEach((k) => { o[k].entity_id = k; o[k].attributes = o[k].attributes || {}; }); return o; };
+
+test('Sichtbarkeit: ohne Regeln immer sichtbar', () => {
+  assert.equal(L.visEval(null, { states: {}, now: at(12) }), true);
+  assert.equal(L.visEval({ act: 'hide', rules: [] }, { states: {}, now: at(12) }), true);
+});
+
+test('Sichtbarkeit: Zustand ist / ist nicht, fehlende Entität gilt als nicht erreichbar', () => {
+  const states = vs({ 'light.a': { state: 'on' } });
+  const on = { act: 'show', mode: 'all', rules: [{ t: 'state', id: 'light.a', op: 'eq', v: 'on' }] };
+  assert.equal(L.visEval(on, { states, now: at(12) }), true);
+  states['light.a'].state = 'off';
+  assert.equal(L.visEval(on, { states, now: at(12) }), false);
+  assert.equal(L.visEval({ ...on, rules: [{ t: 'state', id: 'light.a', op: 'ne', v: 'on' }] }, { states, now: at(12) }), true);
+  assert.equal(L.visEval({ ...on, rules: [{ t: 'state', id: 'light.weg', op: 'eq', v: 'unavailable' }] }, { states, now: at(12) }), true);
+});
+
+test('Sichtbarkeit: "ausblenden, wenn" kehrt um', () => {
+  const states = vs({ 'person.a': { state: 'home' } });
+  const c = { act: 'hide', mode: 'all', rules: [{ t: 'person', id: 'person.a', v: 'home' }] };
+  assert.equal(L.visEval(c, { states, now: at(12) }), false);
+  states['person.a'].state = 'not_home';
+  assert.equal(L.visEval(c, { states, now: at(12) }), true);
+});
+
+test('Sichtbarkeit: Anwesenheit ohne Person gilt für alle Personen', () => {
+  const states = vs({ 'person.a': { state: 'not_home' }, 'person.b': { state: 'home' } });
+  const home = { act: 'show', mode: 'all', rules: [{ t: 'person', id: '', v: 'home' }] };
+  const away = { act: 'show', mode: 'all', rules: [{ t: 'person', id: '', v: 'away' }] };
+  assert.equal(L.visEval(home, { states, now: at(12) }), true);
+  assert.equal(L.visEval(away, { states, now: at(12) }), false);
+  states['person.b'].state = 'not_home';
+  assert.equal(L.visEval(away, { states, now: at(12) }), true);
+});
+
+test('Sichtbarkeit: Tag/Nacht aus sun.sun, ohne Sonne nach Uhrzeit', () => {
+  const night = { act: 'show', mode: 'all', rules: [{ t: 'sun', v: 'night' }] };
+  assert.equal(L.visEval(night, { states: vs({ 'sun.sun': { state: 'below_horizon' } }), now: at(12) }), true);
+  assert.equal(L.visEval(night, { states: vs({ 'sun.sun': { state: 'above_horizon' } }), now: at(23) }), false);
+  assert.equal(L.visEval(night, { states: {}, now: at(23) }), true);
+  assert.equal(L.visEval(night, { states: {}, now: at(12) }), false);
+});
+
+test('Sichtbarkeit: Uhrzeit auch über Mitternacht, Ende ist exklusiv', () => {
+  const day = { act: 'show', mode: 'all', rules: [{ t: 'time', from: '07:00', to: '20:00' }] };
+  assert.equal(L.visEval(day, { states: {}, now: at(7, 0) }), true);
+  assert.equal(L.visEval(day, { states: {}, now: at(19, 59) }), true);
+  assert.equal(L.visEval(day, { states: {}, now: at(20, 0) }), false);
+  const night = { act: 'show', mode: 'all', rules: [{ t: 'time', from: '22:00', to: '06:00' }] };
+  assert.equal(L.visEval(night, { states: {}, now: at(23, 30) }), true);
+  assert.equal(L.visEval(night, { states: {}, now: at(5, 59) }), true);
+  assert.equal(L.visEval(night, { states: {}, now: at(12) }), false);
+});
+
+test('Sichtbarkeit: Wochentage (0 = Montag), leere Auswahl gilt immer', () => {
+  const we = { act: 'show', mode: 'all', rules: [{ t: 'wd', days: [5, 6] }] };
+  assert.equal(L.visEval(we, { states: {}, now: at(12, 0, 3) }), false); /* Dienstag */
+  assert.equal(L.visEval(we, { states: {}, now: at(12, 0, 7) }), true); /* Samstag */
+  assert.equal(L.visEval(we, { states: {}, now: at(12, 0, 8) }), true); /* Sonntag */
+  assert.equal(L.visEval({ act: 'show', mode: 'all', rules: [{ t: 'wd', days: [] }] }, { states: {}, now: at(12) }), true);
+});
+
+test('Sichtbarkeit: Benutzer über die Person mit user_id', () => {
+  const states = vs({ 'person.steffen': { state: 'home', attributes: { user_id: 'u1' } }, 'person.frau': { state: 'home', attributes: { user_id: 'u2' } } });
+  const c = { act: 'show', mode: 'all', rules: [{ t: 'user', ids: ['person.steffen'] }] };
+  assert.equal(L.visEval(c, { states, now: at(12), userId: 'u1' }), true);
+  assert.equal(L.visEval(c, { states, now: at(12), userId: 'u2' }), false);
+  assert.equal(L.visEval({ ...c, rules: [{ t: 'user', ids: [] }] }, { states, now: at(12), userId: 'u2' }), true);
+});
+
+test('Sichtbarkeit: alle zutreffen oder eine zutrifft', () => {
+  const states = vs({ 'light.a': { state: 'on' } });
+  const rules = [{ t: 'state', id: 'light.a', op: 'eq', v: 'on' }, { t: 'time', from: '22:00', to: '23:00' }];
+  assert.equal(L.visEval({ act: 'show', mode: 'all', rules }, { states, now: at(12) }), false);
+  assert.equal(L.visEval({ act: 'show', mode: 'any', rules }, { states, now: at(12) }), true);
+});
+
+test('Sichtbarkeit: visClean verwirft Unbrauchbares und begrenzt Werte', () => {
+  const c = L.visClean({
+    a: { act: 'hide', mode: 'any', rules: [{ t: 'state', id: 'light.a', op: 'x', v: 'on' }, { t: 'quatsch' }, null, { t: 'time', from: 'kaputt', to: '25:99' }, { t: 'wd', days: [1, 1, 9, '3', -1] }] },
+    leer: { rules: [] }, kaputt: 'x',
+  });
+  assert.deepEqual(Object.keys(c), ['a']);
+  assert.equal(c.a.act, 'hide'); assert.equal(c.a.mode, 'any'); assert.equal(c.a.rules.length, 3);
+  assert.equal(c.a.rules[0].op, 'eq');
+  assert.equal(c.a.rules[1].from, '07:00');
+  assert.equal(c.a.rules[2].days.join(), '1,3');
+  assert.equal(Object.keys(L.visClean(undefined)).length, 0);
+});
+
+test('Sichtbarkeit: Karte mit Regel verschwindet im Normalbetrieb, bleibt im Bearbeiten-Modus', () => {
+  const c = Object.create(L.card.prototype);
+  const states = vs({ 'light.a': { state: 'off' } });
+  c._hass = { states, user: { id: 'u1' } };
+  c._edit = false;
+  c._set = { hidden: [], vis: { x: { act: 'show', mode: 'all', rules: [{ t: 'state', id: 'light.a', op: 'eq', v: 'on' }] } } };
+  c._tools = () => '';
+  const cell = { id: 'x', size: 's', def: {}, html: '<b>K</b>' };
+  assert.equal(c._cell(cell, 'home'), '');
+  states['light.a'].state = 'on';
+  assert.match(c._cell(cell, 'home'), /<b>K<\/b>/);
+  states['light.a'].state = 'off'; c._edit = true;
+  assert.match(c._cell(cell, 'home'), /<b>K<\/b>/);
+});
+
+
+/* ---------- Hervorheben, wenn an ---------- */
+test('Hervorheben: gewählte Entität bestimmt, ob die Taste leuchtet', () => {
+  const c = Object.create(L.card.prototype);
+  const states = vs({ 'scene.film': { state: '2026-11-28T10:00:00+00:00' }, 'media_player.tv': { state: 'playing' }, 'script.gute_nacht': { state: 'off' } });
+  c._hass = { states };
+  c._set = { qhl: { 'scene.film': 'media_player.tv' }, quick: ['scene.film', 'script.gute_nacht'] };
+  assert.equal(c._qOn('scene.film'), true);
+  states['media_player.tv'].state = 'off';
+  assert.equal(c._qOn('scene.film'), false);
+});
+
+test('Hervorheben: Skript leuchtet ohne Auswahl, solange es läuft; Szene ohne Auswahl nie', () => {
+  const c = Object.create(L.card.prototype);
+  const states = vs({ 'scene.film': { state: '2026-11-28T10:00:00+00:00' }, 'script.gute_nacht': { state: 'on' } });
+  c._hass = { states }; c._set = { qhl: {}, quick: [] };
+  assert.equal(c._qOn('script.gute_nacht'), true);
+  assert.equal(c._qOn('scene.film'), false);
+  assert.equal(c._qOn('__alloff'), false);
+  states['script.gute_nacht'].state = 'off';
+  assert.equal(c._qOn('script.gute_nacht'), false);
+});
+
+test('Hervorheben: Taste bekommt die Klasse hl und aria-pressed', () => {
+  const c = Object.create(L.card.prototype);
+  const states = vs({ 'scene.film': { state: 'scening', attributes: { friendly_name: 'Film' } }, 'light.sofa': { state: 'on' } });
+  c._hass = { states }; c._edit = false; c._icon = () => 'mdi:palette';
+  c._set = { qhl: { 'scene.film': 'light.sofa' }, quick: ['scene.film'] };
+  assert.match(c._quickHtml(['scene.film']), /class="qa hl"[^>]*aria-pressed="true"/);
+  states['light.sofa'].state = 'off';
+  assert.doesNotMatch(c._quickHtml(['scene.film']), /qa hl/);
+});

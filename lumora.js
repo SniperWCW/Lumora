@@ -1,6 +1,6 @@
 /* Lumora
  * Schnelle, abhängigkeitsfreie Karte: Startseite mit gefilterten Meldungen + Räume je Etage/Area + Kameras.
- * Einbindung: Ressource /local/lumora/lumora.js (Typ: JavaScript-Modul), Karte: type: custom:lumora-card (Panel-Ansicht). Optional: theme: sand | sage | auto.
+ * Einbindung: Ressource /local/lumora/lumora.js (Typ: JavaScript-Modul), Karte: type: custom:lumora-card (Panel-Ansicht). Optional: theme: sand | sage | night | auto.
  */
 const VERSION = '0.0.0-dev';
 const KEY = 'lumora_panel';
@@ -17,6 +17,8 @@ const DEF = {
   roomSensors: {},
   sources: {},
   quick: [],
+  qhl: {},
+  vis: {},
   custom: [],
   embeds: [],
   devices: [],
@@ -46,13 +48,14 @@ const BLOCK_DEF = [
 ];
 const BLOCK_W = [[3, '¼'], [4, '⅓'], [6, '½'], [8, '⅔'], [12, 'Voll']];
 const KPI_DEF = { lights: ['Beleuchtung', 'mdi:lightbulb-on-outline'], heat: ['Heizung', 'mdi:radiator'], temp: ['Raumtemperatur Ø', 'mdi:thermometer'], hum: ['Luftfeuchte Ø', 'mdi:water-percent'], power: ['Verbrauch', 'mdi:flash-outline'], open: ['Offene Fenster/Türen', 'mdi:window-open-variant'], persons: ['Zu Hause', 'mdi:account-multiple-outline'], entity: ['Eigene Kennzahl', 'mdi:gauge'] };
-const LOOK_THEMES = [['', 'Aus Karte'], ['sand', 'Sand'], ['sage', 'Salbei'], ['auto', 'Auto']];
+const LOOK_THEMES = [['', 'Aus Karte'], ['sand', 'Sand'], ['sage', 'Salbei'], ['night', 'Mitternacht'], ['auto', 'Auto']];
 const LOOK_RADIUS = { sm: '10px', md: '20px', lg: '30px' };
 const LOOK_GAP = { s: '6px', m: '10px', l: '16px' };
 const LOOK_FONT = { round: 'ui-rounded,"SF Pro Rounded","Varela Round",Nunito,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', serif: '"Iowan Old Style","Palatino Linotype",Georgia,"Times New Roman",serif' };
 const LOOK_PRESETS = {
   sand: { layout: 'classic', theme: 'sand', accent: '', bg1: '', bg2: '', radius: '', cards: 'flat', gap: '', font: '' },
   sage: { layout: 'tiles', theme: 'sage', accent: '', bg1: '', bg2: '', radius: 'lg', cards: 'soft', gap: 'm', font: 'round' },
+  night: { layout: 'tiles', theme: 'night', accent: '', bg1: '', bg2: '', radius: 'lg', cards: 'glass', gap: 'm', font: 'round' },
 };
 const EV_CALX = /abfall|muell|waste|tonne|entsorg|garbage|trash|holiday|feiertag|geburtstag.*feiertag/;
 const ROOM_ICONS = [[/wohn|stube|living/, 'mdi:sofa-outline'], [/schlaf|bed/, 'mdi:bed-outline'], [/buro|office|arbeit/, 'mdi:briefcase-outline'], [/kuche|kitchen/, 'mdi:silverware-fork-knife'], [/bad|wc|dusche|gaste/, 'mdi:shower'], [/kind|spiel/, 'mdi:teddy-bear'], [/garten|aussen|terrasse|balkon/, 'mdi:tree-outline'], [/flur|diele|eingang/, 'mdi:door'], [/keller/, 'mdi:stairs-down'], [/garage/, 'mdi:garage-variant'], [/ess/, 'mdi:table-furniture'], [/dach|spitz|dg/, 'mdi:home-roof'], [/wasch|hauswirt|technik/, 'mdi:washing-machine']];
@@ -359,10 +362,62 @@ const embedConfig = (yaml) => {
     return { cfg };
   } catch (e) { return { err: e.message || String(e) }; }
 };
+/* Sichtbarkeitsregeln pro Karte: Zustand, Anwesenheit, Tag/Nacht, Uhrzeit, Wochentage, Benutzer.
+ * Format je Karte: { act: 'show' | 'hide', mode: 'all' | 'any', rules: [...] }; ohne Regeln ist die Karte immer sichtbar. */
+const VIS_TYPES = [['state', 'Zustand', 'mdi:toggle-switch-outline'], ['person', 'Anwesenheit', 'mdi:home-account'], ['sun', 'Tag oder Nacht', 'mdi:theme-light-dark'], ['time', 'Uhrzeit', 'mdi:clock-outline'], ['wd', 'Wochentage', 'mdi:calendar-week'], ['user', 'Benutzer', 'mdi:account-outline']];
+const VIS_WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+const VIS_VALS = [['on', 'an'], ['off', 'aus'], ['open', 'offen'], ['closed', 'zu'], ['home', 'zu Hause'], ['not_home', 'weg'], ['unavailable', 'nicht erreichbar']];
+const visMin = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(String(t || '')); return m ? Math.min(23, +m[1]) * 60 + Math.min(59, +m[2]) : null; };
+const visRule = (r) => {
+  if (!r || typeof r !== 'object') return null;
+  const str = (x, n) => String(x === undefined || x === null ? '' : x).slice(0, n || 120);
+  switch (r.t) {
+    case 'state': return { t: 'state', id: str(r.id), op: r.op === 'ne' ? 'ne' : 'eq', v: str(r.v, 60) };
+    case 'person': return { t: 'person', id: str(r.id), v: r.v === 'away' ? 'away' : 'home' };
+    case 'sun': return { t: 'sun', v: r.v === 'night' ? 'night' : 'day' };
+    case 'time': return { t: 'time', from: visMin(r.from) === null ? '07:00' : str(r.from, 5), to: visMin(r.to) === null ? '20:00' : str(r.to, 5) };
+    case 'wd': return { t: 'wd', days: [...new Set((Array.isArray(r.days) ? r.days : []).map(Number).filter((d) => d >= 0 && d <= 6))].sort() };
+    case 'user': return { t: 'user', ids: (Array.isArray(r.ids) ? r.ids : []).map((x) => str(x)).filter(Boolean).slice(0, 12) };
+    default: return null;
+  }
+};
+const visClean = (v) => {
+  const o = {}; if (!v || typeof v !== 'object') return o;
+  Object.keys(v).slice(0, 200).forEach((k) => {
+    const c = v[k]; const rules = (c && Array.isArray(c.rules) ? c.rules : []).map(visRule).filter(Boolean).slice(0, 10);
+    if (rules.length) o[k] = { act: c.act === 'hide' ? 'hide' : 'show', mode: c.mode === 'any' ? 'any' : 'all', rules };
+  });
+  return o;
+};
+/* x: { states, now: Date, userId } */
+const visEval = (cfg, x) => {
+  const rs = cfg && Array.isArray(cfg.rules) ? cfg.rules : [];
+  if (!rs.length) return true;
+  const st = (id) => (x.states && x.states[id]) || null;
+  const one = (r) => {
+    switch (r.t) {
+      case 'state': { const e = st(r.id); const hit = (e ? String(e.state) : 'unavailable').toLowerCase() === String(r.v || '').toLowerCase(); return r.op === 'ne' ? !hit : hit; }
+      case 'person': {
+        const ps = r.id ? [st(r.id)].filter(Boolean) : Object.keys(x.states || {}).filter((k) => k.startsWith('person.')).map((k) => x.states[k]);
+        const home = ps.some((p) => p.state === 'home'); return r.v === 'away' ? !home : home;
+      }
+      case 'sun': { const e = st('sun.sun'); const hr = x.now.getHours(); const day = e ? e.state === 'above_horizon' : hr >= 6 && hr < 20; return r.v === 'night' ? !day : day; }
+      case 'time': {
+        const a = visMin(r.from); const b = visMin(r.to); if (a === null || b === null || a === b) return true;
+        const n = x.now.getHours() * 60 + x.now.getMinutes(); return a < b ? n >= a && n < b : n >= a || n < b;
+      }
+      case 'wd': return !(r.days && r.days.length) || r.days.includes((x.now.getDay() + 6) % 7);
+      case 'user': return !(r.ids && r.ids.length) || r.ids.some((id) => { const e = st(id); return !!(e && e.attributes && e.attributes.user_id && e.attributes.user_id === x.userId); });
+      default: return true;
+    }
+  };
+  const ok = cfg.mode === 'any' ? rs.some(one) : rs.every(one);
+  return cfg.act === 'hide' ? !ok : ok;
+};
 const merge = (v) => {
   v = v || {};
   const arr = (k) => [...(v[k] || DEF[k])];
-  const r = { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), custom: JSON.parse(JSON.stringify(v.custom || [])), embeds: JSON.parse(JSON.stringify(v.embeds || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, camW: { ...v.camW }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify }, ptz: { ...DEF.ptz, ...v.ptz }, door: { ...DEF.door, ...v.door, bell: [...((v.door && v.door.bell) || [])], motion: [...((v.door && v.door.motion) || [])] }, look: mergeLook(v.look) };
+  const r = { alerts: { ...DEF.alerts, ...v.alerts }, chips: { ...DEF.chips, ...v.chips }, excludeEntities: arr('excludeEntities'), excludeAreas: arr('excludeAreas'), pinned: arr('pinned'), homeCams: arr('homeCams'), hidden: arr('hidden'), hiddenAreas: arr('hiddenAreas'), order: { ...v.order }, roomSensors: JSON.parse(JSON.stringify(v.roomSensors || {})), sources: { ...v.sources }, quick: arr('quick'), qhl: { ...v.qhl }, vis: visClean(v.vis), custom: JSON.parse(JSON.stringify(v.custom || [])), embeds: JSON.parse(JSON.stringify(v.embeds || [])), devices: JSON.parse(JSON.stringify(v.devices || [])), size: { ...v.size }, camW: { ...v.camW }, place: { ...v.place }, ignore: arr('ignore'), battLimit: v.battLimit || DEF.battLimit, fx: mergeFx(v.fx), _pub: v._pub || 0, _base: v._base || 0, snooze: { ...v.snooze }, notify: { ...DEF.notify, ...v.notify }, ptz: { ...DEF.ptz, ...v.ptz }, door: { ...DEF.door, ...v.door, bell: [...((v.door && v.door.bell) || [])], motion: [...((v.door && v.door.motion) || [])] }, look: mergeLook(v.look) };
   if (((v.look && v.look.v) || 0) < LOOK_V) delete r.order.lookb;
   return r;
 };
@@ -386,7 +441,7 @@ const cleanName = (n) => {
 
 const CARD_SEL = ['.en', '.cl', '.vc', '.pl:not(.on)', '.card', '.tile', '.ap', '.qs', '.dvc', '.pool', '.kp', '.tl', '.rm', '.gt'];
 const CARD_CSS = `${CARD_SEL.map((x) => `:host([data-cs=soft]) ${x}`).join(',')}{box-shadow:var(--shadow-soft,0 8px 22px rgba(90,70,40,.13),0 1px 2px rgba(90,70,40,.08))}
-${CARD_SEL.map((x) => `:host([data-cs=glass]) ${x}`).join(',')}{background-color:var(--glass,rgba(255,255,255,.4));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+${CARD_SEL.map((x) => `:host([data-cs=glass]) ${x}`).join(',')}{background-color:var(--glass,rgba(255,255,255,.4));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:inset 0 0 0 1px var(--glass-line,rgba(255,255,255,.35))}
 :host([theme=dark]){--glass:rgba(255,255,255,.12)}
 .lkl{font-size:12.5px;color:var(--fg2);margin:8px 2px 4px}.lkc input[type=color]{margin:0}
 .lkb button{display:inline-flex;align-items:center;justify-content:center;min-width:34px}.lkb ha-icon{--mdc-icon-size:18px}.lkb button[disabled]{opacity:.35;cursor:default}
@@ -403,6 +458,38 @@ const CSS = `
 :host([theme=sage]){--fg:#2f3b2a;--fg2:rgba(47,59,42,.62);--a:rgba(255,253,247,.86);--b:rgba(107,143,78,.16);--from:#f8f0e4;--to:#ebdcc4;
  --sheet:#fbf7ee;--selbg:#4b6b3a;--selfg:#fbf7ee;--accent:#6b8f4e;--accentfg:#fff;--on:rgba(247,216,132,.6);--onring:rgba(214,160,40,.5);--line:rgba(47,59,42,.1);--nav:rgba(255,253,247,.72);
  --bad:rgba(205,65,50,.22);--badfg:#7d1f16;--warn:rgba(224,160,40,.28);--okbg:rgba(107,143,78,.2);--scrim:rgba(40,40,20,.4);--shadow:0 8px 22px rgba(120,95,50,.13),0 1px 2px rgba(120,95,50,.08);--r:24px}
+:host([theme=night]){color-scheme:dark;--fg:#f5f7ff;--fg2:rgba(226,232,255,.6);--a:rgba(255,255,255,.085);--b:rgba(132,152,222,.3);--glass:rgba(255,255,255,.085);--glass-line:rgba(255,255,255,.1);--from:#1b2a52;--to:#0a1021;
+ --sheet:#151d36;--selbg:#eef1fb;--selfg:#16203b;--accent:#9fb4ff;--accentfg:#0d1530;--on:rgba(255,196,92,.3);--onring:rgba(255,206,112,.62);--line:rgba(255,255,255,.1);--nav:rgba(255,255,255,.1);
+ --bad:rgba(255,92,80,.34);--badfg:#ffe0dc;--warn:rgba(255,196,60,.26);--okbg:rgba(110,214,150,.22);--scrim:rgba(4,8,22,.62);--shadow:none;--r:32px}
+:host([theme=night]) .app{background:radial-gradient(120% 55% at 78% 34%,rgba(92,122,200,.5),rgba(92,122,200,0) 64%),radial-gradient(90% 40% at 8% 70%,rgba(70,92,170,.28),rgba(70,92,170,0) 70%),linear-gradient(172deg,var(--zp-from,#15213f) 0%,var(--zp-to,#0a1021) 100%)}
+:host([theme=night]) .hd2 .clk{background:transparent;box-shadow:none;padding:0;gap:18px}
+:host([theme=night]) .hd2 .clk small{font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:500;white-space:nowrap}
+:host([theme=night]) .hd2 .clk b{font-size:clamp(52px,15vw,84px);font-weight:300;letter-spacing:-.02em;line-height:1}
+:host([theme=night]) .hd2 .clk .wxx b{font-size:clamp(24px,6vw,34px);font-weight:400}
+:host([theme=night]) .hd2 .rb,:host([theme=night]) .hd2 .cp{background:rgba(120,140,210,.3);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+:host([theme=night]) .hd2 .rb.sel{background:var(--selbg);color:var(--selfg)}
+:host([theme=night]) .pill{background:rgba(120,140,210,.26);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+:host([theme=night]) .pill.sel{background:#8e9ab9;color:#fff;box-shadow:none}
+:host([theme=night]) .pill.warn{background:var(--warn)}:host([theme=night]) .pill.bad{background:var(--bad);color:var(--badfg)}:host([theme=night]) .pill.ok{background:var(--okbg)}
+:host([theme=night]) .rm{background:linear-gradient(160deg,rgba(255,255,255,.14),rgba(255,255,255,.05));box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);color:var(--fg)}
+:host([theme=night]) .rm.img{color:#fff}
+:host([theme=night]) .rm .bt{background:rgba(255,255,255,.13);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+:host([theme=night]) .rm .bt ha-icon{color:#ffd68a}
+:host([theme=night]) .rm .bt .go{background:rgba(255,255,255,.18);color:#fff}
+:host([theme=night]) .rm .st.off{background:rgba(255,255,255,.2)}
+:host([theme=night]) .kp.heat{--kc:rgba(255,150,90,.3);--kf:#ffa66e}:host([theme=night]) .kp.temp{--kc:rgba(130,200,120,.28);--kf:#a4d98f}:host([theme=night]) .kp.hum{--kc:rgba(110,180,240,.3);--kf:#82c8f6}:host([theme=night]) .kp.power{--kc:rgba(250,210,90,.3);--kf:#f6d468}:host([theme=night]) .kp.open{--kc:rgba(240,130,110,.3);--kf:#f59383}:host([theme=night]) .kp.persons{--kc:rgba(160,160,240,.3);--kf:#b4b4f6}:host([theme=night]) .kp.entity{--kc:rgba(190,180,150,.26);--kf:#d7c9a2}
+:host([theme=night]) .kp,:host([theme=night]) .tl,:host([theme=night]) .qs,:host([theme=night]) .adv{background-image:linear-gradient(160deg,rgba(255,255,255,.1),rgba(255,255,255,.025))}
+:host([theme=night]) .gt{background-image:linear-gradient(135deg,rgba(120,140,210,.4),rgba(255,255,255,.07));box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+:host([theme=night]) .gt.img:before{background:rgba(10,16,33,.35)}
+:host([theme=night]) .kp .t{overflow:hidden}:host([theme=night]) .kp .t b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+:host([theme=night]) .kp .t strong{font-size:clamp(26px,5vw,36px)}
+:host([theme=night]) .kp .go{background:rgba(255,255,255,.12);color:var(--fg)}
+:host([theme=night]) .nav{margin:0 14px calc(10px + env(safe-area-inset-bottom));padding:7px;gap:4px;border-radius:99px;background:var(--nav);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),0 10px 30px rgba(3,8,24,.45);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+:host([theme=night]) .nav button.sel{background:#fff;color:#16203b}
+:host([theme=night]) .hs .ck{box-shadow:0 0 0 8px rgba(255,255,255,.1)}
+:host([theme=night]) input,:host([theme=night]) select,:host([theme=night]) textarea{color:var(--fg)}
+:host([theme=night]) .srch,:host([theme=night]) .lkin{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--fg)}
+:host([theme=night]) .row{border-color:rgba(255,255,255,.08)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 .bl{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:var(--gap,10px);align-items:stretch}
 .bl>.b{grid-column:span 12;min-width:0}.bl>.w3{grid-column:span 3}.bl>.w4{grid-column:span 4}.bl>.w6{grid-column:span 6}.bl>.w8{grid-column:span 8}
@@ -465,6 +552,7 @@ const CSS = `
 .ttl{font-size:18px;font-weight:600;flex:1}
 [data-act]{cursor:pointer;-webkit-tap-highlight-color:transparent}[data-act=noop]{cursor:auto}
 .pill.hid{opacity:.5}
+.tools .mini.vsa,.b>.tools .mini.vsa{background:var(--accent);color:var(--accentfg)}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:99px;background:var(--a);cursor:pointer;border:0;color:inherit;font:inherit;font-size:14px}
 .pill.warn{background:var(--warn)}.pill.bad{background:var(--bad);color:var(--badfg)}.pill.ok{background:var(--okbg)}
 .pill ha-icon{--mdc-icon-size:18px}
@@ -615,6 +703,8 @@ textarea.embyaml{resize:vertical;min-height:140px;font:12px/1.45 ui-monospace,SF
 .qc{display:flex;flex-wrap:wrap;gap:8px}
 .qa{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:99px;padding:10px 14px;background:var(--b);color:inherit;font:inherit;font-size:14px;cursor:pointer;box-shadow:var(--shadow);transition:background .2s}
 .qa ha-icon{--mdc-icon-size:20px}.qa.ok{background:var(--accent);color:var(--accentfg)}
+.qa.hl{background:var(--on);box-shadow:0 0 0 1.5px var(--onring),0 0 14px var(--onring);transition:box-shadow .3s,background .3s}
+.qx.qhs{margin-right:-2px;background:rgba(0,0,0,.18)}.qx.qhs.set{background:var(--accent);color:var(--accentfg)}
 .qa.add{background:transparent;box-shadow:none;border:1.5px dashed var(--fg2);color:var(--fg2)}
 .qx{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.25);color:#fff;margin-right:-6px}.qx ha-icon{--mdc-icon-size:14px}
 .br{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);cursor:pointer;margin-top:4px}
@@ -1272,10 +1362,14 @@ class LumoraCard extends HTMLElement {
         em.yaml = e.target.value; const r = embedConfig(em.yaml);
         const st = this.shadowRoot.querySelector('.embst'); if (st) st.textContent = r.err ? r.err : r.cfg ? `Karte: ${r.cfg.type}` : '';
         clearTimeout(this._ct); this._ct = setTimeout(() => this._save(), 600);
-      } else if (e.target.classList.contains('lkin')) {
+      } else if (e.target.classList.contains('lkin') && !e.target.classList.contains('visin')) {
         const k = e.target.dataset.k;
         if (e.target.dataset.i !== undefined) { const x = this._set.look.kpis[Number(e.target.dataset.i)]; if (x) x.title = e.target.value; } else if (LOOK_IN.includes(k)) this._set.look[k] = e.target.value; else return;
         this._applyLook(); clearTimeout(this._ct); this._ct = setTimeout(() => this._save(), 500);
+      } else if (e.target.classList.contains('visin')) {
+        const i = Number(e.target.dataset.i); const f = e.target.dataset.f; const val = e.target.value;
+        const id = this._vid; const c = this._set.vis[id]; const r = c && c.rules[i]; if (!r || !['v', 'from', 'to'].includes(f)) return;
+        r[f] = val; clearTimeout(this._ct); this._ct = setTimeout(() => { this._save(); this._sig = ''; }, 500);
       } else if (e.target.classList.contains('mgsrch')) {
         mgS(this).q[e.target.dataset.id] = e.target.value; this._sig = ''; clearTimeout(this._mgt); this._mgt = setTimeout(() => this._render(), 150);
       } else if (e.target.classList.contains('dvin')) {
@@ -1310,7 +1404,7 @@ class LumoraCard extends HTMLElement {
   }
   _applyCs() {
     const L = (this._set && this._set.look) || mergeLook({});
-    this.setAttribute('data-cs', L.cards || (this.getAttribute('theme') === 'sage' ? 'soft' : 'flat'));
+    this.setAttribute('data-cs', L.cards || ({ sage: 'soft', night: 'glass' }[this.getAttribute('theme')] || 'flat'));
   }
   getCardSize() { return 12; }
   connectedCallback() {
@@ -1332,7 +1426,7 @@ class LumoraCard extends HTMLElement {
     if (first) this._load();
     if (this._loaded) this._notifyAlerts();
     if (this._loaded) this._doorCheck();
-    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'emb', 'dv', 'dvadd', 'dvmain', 'dvpick', 'dbpick', 'look', 'lkblk', 'lkpick', 'lkcards'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
+    if (!this._loaded || ['add', 'srcpick', 'quick', 'cc', 'emb', 'dv', 'dvadd', 'dvmain', 'dvpick', 'dbpick', 'look', 'lkblk', 'lkpick', 'lkcards', 'vis', 'vispick'].includes(this._sheet) || this._drag || this._dg || this._edit) return;
     if (this._down && this._edit) { this._pend = true; return; }
     if (this._plFocus()) return;
     this._fxUpdate();
@@ -1371,7 +1465,7 @@ class LumoraCard extends HTMLElement {
     if (['home', 'more', 'rooms'].includes(this._view)) { parts.push(this._plSig()); parts.push(this._prSig()); }
     if (!this._bd || Date.now() - this._bd.t > 30000) this._bd = { t: Date.now(), s: this._batteries().map((x) => x.id + x.v).join() + '|' + this._offline().map((x) => x.did).join() };
     parts.push(this._bd.s);
-    parts.push('sn' + this._snoozed().length);
+    parts.push('sn' + this._snoozed().length); parts.push(this._visSig()); parts.push(this._qhlSig());
     for (const id of ['input_text.advent_geoffnet', 'input_text.advent_gefunden', 'input_boolean.advent_testmodus']) if (h.states[id]) parts.push(id + h.states[id].state);
     parts.push(this._fpSig());
     return parts.join('|');
@@ -1880,7 +1974,7 @@ class LumoraCard extends HTMLElement {
       Object.keys(pk).forEach((k) => { const i = this.shadowRoot.querySelector(`[data-pk="${k}"]`); if (i && !i.disabled) i.value = pk[k]; });
       if (fk) { const i = this.shadowRoot.querySelector(`[data-pk="${fk.k}"]`); if (i) { i.focus(); try { if (fk.s != null) i.setSelectionRange(fk.s, fk.e); } catch (_) { /* number-Felder */ } } }
     }
-    if (['add', 'srcpick', 'quick', 'dvmain', 'dvpick', 'dbpick', 'lkpick'].includes(this._sheet)) this._fillList();
+    if (['add', 'srcpick', 'quick', 'dvmain', 'dvpick', 'dbpick', 'lkpick', 'vispick'].includes(this._sheet)) this._fillList();
   }
   _num(id) { const st = this._hass.states[id]; const v = st ? parseFloat(st.state) : NaN; return isNaN(v) ? null : v; }
   _w(v) { return Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')} kW` : `${Math.round(v)} W`; }
@@ -1943,10 +2037,11 @@ class LumoraCard extends HTMLElement {
     const out = this._ord('lookb', L.blocks, (b) => b.id).map((b) => {
       const isC = b.id.startsWith('c:'); const it = isC ? byId[b.id.slice(2)] : null;
       if ((!isC && !R[b.id]) || (!b.on && !ed)) return '';
+      if (isC && !ed && !this._visOk(b.id.slice(2))) return '';
       let html = ''; try { html = isC ? (it ? it.html : '') : R[b.id](); } catch (_) { html = ''; }
       if (!ed) return html ? `<div class="b w${b.w}">${html}</div>` : '';
       const nm = isC ? (it ? names[it.id] : 'Karte nicht verfügbar') : BLOCK_DEF.find((d) => d[0] === b.id)[1]; const wl = (BLOCK_W.find((x) => x[0] === b.w) || [0, 'Voll'])[1];
-      const tools = `<span class="tools"><span class="mini t" data-act="blkw" data-id="${esc(b.id)}">${wl}</span><span class="mini" data-act="lkblk" data-id="${esc(b.id)}"><ha-icon icon="mdi:cog-outline"></ha-icon></span><span class="mini" data-act="blkon" data-id="${esc(b.id)}"><ha-icon icon="${b.on ? 'mdi:eye-off' : 'mdi:eye'}"></ha-icon></span>${isC ? `<span class="mini" data-act="lkcdel" data-id="${esc(b.id)}"><ha-icon icon="mdi:close"></ha-icon></span>` : ''}</span>`;
+      const tools = `<span class="tools"><span class="mini t" data-act="blkw" data-id="${esc(b.id)}">${wl}</span><span class="mini" data-act="lkblk" data-id="${esc(b.id)}"><ha-icon icon="mdi:cog-outline"></ha-icon></span>${isC ? this._visTools(b.id.slice(2)) : ''}<span class="mini" data-act="blkon" data-id="${esc(b.id)}"><ha-icon icon="${b.on ? 'mdi:eye-off' : 'mdi:eye'}"></ha-icon></span>${isC ? `<span class="mini" data-act="lkcdel" data-id="${esc(b.id)}"><ha-icon icon="mdi:close"></ha-icon></span>` : ''}</span>`;
       return `<div class="b w${b.w} ed ${b.on ? '' : 'hid'}"><span class="bn">${esc(nm)}</span>${tools}${html || '<div class="tl"><div class="ev none">Gerade nichts anzuzeigen</div></div>'}<i class="dg" data-s="lookb" data-id="${esc(b.id)}" style="display:none"></i></div>`;
     }).join('');
     const add = ed ? '<div class="b w12"><button class="pill" data-act="lkcards"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</button></div>' : '';
@@ -2296,6 +2391,64 @@ _more() {
     return `<div class="rh"><h2>Mehr</h2><div class="inf">${this._editBtn()}</div></div>${this._hint()}<div class="grid">${cells.join('') || '<div class="empty">Keine weiteren Daten gefunden.</div>'}${this._edit ? '<div class="card add" data-act="add"><ha-icon icon="mdi:plus"></ha-icon>Karte hinzufügen</div>' : ''}</div>`;
   }
 
+  /* ---------- Sichtbarkeitsregeln ---------- */
+  _visCfg(id) { const c = this._set.vis && this._set.vis[id]; return c && c.rules && c.rules.length ? c : null; }
+  _visOk(id) {
+    const c = this._visCfg(id); if (!c) return true;
+    try { return visEval(c, { states: this._hass.states, now: new Date(), userId: this._hass.user && this._hass.user.id }); } catch (_) { return true; }
+  }
+  _visSig() {
+    const v = this._set.vis; const ids = Object.keys(v || {}); if (!ids.length || !this._hass) return '';
+    const h = this._hass; const out = [];
+    ids.forEach((k) => (v[k].rules || []).forEach((r) => {
+      if (r.t === 'state' || (r.t === 'person' && r.id)) out.push(r.id + (h.states[r.id] ? h.states[r.id].state : ''));
+      else if (r.t === 'sun' && h.states['sun.sun']) out.push(h.states['sun.sun'].state);
+      else if (r.t === 'person') Object.keys(h.states).forEach((e) => { if (e.startsWith('person.')) out.push(e + h.states[e].state); });
+    }));
+    return out.join();
+  }
+  _visTools(id) {
+    if (!this._edit) return '';
+    return `<span class="mini ${this._visCfg(id) ? 'vsa' : ''}" data-act="vis" data-id="${esc(id)}" aria-label="Sichtbarkeit"><ha-icon icon="${this._visCfg(id) ? 'mdi:eye-check' : 'mdi:eye-settings-outline'}"></ha-icon></span>`;
+  }
+  _visName(id) { const it = this._allReg().find((x) => x.id === id); const n = it ? this._cardNames(this._cardCat())[it.id] : ''; return n || (it && it.def && it.def.label) || id; }
+  _visSheet() {
+    const id = this._vid; const c = (this._set.vis && this._set.vis[id]) || { act: 'show', mode: 'all', rules: [] };
+    const h = this._hass; const nm = (e) => (h.states[e] ? (h.states[e].attributes.friendly_name || e) : (e || ''));
+    const pill = (a, k, v, l, sel, i) => `<button class="pill ${sel ? 'sel' : ''}" data-act="${a}" ${i !== undefined ? `data-i="${i}" ` : ''}data-k="${k}" data-v="${esc(v)}">${l}</button>`;
+    const rows = c.rules.map((r, i) => {
+      const ty = VIS_TYPES.find((x) => x[0] === r.t) || VIS_TYPES[0]; let body = '';
+      if (r.t === 'state') {
+        body = `<button class="pill" data-act="vispick" data-i="${i}"><ha-icon icon="mdi:magnify"></ha-icon>${esc(r.id ? nm(r.id) : 'Entität wählen')}</button>
+          <div class="lkc" style="margin-top:6px">${pill('visf', 'op', 'eq', 'ist', r.op === 'eq', i)}${pill('visf', 'op', 'ne', 'ist nicht', r.op === 'ne', i)}</div>
+          <div class="lkc" style="margin-top:6px">${VIS_VALS.map(([v, l]) => pill('visf', 'v', v, l, String(r.v).toLowerCase() === v, i)).join('')}</div>
+          <input class="visin lkin" data-i="${i}" data-f="v" placeholder="oder eigener Wert" value="${esc(VIS_VALS.some(([v]) => v === String(r.v).toLowerCase()) ? '' : r.v)}" style="margin-top:6px">`;
+      } else if (r.t === 'person') {
+        body = `<button class="pill" data-act="vispick" data-i="${i}"><ha-icon icon="mdi:account-search-outline"></ha-icon>${esc(r.id ? nm(r.id) : 'Irgendeine Person')}</button>
+          <div class="lkc" style="margin-top:6px">${pill('visf', 'v', 'home', 'ist zu Hause', r.v === 'home', i)}${pill('visf', 'v', 'away', 'ist nicht zu Hause', r.v === 'away', i)}</div>`;
+      } else if (r.t === 'sun') {
+        body = `<div class="lkc">${pill('visf', 'v', 'day', 'Tag', r.v === 'day', i)}${pill('visf', 'v', 'night', 'Nacht', r.v === 'night', i)}</div>`;
+      } else if (r.t === 'time') {
+        body = `<div class="lkc"><span>von</span><input type="time" class="visin lkin" data-i="${i}" data-f="from" value="${esc(r.from)}" style="width:auto"><span>bis</span><input type="time" class="visin lkin" data-i="${i}" data-f="to" value="${esc(r.to)}" style="width:auto"></div>`;
+      } else if (r.t === 'wd') {
+        body = `<div class="lkc">${VIS_WD.map((l, d) => `<button class="pill ${r.days.includes(d) ? 'sel' : ''}" data-act="visday" data-i="${i}" data-v="${d}">${l}</button>`).join('')}</div><div class="hint">Ohne Auswahl gilt die Regel an jedem Tag.</div>`;
+      } else if (r.t === 'user') {
+        const ps = Object.values(h.states).filter((e) => e.entity_id.startsWith('person.') && e.attributes.user_id);
+        body = `<div class="lkc">${ps.map((p) => `<button class="pill ${r.ids.includes(p.entity_id) ? 'sel' : ''}" data-act="visusr" data-i="${i}" data-id="${esc(p.entity_id)}">${esc(p.attributes.friendly_name || p.entity_id)}</button>`).join('') || '<span class="hint">Keine Personen mit Benutzerkonto gefunden.</span>'}</div><div class="hint">Gilt für den Benutzer, der gerade angemeldet ist. Ohne Auswahl gilt die Regel für alle.</div>`;
+      }
+      return `<div class="row" style="display:block"><div class="lkc" style="justify-content:space-between;margin-bottom:6px"><b><ha-icon icon="${ty[2]}" style="--mdc-icon-size:18px;vertical-align:-4px"></ha-icon> ${ty[1]}</b><button data-act="visdel" data-i="${i}" aria-label="Regel entfernen"><ha-icon icon="mdi:close"></ha-icon></button></div>${body}</div>`;
+    }).join('');
+    const types = VIS_TYPES.map(([k, l, ic]) => `<button class="pill" data-act="visadd" data-k="${k}"><ha-icon icon="${ic}"></ha-icon>${l}</button>`).join('');
+    return `<h2>Sichtbarkeit</h2><div class="hint">${esc(this._visName(id))}</div>
+      <div class="lkl">Karte</div><div class="lkc">${pill('visg', 'act', 'show', 'zeigen, wenn …', c.act === 'show')}${pill('visg', 'act', 'hide', 'ausblenden, wenn …', c.act === 'hide')}</div>
+      ${c.rules.length > 1 ? `<div class="lkl">Bedingungen</div><div class="lkc">${pill('visg', 'mode', 'all', 'alle zutreffen', c.mode === 'all')}${pill('visg', 'mode', 'any', 'eine zutrifft', c.mode === 'any')}</div>` : ''}
+      <div style="margin-top:8px">${rows || '<div class="hint">Noch keine Regel. Ohne Regel ist die Karte immer sichtbar.</div>'}</div>
+      <h4>Regel hinzufügen</h4><div class="lkc">${types}</div>
+      <div class="hint" style="margin-top:8px">Im Bearbeiten-Modus bleibt die Karte immer sichtbar, damit du sie weiter anpassen kannst.</div>
+      <div class="row" style="border:0;margin-top:10px"><button data-act="visclr">Alle Regeln löschen</button><button class="sel" data-act="close">Fertig</button></div>`;
+  }
+  _visSet(fn) { const id = this._vid; const v = this._set.vis; const c = v[id] || (v[id] = { act: 'show', mode: 'all', rules: [] }); fn(c); this._save(); }
+
   /* ---------- Karten-Register ---------- */
   _allReg() {
     const s = this._set; const out = [];
@@ -2313,7 +2466,8 @@ _more() {
   _cell(x, scope) {
     const hd = this._set.hidden.includes(x.id);
     if (hd && !this._edit) return '';
-    const opts = { size: x.size, place: x.def.fixed ? null : scope, cfg: x.cfg };
+    if (!this._edit && !this._visOk(x.id)) return '';
+    const opts = { size: x.size, place: x.def.fixed ? null : scope, cfg: x.cfg, vis: true };
     return `<div class="mw sz-${x.size} ${x.id === 'quick' ? 'qw' : ''} ${hd ? 'hid' : ''}">${this._tools(scope, x.id, 'hidden', opts)}${x.html}</div>`;
   }
 
@@ -2354,13 +2508,25 @@ _more() {
   _hrs(h) { return h < 24 ? `${h} h` : h === 24 ? '24 h' : `${Math.round(h / 24)} Tage`; }
 
   /* ---------- Schnellaktionen ---------- */
+  /* Hervorheben, wenn an: eigene Entität je Taste; Skripte leuchten ohne Auswahl, solange sie laufen */
+  _qhlEnt(id) { const e = this._set.qhl[id]; if (e) return e; return dom(id) === 'script' ? id : ''; }
+  _qOn(id) {
+    const e = this._qhlEnt(id); const st = e && this._hass.states[e];
+    return !!st && !INACTIVE.includes(st.state);
+  }
+  _qhlSig() {
+    const h = this._hass; if (!h) return '';
+    return this._set.quick.map((id) => { const e = this._qhlEnt(id); return e && h.states[e] ? e + h.states[e].state : ''; }).join();
+  }
   _quickHtml(q) {
     const h = this._hass;
     const chips = q.map((id) => {
       const st = h.states[id];
       const ic = id === '__alloff' ? 'mdi:lightbulb-group-off' : this._icon(st);
       const nm = id === '__alloff' ? 'Alles Licht aus' : (st.attributes.friendly_name || id);
-      return `<button class="qa" data-act="qrun" data-id="${esc(id)}"><ha-icon icon="${ic}"></ha-icon>${esc(nm)}${this._edit ? `<span class="qx" data-act="qdel" data-id="${esc(id)}"><ha-icon icon="mdi:close"></ha-icon></span>` : ''}</button>`;
+      const hl = this._qOn(id); const hs = this._set.qhl[id];
+      const tl = this._edit ? `<span class="qx qhs ${hs ? 'set' : ''}" data-act="qhlset" data-id="${esc(id)}" aria-label="Hervorheben, wenn an"><ha-icon icon="mdi:lightbulb-on-outline"></ha-icon></span><span class="qx" data-act="qdel" data-id="${esc(id)}"><ha-icon icon="mdi:close"></ha-icon></span>` : '';
+      return `<button class="qa ${hl ? 'hl' : ''}" data-act="qrun" data-id="${esc(id)}"${hl ? ' aria-pressed="true"' : ''}><ha-icon icon="${ic}"></ha-icon>${esc(nm)}${tl}</button>`;
     }).join('');
     return `<div class="qs"><div class="qh"><ha-icon icon="mdi:flash"></ha-icon>Schnellaktionen</div><div class="qc">${chips}${this._edit ? '<button class="qa add" data-act="quick"><ha-icon icon="mdi:plus"></ha-icon>Aktion</button>' : ''}</div></div>`;
   }
@@ -2862,7 +3028,7 @@ _more() {
     /* Räume ohne eigene Entitäten bleiben sichtbar, sobald eine Karte (z. B. Proxmox) dorthin verschoben wurde */
     new Set(Object.values(this._set.place).filter((p) => typeof p === 'string' && p.startsWith('area:')).map((p) => p.slice(5))).forEach((aid) => {
       if (areas[aid] || !(h.areas && h.areas[aid])) return;
-      if (this._regItems(`area:${aid}`).some((x) => this._edit || !this._set.hidden.includes(x.id))) areas[aid] = [];
+      if (this._regItems(`area:${aid}`).some((x) => this._edit || (!this._set.hidden.includes(x.id) && this._visOk(x.id)))) areas[aid] = [];
     });
     const floors = {};
     const fl = h.floors || {};
@@ -2930,7 +3096,8 @@ _more() {
     const cf = o && o.cfg ? `<span class="mini" data-act="cc" data-id="${e}"><ha-icon icon="mdi:cog-outline"></ha-icon></span>` : '';
     const sz = o && o.size ? `<span class="mini" data-act="size" data-id="${e}" data-d="${o.size}"><ha-icon icon="${SIZE_ICON[o.size]}"></ha-icon></span>` : '';
     const pl = o && o.place ? `<span class="mini" data-act="placeopen" data-id="${e}"><ha-icon icon="mdi:folder-move-outline"></ha-icon></span>` : '';
-    return `<span class="tools">${cf}${sz}${pl}${eye}</span><i class="dg" data-s="${esc(scope)}" data-id="${esc(id)}" style="display:none"></i>`;
+    const vs = o && o.vis ? this._visTools(id) : '';
+    return `<span class="tools">${cf}${sz}${pl}${vs}${eye}</span><i class="dg" data-s="${esc(scope)}" data-id="${esc(id)}" style="display:none"></i>`;
   }
   _ord(scope, items, idf) {
     const o = this._set.order[scope];
@@ -3157,6 +3324,10 @@ _more() {
       c = this._blkSheet();
     } else if (this._sheet === 'lkcards') {
       c = this._cardsSheet();
+    } else if (this._sheet === 'vis') {
+      c = this._visSheet();
+    } else if (this._sheet === 'vispick') {
+      c = `<h2>Entität wählen</h2><input class="srch" placeholder="Suchen …" value="${esc(this._q)}"><div class="list"></div>`;
     } else if (this._sheet === 'lkpick') {
       c = `<h2>Quelle wählen</h2><input class="srch" placeholder="Suchen …" value="${esc(this._q)}"><div class="list"></div>`;
     } else if (this._sheet === 'heat') {
@@ -3189,7 +3360,7 @@ _more() {
     const blocks = this._ord('lookb', L.blocks, (b) => b.id).map((b, i, a) => { const isC = b.id.startsWith('c:'); const d = [b.id, isC ? (cnames[b.id.slice(2)] || 'Karte nicht verfügbar') : (BLOCK_DEF.find((x) => x[0] === b.id) || [0, b.id])[1]]; const wl = (BLOCK_W.find((x) => x[0] === b.w) || [0, 'Voll'])[1];
       return `<div class="row"><div class="t"><b>${d[1]}</b></div><div class="lkb"><button data-act="mv" data-s="lookb" data-id="${esc(b.id)}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Nach oben"><ha-icon icon="mdi:arrow-up"></ha-icon></button><button data-act="mv" data-s="lookb" data-id="${esc(b.id)}" data-d="1" ${i === a.length - 1 ? 'disabled' : ''} aria-label="Nach unten"><ha-icon icon="mdi:arrow-down"></ha-icon></button><button data-act="blkw" data-id="${esc(b.id)}" aria-label="Breite">${wl}</button><button data-act="lkblk" data-id="${esc(b.id)}" aria-label="Einstellungen"><ha-icon icon="mdi:cog-outline"></ha-icon></button><button class="${b.on ? 'sel' : ''}" data-act="blkon" data-id="${esc(b.id)}">${b.on ? 'An' : 'Aus'}</button>${isC ? `<button data-act="lkcdel" data-id="${esc(b.id)}" aria-label="Entfernen"><ha-icon icon="mdi:close"></ha-icon></button>` : ''}</div></div>`; }).join('');
     return `<h2>Design</h2>
-      <h4>Vorlagen</h4><div class="lkc">${[['sand', 'Sand'], ['sage', 'Salbei (Kacheln)']].map(([k, l]) => `<button class="pill" data-act="lkpre" data-k="${k}">${l}</button>`).join('')}</div>
+      <h4>Vorlagen</h4><div class="lkc">${[['sand', 'Sand'], ['sage', 'Salbei (Kacheln)'], ['night', 'Mitternacht (Glas)']].map(([k, l]) => `<button class="pill" data-act="lkpre" data-k="${k}">${l}</button>`).join('')}</div>
       <div class="hint" style="margin-top:8px">Eine Vorlage setzt Startseite, Farbthema, Rundung, Kartenstil und Schrift auf einmal. Danach lässt sich alles einzeln anpassen.</div>
       <h4>Startseite</h4>${this._lkSeg('layout', [['classic', 'Klassisch'], ['tiles', 'Kacheln']], L.layout)}
       <h4>Farben</h4>${this._lkSeg('theme', LOOK_THEMES, L.theme)}
@@ -3208,7 +3379,7 @@ _more() {
       const cat = this._cardCat(); const it = cat.find((x) => x.id === id.slice(2)); const nm = it ? this._cardNames(cat)[it.id] : 'Karte nicht verfügbar';
       return `<div class="lkc" style="margin-bottom:6px"><button class="pill" data-act="look"><ha-icon icon="mdi:chevron-left"></ha-icon>Design</button></div><h2>${esc(nm)}</h2>
         ${it ? '' : '<div class="hint">Diese Karte gibt es gerade nicht (gelöscht oder keine passenden Daten). Sie lässt sich aus dem Layout entfernen.</div>'}
-        <div class="lkc">${it && it.cfg ? `<button class="pill" data-act="cc" data-id="${esc(it.id)}"><ha-icon icon="mdi:cog-outline"></ha-icon>Karte konfigurieren</button>` : ''}${it ? `<button class="pill" data-act="placeopen" data-id="${esc(it.id)}"><ha-icon icon="mdi:folder-move-outline"></ha-icon>Ort ändern</button>` : ''}<button class="pill" data-act="lkcdel" data-id="${esc(id)}"><ha-icon icon="mdi:close"></ha-icon>Aus dem Layout entfernen</button></div>
+        <div class="lkc">${it && it.cfg ? `<button class="pill" data-act="cc" data-id="${esc(it.id)}"><ha-icon icon="mdi:cog-outline"></ha-icon>Karte konfigurieren</button>` : ''}${it ? `<button class="pill" data-act="placeopen" data-id="${esc(it.id)}"><ha-icon icon="mdi:folder-move-outline"></ha-icon>Ort ändern</button>` : ''}<button class="pill" data-act="vis" data-id="${esc(id.slice(2))}"><ha-icon icon="mdi:eye-settings-outline"></ha-icon>Sichtbarkeit</button><button class="pill" data-act="lkcdel" data-id="${esc(id)}"><ha-icon icon="mdi:close"></ha-icon>Aus dem Layout entfernen</button></div>
         <div class="hint" style="margin-top:8px">Breite und Ein/Aus stehen im Design-Dialog oder direkt am Block im Bearbeiten-Modus. Die Karte bleibt erhalten, wenn du sie nur aus dem Layout entfernst.</div>
         <div class="row" style="border:0;margin-top:10px"><span></span><button class="sel" data-act="close">Fertig</button></div>`;
     }
@@ -3243,6 +3414,13 @@ _more() {
 
   _fillList0() {
     const el = this.shadowRoot.querySelector('.list'); if (!el) return;
+    if (this._sheet === 'vispick') {
+      const q = norm(this._q); const k = this._vk || {}; const person = k.kind === 'rule' && ((this._visCfg(this._vid) || {}).rules || [])[k.i] && ((this._visCfg(this._vid) || {}).rules[k.i].t === 'person');
+      const res = Object.values(this._hass.states).filter((st) => (!person || dom(st.entity_id) === 'person') && (!q || norm(`${st.entity_id} ${st.attributes.friendly_name || ''}`).includes(q))).sort((a, b) => String(a.attributes.friendly_name || a.entity_id).localeCompare(String(b.attributes.friendly_name || b.entity_id), 'de')).slice(0, 60);
+      const none = k.kind === 'qhl' ? '<div class="row" data-act="vispset" data-id=""><ha-icon icon="mdi:close-circle-outline"></ha-icon><div class="t"><b>Keine Hervorhebung</b><span>Zurück zum Standard</span></div></div>' : (person ? '<div class="row" data-act="vispset" data-id=""><ha-icon icon="mdi:account-multiple-outline"></ha-icon><div class="t"><b>Irgendeine Person</b><span>Alle Personen</span></div></div>' : '');
+      el.innerHTML = none + res.map((st) => `<div class="row" data-act="vispset" data-id="${esc(st.entity_id)}"><ha-icon icon="${this._icon(st)}"></ha-icon><div class="t"><b>${esc(st.attributes.friendly_name || st.entity_id)}</b><span>${esc(st.entity_id)} · ${esc(this._state(st))}</span></div></div>`).join('');
+      return;
+    }
     if (this._sheet === 'lkpick') {
       const x = this._set.look.kpis[this._lkp && this._lkp.i]; if (!x) { el.innerHTML = ''; return; }
       const q = norm(this._q); const h = this._hass; const k = x.k;
@@ -4292,7 +4470,8 @@ _more() {
       case 'regset': s.place[id] = `area:${this._area}`; this._save(); this._sheet = null; break;
       case 'quick': this._sheet = 'quick'; this._q = ''; break;
       case 'qtog': s.quick = s.quick.includes(id) ? s.quick.filter((x) => x !== id) : [...s.quick, id]; this._save(); this._fillList(); return;
-      case 'qdel': s.quick = s.quick.filter((x) => x !== id); this._save(); break;
+      case 'qdel': s.quick = s.quick.filter((x) => x !== id); delete s.qhl[id]; this._save(); break;
+      case 'qhlset': this._vk = { kind: 'qhl', id }; this._sheet = 'vispick'; this._q = ''; break;
       case 'qrun': {
         if (id === '__alloff') h.callService('light', 'turn_off', { entity_id: 'all' });
         else { const d = dom(id); if (d === 'button' || d === 'input_button') h.callService(d, 'press', { entity_id: id }); else h.callService(d, 'turn_on', { entity_id: id }); }
@@ -4368,6 +4547,20 @@ _more() {
           if (i >= 0 && j >= 0 && j < ids.length) { [ids[i], ids[j]] = [ids[j], ids[i]]; s.order[sc] = ids; }
         }
         this._save(); break;
+      }
+      case 'vis': this._vid = id; this._sheet = 'vis'; break;
+      case 'visg': this._visSet((c) => { c[t.dataset.k] = t.dataset.v; }); break;
+      case 'visadd': this._visSet((c) => { const b = { state: { t: 'state', id: '', op: 'eq', v: 'on' }, person: { t: 'person', id: '', v: 'home' }, sun: { t: 'sun', v: 'night' }, time: { t: 'time', from: '18:00', to: '23:00' }, wd: { t: 'wd', days: [] }, user: { t: 'user', ids: [] } }[t.dataset.k]; if (b && c.rules.length < 10) c.rules.push(b); }); break;
+      case 'visdel': this._visSet((c) => { c.rules.splice(Number(t.dataset.i), 1); }); break;
+      case 'visclr': delete s.vis[this._vid]; this._save(); break;
+      case 'visf': this._visSet((c) => { const r = c.rules[Number(t.dataset.i)]; if (r) r[t.dataset.k] = t.dataset.v; }); break;
+      case 'visday': this._visSet((c) => { const r = c.rules[Number(t.dataset.i)]; const d = Number(t.dataset.v); if (r) r.days = r.days.includes(d) ? r.days.filter((x) => x !== d) : [...r.days, d]; }); break;
+      case 'visusr': this._visSet((c) => { const r = c.rules[Number(t.dataset.i)]; if (r) r.ids = r.ids.includes(id) ? r.ids.filter((x) => x !== id) : [...r.ids, id]; }); break;
+      case 'vispick': this._vk = { kind: 'rule', i: Number(t.dataset.i) }; this._sheet = 'vispick'; this._q = ''; break;
+      case 'vispset': {
+        const k = this._vk || {};
+        if (k.kind === 'qhl') { if (id) s.qhl[k.id] = id; else delete s.qhl[k.id]; this._save(); this._sheet = null; this._vk = null; break; }
+        this._visSet((c) => { const r = c.rules[k.i]; if (r) r.id = id || ''; }); this._sheet = 'vis'; break;
       }
       case 'hidee': s.hidden = s.hidden.includes(id) ? s.hidden.filter((x) => x !== id) : [...s.hidden, id]; this._save(); break;
       case 'hidearea': s.hiddenAreas = s.hiddenAreas.includes(id) ? s.hiddenAreas.filter((x) => x !== id) : [...s.hiddenAreas, id]; this._save(); break;
